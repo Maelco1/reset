@@ -45,6 +45,32 @@
           <div class="user-groups" id="user-groups"></div>
         </section>
 
+        <section aria-labelledby="planning-title" class="planning-section">
+          <div class="section-header">
+            <h2 id="planning-title">Planning des gardes</h2>
+            <p id="planning-feedback" role="status"></p>
+          </div>
+
+          <form id="planning-controls" class="planning-controls" aria-label="Filtres du planning">
+            <div class="planning-control">
+              <label for="planning-year">Année</label>
+              <select id="planning-year" name="year"></select>
+            </div>
+
+            <div class="planning-control">
+              <label for="planning-month-1">Mois 1</label>
+              <select id="planning-month-1" name="month-1"></select>
+            </div>
+
+            <div class="planning-control">
+              <label for="planning-month-2">Mois 2</label>
+              <select id="planning-month-2" name="month-2"></select>
+            </div>
+          </form>
+
+          <div class="planning-tables" id="planning-tables" aria-live="polite"></div>
+        </section>
+
         <footer class="admin-footer" aria-labelledby="create-title">
           <h2 id="create-title">Ajouter un utilisateur</h2>
           <p>Complétez les informations ci-dessous pour ajouter un nouveau compte.</p>
@@ -126,6 +152,68 @@
         </form>
       </section>
     </div>
+
+    <div id="slot-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="slot-modal-title">
+      <section class="modal planning-modal">
+        <header class="modal-header">
+          <div>
+            <h2 id="slot-modal-title">Configurer le créneau</h2>
+            <p id="slot-modal-subtitle"></p>
+          </div>
+          <button type="button" class="icon-button" id="close-slot-modal" aria-label="Fermer">&times;</button>
+        </header>
+
+        <form id="slot-form">
+          <input type="hidden" name="position" id="slot-position" />
+
+          <label for="slot-label">Nom du créneau</label>
+          <input id="slot-label" name="label" type="text" required />
+
+          <label for="slot-type">Type</label>
+          <input id="slot-type" name="slotType" type="text" placeholder="Visite, consultation, téléconsultation…" />
+
+          <div class="slot-times">
+            <div>
+              <label for="slot-start">Début</label>
+              <input id="slot-start" name="startTime" type="time" />
+            </div>
+            <div>
+              <label for="slot-end">Fin</label>
+              <input id="slot-end" name="endTime" type="time" />
+            </div>
+          </div>
+
+          <label for="slot-color">Couleur</label>
+          <input id="slot-color" name="color" type="color" value="#3498db" />
+
+          <label for="slot-quality">Qualité de garde</label>
+          <input id="slot-quality" name="quality" type="text" placeholder="Bonne, normale…" />
+
+          <fieldset class="slot-days">
+            <legend>Jours d'ouverture</legend>
+            <div class="slot-days-grid">
+              <label><input type="checkbox" name="activeDays" value="monday" /> Lundi</label>
+              <label><input type="checkbox" name="activeDays" value="tuesday" /> Mardi</label>
+              <label><input type="checkbox" name="activeDays" value="wednesday" /> Mercredi</label>
+              <label><input type="checkbox" name="activeDays" value="thursday" /> Jeudi</label>
+              <label><input type="checkbox" name="activeDays" value="friday" /> Vendredi</label>
+              <label><input type="checkbox" name="activeDays" value="saturday" /> Samedi</label>
+              <label><input type="checkbox" name="activeDays" value="sunday" /> Dimanche</label>
+            </div>
+          </fieldset>
+
+          <label class="slot-toggle"><input type="checkbox" name="closedOnSundays" id="slot-closed-sundays" /> Fermer automatiquement les dimanches</label>
+          <label class="slot-toggle"><input type="checkbox" name="closedOnHolidays" id="slot-closed-holidays" checked /> Fermer automatiquement les jours fériés</label>
+
+          <div class="modal-actions">
+            <button type="submit">Enregistrer</button>
+            <button type="button" class="secondary" id="cancel-slot">Annuler</button>
+          </div>
+          <p id="slot-feedback" role="status"></p>
+        </form>
+      </section>
+    </div>
+
     <script type="module">
       import {
         initializeConnectionModal,
@@ -135,6 +223,26 @@
         getSupabaseClient,
         onSupabaseReady
       } from './js/supabaseClient.js';
+
+      const DEFAULT_COLOR = '#3498db';
+      const DEFAULT_COLORS = ['#3498db', '#9b59b6', '#1abc9c', '#e67e22', '#2ecc71', '#e84393'];
+      const DEFAULT_SLOT_TITLES = ['Visites matin', 'Visites après-midi', 'Consultations', 'Téléconsultations'];
+      const WEEKDAY_KEYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+      const WEEKDAY_LABELS = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
+      const MONTH_NAMES = [
+        'Janvier',
+        'Février',
+        'Mars',
+        'Avril',
+        'Mai',
+        'Juin',
+        'Juillet',
+        'Août',
+        'Septembre',
+        'Octobre',
+        'Novembre',
+        'Décembre'
+      ];
 
       const currentUser = getCurrentUser();
       if (!currentUser) {
@@ -160,24 +268,365 @@
       const deleteUserBtn = document.querySelector('#delete-user');
       const closeUserModalBtn = document.querySelector('#close-user-modal');
       const trigramInputs = document.querySelectorAll('.uppercase-input');
+
+      const planningYearSelect = document.querySelector('#planning-year');
+      const planningMonthOneSelect = document.querySelector('#planning-month-1');
+      const planningMonthTwoSelect = document.querySelector('#planning-month-2');
+      const planningTables = document.querySelector('#planning-tables');
+      const planningFeedback = document.querySelector('#planning-feedback');
+
+      const slotModal = document.querySelector('#slot-modal');
+      const slotModalSubtitle = document.querySelector('#slot-modal-subtitle');
+      const slotForm = document.querySelector('#slot-form');
+      const slotFeedback = document.querySelector('#slot-feedback');
+      const closeSlotModalBtn = document.querySelector('#close-slot-modal');
+      const cancelSlotBtn = document.querySelector('#cancel-slot');
+
       const formatTrigram = (value) => value.replace(/[^a-zA-Z0-9]/g, '').slice(0, 3).toUpperCase();
       trigramInputs.forEach((input) => {
         input.addEventListener('input', () => {
           input.value = formatTrigram(input.value);
         });
       });
+
       let editingUser = null;
-      let channel;
-
-      const roles = [
-        { value: 'administrateur', label: 'Administrateurs' },
-        { value: 'medecin', label: 'Médecins' },
-        { value: 'remplacant', label: 'Remplaçants' }
-      ];
-
-      const roleLabels = Object.fromEntries(roles.map(({ value, label }) => [value, label]));
-
+      let editingSlot = null;
+      let usersChannel;
+      let planningChannel;
       let allUsers = [];
+      let planningSlots = [];
+      let planningLoading = false;
+
+      const sanitizeColor = (value) => {
+        if (typeof value !== 'string') {
+          return null;
+        }
+        const trimmed = value.trim();
+        if (/^#[0-9a-fA-F]{6}$/.test(trimmed)) {
+          return trimmed.toLowerCase();
+        }
+        if (/^#[0-9a-fA-F]{3}$/.test(trimmed)) {
+          const [r, g, b] = trimmed
+            .slice(1)
+            .split('')
+            .map((char) => char + char);
+          return `#${r}${g}${b}`.toLowerCase();
+        }
+        return null;
+      };
+
+      const normalizeColor = (value) => sanitizeColor(value) ?? DEFAULT_COLOR;
+
+      const hexToRgba = (hex, alpha) => {
+        const sanitized = sanitizeColor(hex) ?? DEFAULT_COLOR;
+        const numeric = sanitized.slice(1);
+        const r = parseInt(numeric.slice(0, 2), 16);
+        const g = parseInt(numeric.slice(2, 4), 16);
+        const b = parseInt(numeric.slice(4, 6), 16);
+        return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+      };
+
+      const defaultActiveDays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
+
+      const getDefaultSlot = (position) => {
+        const labelBase = DEFAULT_SLOT_TITLES[(position - 1) % DEFAULT_SLOT_TITLES.length];
+        const cycle = Math.floor((position - 1) / DEFAULT_SLOT_TITLES.length) + 1;
+        const label = cycle > 1 ? `${labelBase} ${cycle}` : labelBase;
+        const color = DEFAULT_COLORS[(position - 1) % DEFAULT_COLORS.length];
+        return {
+          position,
+          label,
+          slot_type: null,
+          start_time: null,
+          end_time: null,
+          color,
+          quality: null,
+          active_days: defaultActiveDays,
+          closed_on_holidays: true,
+          closed_on_sundays: true
+        };
+      };
+
+      const addDays = (date, days) => {
+        const clone = new Date(date);
+        clone.setDate(clone.getDate() + days);
+        return clone;
+      };
+
+      const formatDateKey = (date) =>
+        `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+
+      const calculateEaster = (year) => {
+        const a = year % 19;
+        const b = Math.floor(year / 100);
+        const c = year % 100;
+        const d = Math.floor(b / 4);
+        const e = b % 4;
+        const f = Math.floor((b + 8) / 25);
+        const g = Math.floor((b - f + 1) / 3);
+        const h = (19 * a + b - d - g + 15) % 30;
+        const i = Math.floor(c / 4);
+        const k = c % 4;
+        const l = (32 + 2 * e + 2 * i - h - k) % 7;
+        const m = Math.floor((a + 11 * h + 22 * l) / 451);
+        const month = Math.floor((h + l - 7 * m + 114) / 31);
+        const day = ((h + l - 7 * m + 114) % 31) + 1;
+        return new Date(year, month - 1, day);
+      };
+
+      const getFrenchHolidays = (year) => {
+        const holidays = new Map();
+        const addFixed = (month, day, label) => {
+          holidays.set(formatDateKey(new Date(year, month, day)), label);
+        };
+        addFixed(0, 1, "Jour de l'An");
+        addFixed(4, 1, 'Fête du Travail');
+        addFixed(4, 8, 'Victoire 1945');
+        addFixed(6, 14, 'Fête Nationale');
+        addFixed(7, 15, 'Assomption');
+        addFixed(10, 1, 'Toussaint');
+        addFixed(10, 11, 'Armistice');
+        addFixed(11, 25, 'Noël');
+
+        const easter = calculateEaster(year);
+        holidays.set(formatDateKey(addDays(easter, 1)), 'Lundi de Pâques');
+        holidays.set(formatDateKey(addDays(easter, 39)), 'Ascension');
+        holidays.set(formatDateKey(addDays(easter, 50)), 'Lundi de Pentecôte');
+
+        return holidays;
+      };
+
+      const getMonthDays = (year, month) => {
+        const days = [];
+        const cursor = new Date(year, month, 1);
+        while (cursor.getMonth() === month) {
+          days.push(new Date(cursor));
+          cursor.setDate(cursor.getDate() + 1);
+        }
+        return days;
+      };
+
+      const isSlotOpen = (slot, date, isHoliday) => {
+        const dayKey = WEEKDAY_KEYS[date.getDay()];
+        const allowedDays = Array.isArray(slot.active_days) && slot.active_days.length > 0 ? slot.active_days : defaultActiveDays;
+        if (!allowedDays.includes(dayKey)) {
+          return false;
+        }
+        if (slot.closed_on_sundays && dayKey === 'sunday') {
+          return false;
+        }
+        if (slot.closed_on_holidays && isHoliday) {
+          return false;
+        }
+        return true;
+      };
+
+      const buildSlotTitle = (slot, dayLabel, isHoliday, holidayName, isOpen) => {
+        const details = [];
+        const label = slot.label ?? `Créneau ${slot.position}`;
+        details.push(label);
+        if (slot.slot_type) {
+          details.push(slot.slot_type);
+        }
+        if (slot.start_time && slot.end_time) {
+          details.push(`${slot.start_time} – ${slot.end_time}`);
+        }
+        if (slot.quality) {
+          details.push(`Qualité : ${slot.quality}`);
+        }
+        details.push(isOpen ? 'Ouvert' : 'Fermé');
+        if (isHoliday && holidayName) {
+          details.push(holidayName);
+        }
+        return `${dayLabel} · ${details.join(' · ')}`;
+      };
+
+      const buildPlanningTable = (year, month, holidays) => {
+        const table = document.createElement('table');
+        table.className = 'planning-table';
+
+        const thead = document.createElement('thead');
+        const headerRow = document.createElement('tr');
+        const dayHeader = document.createElement('th');
+        dayHeader.scope = 'col';
+        dayHeader.className = 'planning-day-col';
+        dayHeader.textContent = 'Jour';
+        headerRow.appendChild(dayHeader);
+
+        planningSlots.forEach((slot) => {
+          const th = document.createElement('th');
+          th.scope = 'col';
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.dataset.position = slot.position;
+          button.className = 'planning-slot-button';
+          const slotColor = normalizeColor(slot.color);
+          button.style.setProperty('--slot-color', slotColor);
+          const title = slot.label ?? `Créneau ${slot.position}`;
+          const metaParts = [];
+          if (slot.slot_type) {
+            metaParts.push(slot.slot_type);
+          }
+          if (slot.start_time && slot.end_time) {
+            metaParts.push(`${slot.start_time} – ${slot.end_time}`);
+          }
+          button.innerHTML = `
+            <span class="planning-slot-label">${title}</span>
+            <span class="planning-slot-meta">${metaParts.join(' · ')}</span>
+          `;
+          th.appendChild(button);
+          headerRow.appendChild(th);
+        });
+
+        thead.appendChild(headerRow);
+        table.appendChild(thead);
+
+        const tbody = document.createElement('tbody');
+        const days = getMonthDays(year, month);
+        days.forEach((day) => {
+          const isoKey = formatDateKey(day);
+          const holidayName = holidays?.get(isoKey) ?? null;
+          const isHoliday = Boolean(holidayName);
+          const row = document.createElement('tr');
+          if (isHoliday) {
+            row.classList.add('planning-holiday');
+          }
+          if (day.getDay() === 0) {
+            row.classList.add('planning-sunday');
+          }
+
+          const dayCell = document.createElement('th');
+          dayCell.scope = 'row';
+          dayCell.className = 'planning-day-header';
+          const dayName = WEEKDAY_LABELS[day.getDay()];
+          const dayNumber = String(day.getDate()).padStart(2, '0');
+          dayCell.innerHTML = `
+            <span class="day-name">${dayName}</span>
+            <span class="day-number">${dayNumber} ${MONTH_NAMES[month]}</span>
+          `;
+          if (holidayName) {
+            const badge = document.createElement('span');
+            badge.className = 'holiday-badge';
+            badge.textContent = holidayName;
+            dayCell.appendChild(badge);
+          }
+          row.appendChild(dayCell);
+
+          planningSlots.forEach((slot) => {
+            const cell = document.createElement('td');
+            cell.className = 'planning-cell';
+            const slotColor = normalizeColor(slot.color);
+            const open = isSlotOpen(slot, day, isHoliday);
+            cell.classList.add(open ? 'planning-cell-open' : 'planning-cell-closed');
+            cell.style.borderColor = hexToRgba(slotColor, open ? 0.35 : 0.18);
+            cell.style.backgroundColor = hexToRgba(slotColor, open ? 0.16 : 0.05);
+
+            const status = document.createElement('span');
+            status.className = 'planning-cell-status';
+
+            const dot = document.createElement('span');
+            dot.className = 'planning-dot';
+            dot.style.backgroundColor = slotColor;
+            status.appendChild(dot);
+
+            const label = document.createElement('span');
+            label.className = 'planning-cell-label';
+            label.textContent = open ? 'Ouvert' : 'Fermé';
+            status.appendChild(label);
+
+            cell.appendChild(status);
+
+            if (slot.quality) {
+              const quality = document.createElement('span');
+              quality.className = 'planning-cell-quality';
+              quality.textContent = slot.quality;
+              cell.appendChild(quality);
+            }
+
+            const infoParts = [];
+            if (slot.slot_type) {
+              infoParts.push(slot.slot_type);
+            }
+            if (slot.start_time && slot.end_time) {
+              infoParts.push(`${slot.start_time} – ${slot.end_time}`);
+            }
+            if (infoParts.length > 0) {
+              const details = document.createElement('span');
+              details.className = 'planning-cell-details';
+              details.textContent = infoParts.join(' · ');
+              cell.appendChild(details);
+            }
+
+            cell.title = buildSlotTitle(slot, dayName, isHoliday, holidayName, open);
+            row.appendChild(cell);
+          });
+
+          tbody.appendChild(row);
+        });
+
+        table.appendChild(tbody);
+        return table;
+      };
+
+      const populatePlanningControls = () => {
+        if (!planningYearSelect || !planningMonthOneSelect || !planningMonthTwoSelect) {
+          return;
+        }
+        const now = new Date();
+        const currentYear = now.getFullYear();
+        const years = [currentYear - 1, currentYear, currentYear + 1];
+        planningYearSelect.innerHTML = years.map((year) => `<option value="${year}">${year}</option>`).join('');
+        planningYearSelect.value = String(currentYear);
+
+        const options = MONTH_NAMES.map((name, index) => `<option value="${index}">${name}</option>`).join('');
+        planningMonthOneSelect.innerHTML = options;
+        planningMonthTwoSelect.innerHTML = options;
+        planningMonthOneSelect.value = String(now.getMonth());
+        planningMonthTwoSelect.value = String((now.getMonth() + 1) % 12);
+      };
+
+      const renderPlanningTables = () => {
+        if (!planningTables) {
+          return;
+        }
+        if (!planningSlots.length) {
+          planningTables.innerHTML = '<p class="empty-planning">Chargement du planning…</p>';
+          return;
+        }
+        const baseYear = Number(planningYearSelect?.value ?? new Date().getFullYear());
+        const monthOne = Number(planningMonthOneSelect?.value ?? 0);
+        const monthTwo = Number(planningMonthTwoSelect?.value ?? 0);
+
+        const selections = [];
+        if (!Number.isNaN(monthOne)) {
+          selections.push({ month: monthOne, year: baseYear });
+        }
+        if (!Number.isNaN(monthTwo)) {
+          let targetYear = baseYear;
+          if (!Number.isNaN(monthOne) && monthTwo < monthOne) {
+            targetYear += 1;
+          }
+          selections.push({ month: monthTwo, year: targetYear });
+        }
+
+        const uniqueYears = [...new Set(selections.map((selection) => selection.year))];
+        const holidaysByYear = new Map(uniqueYears.map((year) => [year, getFrenchHolidays(year)]));
+
+        planningTables.innerHTML = '';
+        selections.forEach((selection) => {
+          const monthSection = document.createElement('section');
+          monthSection.className = 'planning-month';
+          const heading = document.createElement('header');
+          heading.className = 'planning-month-header';
+          const title = document.createElement('h3');
+          title.textContent = `${MONTH_NAMES[selection.month]} ${selection.year}`;
+          heading.appendChild(title);
+          monthSection.appendChild(heading);
+          const table = buildPlanningTable(selection.year, selection.month, holidaysByYear.get(selection.year));
+          monthSection.appendChild(table);
+          planningTables.appendChild(monthSection);
+        });
+      };
 
       const closeUserModal = () => {
         editingUser = null;
@@ -189,6 +638,11 @@
       const openUserModal = (user) => {
         editingUser = user;
         const trigram = (user.trigram ?? '').trim() || user.username.slice(0, 3).toUpperCase();
+        const roleLabels = {
+          administrateur: 'Administrateurs',
+          medecin: 'Médecins',
+          remplacant: 'Remplaçants'
+        };
         userModalSubtitle.textContent = `${roleLabels[user.role] ?? 'Utilisateur'} · ${user.username}`;
         editForm.elements['id'].value = user.id;
         editForm.elements['username'].value = user.username;
@@ -201,6 +655,12 @@
 
       const renderUsers = (users) => {
         userGroups.innerHTML = '';
+
+        const roles = [
+          { value: 'administrateur', label: 'Administrateurs' },
+          { value: 'medecin', label: 'Médecins' },
+          { value: 'remplacant', label: 'Remplaçants' }
+        ];
 
         roles.forEach(({ value, label }) => {
           const groupUsers = users.filter((user) => user.role === value);
@@ -256,6 +716,80 @@
         allUsers = data;
         usersFeedback.textContent = `${data.length} utilisateur(s).`;
         renderUsers(allUsers);
+      };
+
+      const ensurePlanningSlots = async (supabase, slots) => {
+        const missing = [];
+        for (let position = 1; position <= 46; position += 1) {
+          if (!slots.some((slot) => slot.position === position)) {
+            missing.push(getDefaultSlot(position));
+          }
+        }
+        if (missing.length === 0) {
+          return slots;
+        }
+        const { error } = await supabase.from('planning_slots').upsert(missing, { onConflict: 'position' });
+        if (error) {
+          console.error(error);
+          return slots;
+        }
+        const { data, error: reloadError } = await supabase
+          .from('planning_slots')
+          .select(
+            'id, position, label, slot_type, start_time, end_time, color, quality, active_days, closed_on_holidays, closed_on_sundays'
+          )
+          .order('position');
+        if (reloadError) {
+          console.error(reloadError);
+          return slots;
+        }
+        return data ?? slots;
+      };
+
+      const loadPlanningSlots = async () => {
+        if (planningLoading) {
+          return;
+        }
+        planningLoading = true;
+        if (planningFeedback) {
+          planningFeedback.textContent = 'Chargement des créneaux…';
+        }
+        if (planningTables) {
+          planningTables.innerHTML = '<p class="empty-planning">Chargement du planning…</p>';
+        }
+        await onSupabaseReady();
+        const supabase = getSupabaseClient();
+        const { data, error } = await supabase
+          .from('planning_slots')
+          .select(
+            'id, position, label, slot_type, start_time, end_time, color, quality, active_days, closed_on_holidays, closed_on_sundays'
+          )
+          .order('position');
+        if (error) {
+          console.error(error);
+          if (planningFeedback) {
+            planningFeedback.textContent = 'Impossible de charger les créneaux.';
+          }
+          if (planningTables) {
+            planningTables.innerHTML = '<p class="empty-planning">Impossible de charger le planning.</p>';
+          }
+          planningLoading = false;
+          return;
+        }
+        let slots = data ?? [];
+        slots = await ensurePlanningSlots(supabase, slots);
+        planningSlots = slots.map((slot) => ({
+          ...slot,
+          active_days: Array.isArray(slot.active_days)
+            ? slot.active_days.map((day) => day.toLowerCase()).sort((a, b) => WEEKDAY_KEYS.indexOf(a) - WEEKDAY_KEYS.indexOf(b))
+            : []
+        }));
+        const total = planningSlots.length;
+        if (planningFeedback) {
+          planningFeedback.textContent = `${total} créneau${total > 1 ? 'x' : ''} configuré${total > 1 ? 's' : ''}.`;
+        }
+        renderPlanningTables();
+        planningLoading = false;
       };
 
       createForm.addEventListener('submit', async (event) => {
@@ -315,9 +849,137 @@
         }
       });
 
+      const closeSlotModal = () => {
+        editingSlot = null;
+        if (slotForm) {
+          slotForm.reset();
+          if (slotForm.elements['color']) {
+            slotForm.elements['color'].value = DEFAULT_COLOR;
+          }
+        }
+        if (slotFeedback) {
+          slotFeedback.textContent = '';
+        }
+        slotModal?.classList.add('hidden');
+      };
+
+      const openSlotModal = (slot) => {
+        editingSlot = slot;
+        if (slotFeedback) {
+          slotFeedback.textContent = '';
+        }
+        const position = slot.position;
+        if (slotModalSubtitle) {
+          slotModalSubtitle.textContent = `Colonne ${String(position).padStart(2, '0')}`;
+        }
+        if (!slotForm) {
+          return;
+        }
+        slotForm.elements['position'].value = position;
+        slotForm.elements['label'].value = slot.label ?? `Créneau ${position}`;
+        slotForm.elements['slotType'].value = slot.slot_type ?? '';
+        slotForm.elements['startTime'].value = slot.start_time ?? '';
+        slotForm.elements['endTime'].value = slot.end_time ?? '';
+        slotForm.elements['color'].value = normalizeColor(slot.color);
+        slotForm.elements['quality'].value = slot.quality ?? '';
+        const active = new Set((slot.active_days ?? []).map((day) => day.toLowerCase()));
+        slotForm.querySelectorAll('input[name="activeDays"]').forEach((checkbox) => {
+          checkbox.checked = active.has(checkbox.value);
+        });
+        slotForm.elements['closedOnSundays'].checked = Boolean(slot.closed_on_sundays);
+        slotForm.elements['closedOnHolidays'].checked = slot.closed_on_holidays !== false;
+        slotModal?.classList.remove('hidden');
+        const labelInput = slotForm.elements['label'];
+        labelInput?.focus();
+      };
+
+      const handleSlotSubmit = async (event) => {
+        event.preventDefault();
+        const formData = new FormData(slotForm);
+        const position = Number(formData.get('position'));
+        if (!position) {
+          return;
+        }
+        const label = formData.get('label').trim();
+        const activeDays = formData
+          .getAll('activeDays')
+          .map((day) => day.toLowerCase())
+          .sort((a, b) => WEEKDAY_KEYS.indexOf(a) - WEEKDAY_KEYS.indexOf(b));
+        const color = normalizeColor(formData.get('color'));
+        if (slotFeedback) {
+          slotFeedback.textContent = 'Enregistrement en cours…';
+        }
+        await onSupabaseReady();
+        const supabase = getSupabaseClient();
+        const payload = {
+          position,
+          label: label || `Créneau ${position}`,
+          slot_type: formData.get('slotType').trim() || null,
+          start_time: formData.get('startTime') || null,
+          end_time: formData.get('endTime') || null,
+          color,
+          quality: formData.get('quality').trim() || null,
+          active_days: activeDays,
+          closed_on_sundays: formData.get('closedOnSundays') === 'on',
+          closed_on_holidays: formData.get('closedOnHolidays') === 'on'
+        };
+        const { error } = await supabase.from('planning_slots').upsert(payload, { onConflict: 'position' });
+        if (error) {
+          console.error(error);
+          if (slotFeedback) {
+            slotFeedback.textContent = "Impossible d'enregistrer le créneau.";
+          }
+          return;
+        }
+        await loadPlanningSlots();
+        closeSlotModal();
+      };
+
+      if (slotModal) {
+        slotModal.addEventListener('click', (event) => {
+          if (event.target === slotModal) {
+            closeSlotModal();
+          }
+        });
+      }
+
+      if (slotForm) {
+        slotForm.addEventListener('submit', handleSlotSubmit);
+      }
+
+      if (closeSlotModalBtn) {
+        closeSlotModalBtn.addEventListener('click', () => {
+          closeSlotModal();
+        });
+      }
+      if (cancelSlotBtn) {
+        cancelSlotBtn.addEventListener('click', () => {
+          closeSlotModal();
+        });
+      }
+
+      if (planningTables) {
+        planningTables.addEventListener('click', (event) => {
+          const button = event.target.closest('.planning-slot-button');
+          if (!button) {
+            return;
+          }
+          const position = Number(button.dataset.position);
+          const slot = planningSlots.find((candidate) => candidate.position === position);
+          if (slot) {
+            openSlotModal(slot);
+          }
+        });
+      }
+
       window.addEventListener('keydown', (event) => {
-        if (event.key === 'Escape' && !userModal.classList.contains('hidden')) {
-          closeUserModal();
+        if (event.key === 'Escape') {
+          if (!userModal.classList.contains('hidden')) {
+            closeUserModal();
+          }
+          if (slotModal && !slotModal.classList.contains('hidden')) {
+            closeSlotModal();
+          }
         }
       });
 
@@ -381,10 +1043,10 @@
         closeUserModal();
       });
 
-      const subscribeToChanges = async () => {
+      const subscribeToUserChanges = async () => {
         await onSupabaseReady();
         const supabase = getSupabaseClient();
-        channel = supabase
+        usersChannel = supabase
           .channel('users-changes')
           .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, () => {
             loadUsers();
@@ -392,12 +1054,34 @@
           .subscribe();
       };
 
+      const subscribeToPlanningChanges = async () => {
+        await onSupabaseReady();
+        const supabase = getSupabaseClient();
+        planningChannel = supabase
+          .channel('planning-slots-changes')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'planning_slots' }, () => {
+            loadPlanningSlots();
+          })
+          .subscribe();
+      };
+
+      if (planningYearSelect && planningMonthOneSelect && planningMonthTwoSelect) {
+        populatePlanningControls();
+        [planningYearSelect, planningMonthOneSelect, planningMonthTwoSelect].forEach((select) => {
+          select.addEventListener('change', renderPlanningTables);
+        });
+      }
+
       loadUsers();
-      subscribeToChanges();
+      loadPlanningSlots();
+      subscribeToUserChanges();
+      subscribeToPlanningChanges();
 
       window.addEventListener('beforeunload', () => {
-        channel?.unsubscribe();
+        usersChannel?.unsubscribe();
+        planningChannel?.unsubscribe();
       });
+
     </script>
   </body>
 </html>

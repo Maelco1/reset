@@ -199,6 +199,207 @@ main {
   width: min(480px, 90vw);
 }
 
+.planning-section {
+  display: grid;
+  gap: 24px;
+}
+
+.planning-controls {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  align-items: end;
+}
+
+.planning-control {
+  display: grid;
+  gap: 6px;
+}
+
+.planning-tables {
+  display: grid;
+  gap: 24px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+}
+
+.planning-month {
+  display: grid;
+  gap: 12px;
+  min-width: max-content;
+}
+
+.planning-month-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.planning-table {
+  border-collapse: collapse;
+  width: max-content;
+  min-width: 100%;
+  background: rgba(255, 255, 255, 0.85);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.planning-table th,
+.planning-table td {
+  border: 1px solid #ecf0f1;
+  padding: 12px;
+  vertical-align: top;
+}
+
+.planning-table thead th {
+  background: rgba(52, 152, 219, 0.08);
+  font-size: 0.9rem;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.planning-day-col {
+  min-width: 220px;
+  background: rgba(52, 152, 219, 0.1);
+}
+
+.planning-day-header {
+  display: grid;
+  gap: 4px;
+  align-content: start;
+}
+
+.planning-day-header .day-name {
+  font-weight: 600;
+}
+
+.holiday-badge {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(231, 76, 60, 0.1);
+  color: #e74c3c;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.planning-slot-button {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  background: transparent;
+  border: none;
+  text-align: left;
+  padding: 8px;
+  border-radius: 8px;
+  border-left: 4px solid var(--slot-color, #3498db);
+  background: rgba(52, 152, 219, 0.12);
+  color: inherit;
+}
+
+.planning-slot-button:hover {
+  background: rgba(52, 152, 219, 0.2);
+}
+
+.planning-slot-label {
+  font-weight: 600;
+}
+
+.planning-slot-meta {
+  font-size: 0.85rem;
+  color: rgba(44, 62, 80, 0.7);
+}
+
+.planning-cell {
+  min-width: 140px;
+  display: grid;
+  gap: 6px;
+  align-content: start;
+  border-radius: 8px;
+}
+
+.planning-cell-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+
+.planning-cell-open {
+  color: var(--text);
+}
+
+.planning-cell-closed {
+  color: rgba(44, 62, 80, 0.6);
+}
+
+.planning-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.planning-cell-quality {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: rgba(44, 62, 80, 0.75);
+}
+
+.planning-cell-details {
+  font-size: 0.8rem;
+  color: rgba(44, 62, 80, 0.65);
+}
+
+.planning-holiday .planning-day-header {
+  background: rgba(231, 76, 60, 0.08);
+}
+
+.planning-holiday .planning-cell {
+  box-shadow: inset 0 0 0 1px rgba(231, 76, 60, 0.2);
+}
+
+.planning-sunday .planning-day-header {
+  background: rgba(52, 152, 219, 0.08);
+}
+
+.planning-modal {
+  width: min(560px, 90vw);
+}
+
+.slot-times {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
+
+.slot-days {
+  border: 1px solid #ecf0f1;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.slot-days-grid {
+  display: grid;
+  gap: 8px 16px;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
+
+.slot-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+}
+
+.empty-planning {
+  margin: 0;
+  color: rgba(44, 62, 80, 0.65);
+  font-style: italic;
+}
+
 h1, h2, h3 {
   margin-top: 0;
   color: var(--primary);
