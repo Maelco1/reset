@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Espace Médecin - Gestion des gardes</title>
+    <link rel="stylesheet" href="assets/css/styles.css" />
+  </head>
+  <body>
+    <div id="connection-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
+      <section class="modal">
+        <h1>Connexion à Supabase</h1>
+        <p>Indiquez vos paramètres Supabase pour enregistrer vos gardes.</p>
+        <form id="connection-form" class="card">
+          <label for="supabaseUrl">URL Supabase</label>
+          <input id="supabaseUrl" name="supabaseUrl" type="url" required />
+
+          <label for="supabaseKey">Clé API</label>
+          <input id="supabaseKey" name="supabaseKey" type="password" required />
+
+          <div class="stack" style="justify-content: flex-end;">
+            <button type="submit">Se connecter</button>
+          </div>
+        </form>
+      </section>
+    </div>
+    <main>
+      <section class="card">
+        <header>
+          <div>
+            <h1>Espace Médecin</h1>
+            <p>Déclarez vos gardes et disponibilités.</p>
+          </div>
+          <nav>
+            <button id="disconnect" class="secondary" type="button">Changer d'instance</button>
+            <button id="logout" class="secondary" type="button">Se déconnecter</button>
+          </nav>
+        </header>
+        <section>
+          <h2>Nouvelle garde</h2>
+          <form id="guard-form">
+            <label for="guard-date">Date</label>
+            <input id="guard-date" name="date" type="date" required />
+
+            <label for="guard-type">Type de garde</label>
+            <select id="guard-type" name="type" required>
+              <option value="Jour">Jour</option>
+              <option value="Nuit">Nuit</option>
+              <option value="Week-end">Week-end</option>
+            </select>
+
+            <label for="guard-notes">Notes</label>
+            <textarea id="guard-notes" name="notes" rows="3" placeholder="Informations complémentaires"></textarea>
+
+            <button type="submit">Enregistrer la garde</button>
+            <p id="guard-feedback" role="status"></p>
+          </form>
+        </section>
+        <section>
+          <h2>Mes gardes</h2>
+          <div class="card">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Type</th>
+                  <th>Notes</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="guards-body"></tbody>
+            </table>
+            <p id="guards-feedback" role="status"></p>
+          </div>
+        </section>
+      </section>
+    </main>
+    <script type="module">
+      import {
+        initializeConnectionModal,
+        requireRole,
+        getCurrentUser,
+        setCurrentUser,
+        getSupabaseClient,
+        onSupabaseReady
+      } from './js/supabaseClient.js';
+
+      const user = getCurrentUser();
+      if (!user) {
+        window.location.replace('index.html');
+      }
+      requireRole('medecin');
+
+      initializeConnectionModal();
+
+      document.querySelector('#logout').addEventListener('click', () => {
+        setCurrentUser(null);
+        window.location.replace('index.html');
+      });
+
+      const form = document.querySelector('#guard-form');
+      const feedback = document.querySelector('#guard-feedback');
+      const tableBody = document.querySelector('#guards-body');
+      const listFeedback = document.querySelector('#guards-feedback');
+      let channel;
+
+      const formatDate = (value) => new Intl.DateTimeFormat('fr-FR').format(new Date(value));
+
+      const renderGuards = (guards) => {
+        tableBody.innerHTML = '';
+        guards.forEach((guard) => {
+          const row = document.createElement('tr');
+          row.innerHTML = `
+            <td>${formatDate(guard.date)}</td>
+            <td><span class="badge">${guard.type}</span></td>
+            <td>${guard.notes ?? ''}</td>
+            <td>
+              <div class="table-actions">
+                <button data-action="delete" data-id="${guard.id}" class="danger">Supprimer</button>
+              </div>
+            </td>
+          `;
+          tableBody.appendChild(row);
+        });
+      };
+
+      const loadGuards = async () => {
+        await onSupabaseReady();
+        const supabase = getSupabaseClient();
+        const { data, error } = await supabase
+          .from('doctor_entries')
+          .select('id, date, type, notes')
+          .eq('user_id', user.id)
+          .order('date', { ascending: true });
+        if (error) {
+          console.error(error);
+          listFeedback.textContent = 'Impossible de récupérer vos gardes.';
+          return;
+        }
+        listFeedback.textContent = `${data.length} garde(s).`;
+        renderGuards(data);
+      };
+
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        await onSupabaseReady();
+        const supabase = getSupabaseClient();
+        const formData = new FormData(form);
+        const payload = {
+          user_id: user.id,
+          date: formData.get('date'),
+          type: formData.get('type'),
+          notes: formData.get('notes')?.trim() || null
+        };
+
+        const { error } = await supabase.from('doctor_entries').insert(payload);
+        if (error) {
+          console.error(error);
+          feedback.textContent = "Impossible d'enregistrer la garde.";
+          return;
+        }
+
+        feedback.textContent = 'Garde enregistrée !';
+        form.reset();
+      });
+
+      tableBody.addEventListener('click', async (event) => {
+        const button = event.target.closest('button');
+        if (!button) {
+          return;
+        }
+        if (button.dataset.action === 'delete') {
+          if (!confirm('Supprimer cette garde ?')) {
+            return;
+          }
+          await onSupabaseReady();
+          const supabase = getSupabaseClient();
+          const { error } = await supabase.from('doctor_entries').delete().eq('id', button.dataset.id);
+          if (error) {
+            console.error(error);
+            alert('Impossible de supprimer la garde.');
+          }
+        }
+      });
+
+      const subscribe = async () => {
+        await onSupabaseReady();
+        const supabase = getSupabaseClient();
+        channel = supabase
+          .channel('doctor-entries')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'doctor_entries', filter: `user_id=eq.${user.id}` }, () => {
+            loadGuards();
+          })
+          .subscribe();
+      };
+
+      loadGuards();
+      subscribe();
+
+      window.addEventListener('beforeunload', () => {
+        channel?.unsubscribe();
+      });
+    </script>
+  </body>
+</html>
