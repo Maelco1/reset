@@ -25,55 +25,107 @@
       </section>
     </div>
     <main>
-      <section class="card">
+      <section class="card admin-shell">
         <header>
           <div>
             <h1>Espace administrateur</h1>
-            <p>Créez, modifiez et supprimez les comptes utilisateurs.</p>
+            <p>Gérez les comptes grâce aux trigrammes de vos collaborateurs.</p>
           </div>
           <nav>
             <button id="disconnect" class="secondary" type="button">Changer d'instance</button>
             <button id="logout" class="secondary" type="button">Se déconnecter</button>
           </nav>
         </header>
-        <section>
-          <h2>Créer un compte</h2>
-          <form id="create-user-form">
-            <label for="new-username">Identifiant</label>
-            <input id="new-username" name="username" type="text" required />
 
-            <label for="new-password">Mot de passe</label>
-            <input id="new-password" name="password" type="password" required />
-
-            <label for="new-role">Rôle</label>
-            <select id="new-role" name="role" required>
-              <option value="administrateur">Administrateur</option>
-              <option value="medecin">Médecin</option>
-              <option value="remplacant">Remplaçant</option>
-            </select>
-
-            <button type="submit">Créer l'utilisateur</button>
-            <p id="create-feedback" role="status"></p>
-          </form>
-        </section>
-        <section>
-          <h2>Comptes existants</h2>
-          <div class="card">
-            <table class="table">
-              <thead>
-                <tr>
-                  <th>Identifiant</th>
-                  <th>Rôle</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody id="users-body"></tbody>
-            </table>
+        <section aria-labelledby="users-title" class="users-section">
+          <div class="section-header">
+            <h2 id="users-title">Comptes utilisateurs</h2>
             <p id="users-feedback" role="status"></p>
           </div>
+          <div class="user-groups" id="user-groups"></div>
         </section>
+
+        <footer class="admin-footer" aria-labelledby="create-title">
+          <h2 id="create-title">Ajouter un utilisateur</h2>
+          <p>Complétez les informations ci-dessous pour ajouter un nouveau compte.</p>
+          <form id="create-user-form" class="compact-form">
+            <div class="form-grid">
+              <label for="new-username">Identifiant</label>
+              <input id="new-username" name="username" type="text" autocomplete="off" required />
+
+              <label for="new-trigram">Trigramme</label>
+              <input
+                id="new-trigram"
+                name="trigram"
+                type="text"
+                inputmode="text"
+                maxlength="3"
+                autocomplete="off"
+                required
+                class="uppercase-input"
+              />
+
+              <label for="new-password">Mot de passe</label>
+              <input id="new-password" name="password" type="password" autocomplete="new-password" required />
+
+              <label for="new-role">Rôle</label>
+              <select id="new-role" name="role" required>
+                <option value="administrateur">Administrateur</option>
+                <option value="medecin">Médecin</option>
+                <option value="remplacant">Remplaçant</option>
+              </select>
+            </div>
+
+            <button type="submit" class="subtle-button">Ajouter l'utilisateur</button>
+            <p id="create-feedback" role="status"></p>
+          </form>
+        </footer>
       </section>
     </main>
+
+    <div id="user-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="user-modal-title">
+      <section class="modal user-modal">
+        <header class="modal-header">
+          <div>
+            <h2 id="user-modal-title">Gérer l'utilisateur</h2>
+            <p id="user-modal-subtitle"></p>
+          </div>
+          <button type="button" class="icon-button" id="close-user-modal" aria-label="Fermer">&times;</button>
+        </header>
+        <form id="edit-user-form">
+          <input type="hidden" id="edit-user-id" name="id" />
+
+          <label for="edit-username">Identifiant</label>
+          <input id="edit-username" name="username" type="text" autocomplete="off" />
+
+          <label for="edit-trigram">Trigramme</label>
+          <input
+            id="edit-trigram"
+            name="trigram"
+            type="text"
+            maxlength="3"
+            autocomplete="off"
+            required
+            class="uppercase-input"
+          />
+
+          <label for="edit-role">Rôle</label>
+          <select id="edit-role" name="role" required>
+            <option value="administrateur">Administrateur</option>
+            <option value="medecin">Médecin</option>
+            <option value="remplacant">Remplaçant</option>
+          </select>
+
+          <label for="edit-password">Nouveau mot de passe</label>
+          <input id="edit-password" name="password" type="password" autocomplete="new-password" placeholder="Laisser vide pour ne pas changer" />
+
+          <div class="modal-actions">
+            <button type="submit">Enregistrer</button>
+            <button type="button" id="delete-user" class="danger">Supprimer</button>
+          </div>
+        </form>
+      </section>
+    </div>
     <script type="module">
       import {
         initializeConnectionModal,
@@ -100,55 +152,110 @@
 
       const createForm = document.querySelector('#create-user-form');
       const createFeedback = document.querySelector('#create-feedback');
-      const usersBody = document.querySelector('#users-body');
       const usersFeedback = document.querySelector('#users-feedback');
+      const userGroups = document.querySelector('#user-groups');
+      const userModal = document.querySelector('#user-modal');
+      const userModalSubtitle = document.querySelector('#user-modal-subtitle');
+      const editForm = document.querySelector('#edit-user-form');
+      const deleteUserBtn = document.querySelector('#delete-user');
+      const closeUserModalBtn = document.querySelector('#close-user-modal');
+      const trigramInputs = document.querySelectorAll('.uppercase-input');
+      const formatTrigram = (value) => value.replace(/[^a-zA-Z0-9]/g, '').slice(0, 3).toUpperCase();
+      trigramInputs.forEach((input) => {
+        input.addEventListener('input', () => {
+          input.value = formatTrigram(input.value);
+        });
+      });
+      let editingUser = null;
       let channel;
 
-      const roles = {
-        administrateur: 'Administrateur',
-        medecin: 'Médecin',
-        remplacant: 'Remplaçant'
+      const roles = [
+        { value: 'administrateur', label: 'Administrateurs' },
+        { value: 'medecin', label: 'Médecins' },
+        { value: 'remplacant', label: 'Remplaçants' }
+      ];
+
+      const roleLabels = Object.fromEntries(roles.map(({ value, label }) => [value, label]));
+
+      let allUsers = [];
+
+      const closeUserModal = () => {
+        editingUser = null;
+        editForm.reset();
+        userModalSubtitle.textContent = '';
+        userModal.classList.add('hidden');
+      };
+
+      const openUserModal = (user) => {
+        editingUser = user;
+        const trigram = (user.trigram ?? '').trim() || user.username.slice(0, 3).toUpperCase();
+        userModalSubtitle.textContent = `${roleLabels[user.role] ?? 'Utilisateur'} · ${user.username}`;
+        editForm.elements['id'].value = user.id;
+        editForm.elements['username'].value = user.username;
+        editForm.elements['trigram'].value = trigram;
+        editForm.elements['role'].value = user.role;
+        editForm.elements['password'].value = '';
+        userModal.classList.remove('hidden');
+        editForm.elements['trigram'].focus();
       };
 
       const renderUsers = (users) => {
-        usersBody.innerHTML = '';
-        users.forEach((user) => {
-          const row = document.createElement('tr');
-          row.innerHTML = `
-            <td>${user.username}</td>
-            <td>
-              <select data-action="change-role" data-id="${user.id}">
-                ${Object.entries(roles)
-                  .map(
-                    ([value, label]) => `
-                      <option value="${value}" ${user.role === value ? 'selected' : ''}>${label}</option>
-                    `
-                  )
-                  .join('')}
-              </select>
-            </td>
-            <td>
-              <div class="table-actions">
-                <button data-action="reset-password" data-id="${user.id}">Définir le mot de passe</button>
-                <button data-action="delete" data-id="${user.id}" class="danger">Supprimer</button>
-              </div>
-            </td>
+        userGroups.innerHTML = '';
+
+        roles.forEach(({ value, label }) => {
+          const groupUsers = users.filter((user) => user.role === value);
+          const section = document.createElement('section');
+          section.className = 'user-group';
+          section.innerHTML = `
+            <header class="user-group-header">
+              <h3>${label}</h3>
+              <span class="badge">${groupUsers.length}</span>
+            </header>
           `;
-          usersBody.appendChild(row);
+
+          const list = document.createElement('div');
+          list.className = 'user-grid';
+
+          if (groupUsers.length === 0) {
+            const empty = document.createElement('p');
+            empty.className = 'empty-group';
+            empty.textContent = 'Aucun utilisateur pour le moment.';
+            list.appendChild(empty);
+          } else {
+            [...groupUsers]
+              .sort((a, b) => a.trigram.localeCompare(b.trigram))
+              .forEach((user) => {
+                const trigram = (user.trigram ?? '').trim() || user.username.slice(0, 3).toUpperCase();
+                const card = document.createElement('button');
+                card.type = 'button';
+                card.className = 'user-card';
+                card.dataset.id = user.id;
+                card.textContent = trigram;
+                card.title = `${trigram} · ${user.username}`;
+                list.appendChild(card);
+              });
+          }
+
+          section.appendChild(list);
+          userGroups.appendChild(section);
         });
       };
 
       const loadUsers = async () => {
         await onSupabaseReady();
         const supabase = getSupabaseClient();
-        const { data, error } = await supabase.from('users').select('id, username, role').order('username');
+        const { data, error } = await supabase
+          .from('users')
+          .select('id, username, trigram, role')
+          .order('username');
         if (error) {
           console.error(error);
           usersFeedback.textContent = "Impossible de récupérer les utilisateurs.";
           return;
         }
+        allUsers = data;
         usersFeedback.textContent = `${data.length} utilisateur(s).`;
-        renderUsers(data);
+        renderUsers(allUsers);
       };
 
       createForm.addEventListener('submit', async (event) => {
@@ -158,12 +265,18 @@
         const formData = new FormData(createForm);
         const payload = {
           username: formData.get('username').trim(),
+          trigram: formatTrigram(formData.get('trigram') ?? ''),
           password: formData.get('password').trim(),
           role: formData.get('role')
         };
 
-        if (!payload.username || !payload.password) {
-          createFeedback.textContent = 'Identifiant et mot de passe sont obligatoires.';
+        if (!payload.username || !payload.password || !payload.trigram) {
+          createFeedback.textContent = 'Identifiant, trigramme et mot de passe sont obligatoires.';
+          return;
+        }
+
+        if (payload.trigram.length !== 3) {
+          createFeedback.textContent = 'Le trigramme doit contenir exactement 3 caractères.';
           return;
         }
 
@@ -178,55 +291,94 @@
         createForm.reset();
       });
 
-      usersBody.addEventListener('change', async (event) => {
-        const target = event.target;
-        if (target.dataset.action === 'change-role') {
-          await onSupabaseReady();
-          const supabase = getSupabaseClient();
-          const id = target.dataset.id;
-          const role = target.value;
-          const { error } = await supabase.from('users').update({ role }).eq('id', id);
-          if (error) {
-            console.error(error);
-            alert('Impossible de mettre à jour le rôle.');
-          }
+      createForm.addEventListener('input', () => {
+        createFeedback.textContent = '';
+      });
+
+      userGroups.addEventListener('click', (event) => {
+        const card = event.target.closest('.user-card');
+        if (!card) {
+          return;
+        }
+        const user = allUsers.find((candidate) => String(candidate.id) === card.dataset.id);
+        if (!user) {
+          return;
+        }
+        openUserModal(user);
+      });
+
+      closeUserModalBtn.addEventListener('click', closeUserModal);
+
+      userModal.addEventListener('click', (event) => {
+        if (event.target === userModal) {
+          closeUserModal();
         }
       });
 
-      usersBody.addEventListener('click', async (event) => {
-        const button = event.target.closest('button');
-        if (!button) {
+      window.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && !userModal.classList.contains('hidden')) {
+          closeUserModal();
+        }
+      });
+
+      editForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        if (!editingUser) {
           return;
         }
-        const { action, id } = button.dataset;
-        if (!action || !id) {
+
+        const formData = new FormData(editForm);
+        const payload = {
+          username: formData.get('username').trim(),
+          trigram: formatTrigram(formData.get('trigram') ?? ''),
+          role: formData.get('role')
+        };
+        const password = formData.get('password').trim();
+
+        if (!payload.username || !payload.trigram) {
+          alert('Merci de renseigner un identifiant et un trigramme.');
           return;
         }
+
+        if (payload.trigram.length !== 3) {
+          alert('Le trigramme doit contenir exactement 3 caractères.');
+          return;
+        }
+
+        if (password) {
+          payload.password = password;
+        }
+
         await onSupabaseReady();
         const supabase = getSupabaseClient();
-
-        if (action === 'delete') {
-          if (!confirm('Supprimer cet utilisateur ?')) {
-            return;
-          }
-          const { error } = await supabase.from('users').delete().eq('id', id);
-          if (error) {
-            console.error(error);
-            alert('Impossible de supprimer cet utilisateur.');
-          }
+        const { error } = await supabase.from('users').update(payload).eq('id', editingUser.id);
+        if (error) {
+          console.error(error);
+          alert("Impossible de mettre à jour l'utilisateur.");
+          return;
         }
 
-        if (action === 'reset-password') {
-          const newPassword = prompt('Nouveau mot de passe :');
-          if (!newPassword) {
-            return;
-          }
-          const { error } = await supabase.from('users').update({ password: newPassword }).eq('id', id);
-          if (error) {
-            console.error(error);
-            alert('Impossible de mettre à jour le mot de passe.');
-          }
+        closeUserModal();
+      });
+
+      deleteUserBtn.addEventListener('click', async () => {
+        if (!editingUser) {
+          return;
         }
+        if (!confirm('Supprimer cet utilisateur ?')) {
+          return;
+        }
+
+        await onSupabaseReady();
+        const supabase = getSupabaseClient();
+        const { error } = await supabase.from('users').delete().eq('id', editingUser.id);
+        if (error) {
+          console.error(error);
+          alert('Impossible de supprimer cet utilisateur.');
+          return;
+        }
+
+        closeUserModal();
       });
 
       const subscribeToChanges = async () => {
