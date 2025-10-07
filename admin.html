@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Administration - Gestion des gardes</title>
+    <link rel="stylesheet" href="assets/css/styles.css" />
+  </head>
+  <body>
+    <div id="connection-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
+      <section class="modal">
+        <h1>Connexion à Supabase</h1>
+        <p>Pour gérer les comptes, configurez l'accès à votre instance Supabase.</p>
+        <form id="connection-form" class="card">
+          <label for="supabaseUrl">URL Supabase</label>
+          <input id="supabaseUrl" name="supabaseUrl" type="url" required />
+
+          <label for="supabaseKey">Clé API</label>
+          <input id="supabaseKey" name="supabaseKey" type="password" required />
+
+          <div class="stack" style="justify-content: flex-end;">
+            <button type="submit">Se connecter</button>
+          </div>
+        </form>
+      </section>
+    </div>
+    <main>
+      <section class="card">
+        <header>
+          <div>
+            <h1>Espace administrateur</h1>
+            <p>Créez, modifiez et supprimez les comptes utilisateurs.</p>
+          </div>
+          <nav>
+            <button id="disconnect" class="secondary" type="button">Changer d'instance</button>
+            <button id="logout" class="secondary" type="button">Se déconnecter</button>
+          </nav>
+        </header>
+        <section>
+          <h2>Créer un compte</h2>
+          <form id="create-user-form">
+            <label for="new-username">Identifiant</label>
+            <input id="new-username" name="username" type="text" required />
+
+            <label for="new-password">Mot de passe</label>
+            <input id="new-password" name="password" type="password" required />
+
+            <label for="new-role">Rôle</label>
+            <select id="new-role" name="role" required>
+              <option value="administrateur">Administrateur</option>
+              <option value="medecin">Médecin</option>
+              <option value="remplacant">Remplaçant</option>
+            </select>
+
+            <button type="submit">Créer l'utilisateur</button>
+            <p id="create-feedback" role="status"></p>
+          </form>
+        </section>
+        <section>
+          <h2>Comptes existants</h2>
+          <div class="card">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Identifiant</th>
+                  <th>Rôle</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="users-body"></tbody>
+            </table>
+            <p id="users-feedback" role="status"></p>
+          </div>
+        </section>
+      </section>
+    </main>
+    <script type="module">
+      import {
+        initializeConnectionModal,
+        requireRole,
+        getCurrentUser,
+        setCurrentUser,
+        getSupabaseClient,
+        onSupabaseReady
+      } from './js/supabaseClient.js';
+
+      const currentUser = getCurrentUser();
+      if (!currentUser) {
+        window.location.replace('index.html');
+      }
+      requireRole('administrateur');
+
+      initializeConnectionModal();
+
+      const logoutBtn = document.querySelector('#logout');
+      logoutBtn.addEventListener('click', () => {
+        setCurrentUser(null);
+        window.location.replace('index.html');
+      });
+
+      const createForm = document.querySelector('#create-user-form');
+      const createFeedback = document.querySelector('#create-feedback');
+      const usersBody = document.querySelector('#users-body');
+      const usersFeedback = document.querySelector('#users-feedback');
+      let channel;
+
+      const roles = {
+        administrateur: 'Administrateur',
+        medecin: 'Médecin',
+        remplacant: 'Remplaçant'
+      };
+
+      const renderUsers = (users) => {
+        usersBody.innerHTML = '';
+        users.forEach((user) => {
+          const row = document.createElement('tr');
+          row.innerHTML = `
+            <td>${user.username}</td>
+            <td>
+              <select data-action="change-role" data-id="${user.id}">
+                ${Object.entries(roles)
+                  .map(
+                    ([value, label]) => `
+                      <option value="${value}" ${user.role === value ? 'selected' : ''}>${label}</option>
+                    `
+                  )
+                  .join('')}
+              </select>
+            </td>
+            <td>
+              <div class="table-actions">
+                <button data-action="reset-password" data-id="${user.id}">Définir le mot de passe</button>
+                <button data-action="delete" data-id="${user.id}" class="danger">Supprimer</button>
+              </div>
+            </td>
+          `;
+          usersBody.appendChild(row);
+        });
+      };
+
+      const loadUsers = async () => {
+        await onSupabaseReady();
+        const supabase = getSupabaseClient();
+        const { data, error } = await supabase.from('users').select('id, username, role').order('username');
+        if (error) {
+          console.error(error);
+          usersFeedback.textContent = "Impossible de récupérer les utilisateurs.";
+          return;
+        }
+        usersFeedback.textContent = `${data.length} utilisateur(s).`;
+        renderUsers(data);
+      };
+
+      createForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        await onSupabaseReady();
+        const supabase = getSupabaseClient();
+        const formData = new FormData(createForm);
+        const payload = {
+          username: formData.get('username').trim(),
+          password: formData.get('password').trim(),
+          role: formData.get('role')
+        };
+
+        if (!payload.username || !payload.password) {
+          createFeedback.textContent = 'Identifiant et mot de passe sont obligatoires.';
+          return;
+        }
+
+        const { error } = await supabase.from('users').insert(payload);
+        if (error) {
+          console.error(error);
+          createFeedback.textContent = "Impossible de créer l'utilisateur.";
+          return;
+        }
+
+        createFeedback.textContent = "Utilisateur créé.";
+        createForm.reset();
+      });
+
+      usersBody.addEventListener('change', async (event) => {
+        const target = event.target;
+        if (target.dataset.action === 'change-role') {
+          await onSupabaseReady();
+          const supabase = getSupabaseClient();
+          const id = target.dataset.id;
+          const role = target.value;
+          const { error } = await supabase.from('users').update({ role }).eq('id', id);
+          if (error) {
+            console.error(error);
+            alert('Impossible de mettre à jour le rôle.');
+          }
+        }
+      });
+
+      usersBody.addEventListener('click', async (event) => {
+        const button = event.target.closest('button');
+        if (!button) {
+          return;
+        }
+        const { action, id } = button.dataset;
+        if (!action || !id) {
+          return;
+        }
+        await onSupabaseReady();
+        const supabase = getSupabaseClient();
+
+        if (action === 'delete') {
+          if (!confirm('Supprimer cet utilisateur ?')) {
+            return;
+          }
+          const { error } = await supabase.from('users').delete().eq('id', id);
+          if (error) {
+            console.error(error);
+            alert('Impossible de supprimer cet utilisateur.');
+          }
+        }
+
+        if (action === 'reset-password') {
+          const newPassword = prompt('Nouveau mot de passe :');
+          if (!newPassword) {
+            return;
+          }
+          const { error } = await supabase.from('users').update({ password: newPassword }).eq('id', id);
+          if (error) {
+            console.error(error);
+            alert('Impossible de mettre à jour le mot de passe.');
+          }
+        }
+      });
+
+      const subscribeToChanges = async () => {
+        await onSupabaseReady();
+        const supabase = getSupabaseClient();
+        channel = supabase
+          .channel('users-changes')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, () => {
+            loadUsers();
+          })
+          .subscribe();
+      };
+
+      loadUsers();
+      subscribeToChanges();
+
+      window.addEventListener('beforeunload', () => {
+        channel?.unsubscribe();
+      });
+    </script>
+  </body>
+</html>

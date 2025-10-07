@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Espace Remplaçant - Gestion des gardes</title>
+    <link rel="stylesheet" href="assets/css/styles.css" />
+  </head>
+  <body>
+    <div id="connection-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
+      <section class="modal">
+        <h1>Connexion à Supabase</h1>
+        <p>Configurez la connexion Supabase pour proposer vos disponibilités.</p>
+        <form id="connection-form" class="card">
+          <label for="supabaseUrl">URL Supabase</label>
+          <input id="supabaseUrl" name="supabaseUrl" type="url" required />
+
+          <label for="supabaseKey">Clé API</label>
+          <input id="supabaseKey" name="supabaseKey" type="password" required />
+
+          <div class="stack" style="justify-content: flex-end;">
+            <button type="submit">Se connecter</button>
+          </div>
+        </form>
+      </section>
+    </div>
+    <main>
+      <section class="card">
+        <header>
+          <div>
+            <h1>Espace Remplaçant</h1>
+            <p>Signalez vos disponibilités pour les gardes.</p>
+          </div>
+          <nav>
+            <button id="disconnect" class="secondary" type="button">Changer d'instance</button>
+            <button id="logout" class="secondary" type="button">Se déconnecter</button>
+          </nav>
+        </header>
+        <section>
+          <h2>Nouvelle disponibilité</h2>
+          <form id="availability-form">
+            <label for="availability-date">Date</label>
+            <input id="availability-date" name="date" type="date" required />
+
+            <label for="availability-slot">Créneau proposé</label>
+            <select id="availability-slot" name="slot" required>
+              <option value="Matin">Matin</option>
+              <option value="Après-midi">Après-midi</option>
+              <option value="Nuit">Nuit</option>
+            </select>
+
+            <label for="availability-notes">Notes</label>
+            <textarea id="availability-notes" name="notes" rows="3" placeholder="Précisions"></textarea>
+
+            <button type="submit">Publier ma disponibilité</button>
+            <p id="availability-feedback" role="status"></p>
+          </form>
+        </section>
+        <section>
+          <h2>Mes disponibilités</h2>
+          <div class="card">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Créneau</th>
+                  <th>Notes</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="availability-body"></tbody>
+            </table>
+            <p id="availability-list-feedback" role="status"></p>
+          </div>
+        </section>
+      </section>
+    </main>
+    <script type="module">
+      import {
+        initializeConnectionModal,
+        requireRole,
+        getCurrentUser,
+        setCurrentUser,
+        getSupabaseClient,
+        onSupabaseReady
+      } from './js/supabaseClient.js';
+
+      const user = getCurrentUser();
+      if (!user) {
+        window.location.replace('index.html');
+      }
+      requireRole('remplacant');
+
+      initializeConnectionModal();
+
+      document.querySelector('#logout').addEventListener('click', () => {
+        setCurrentUser(null);
+        window.location.replace('index.html');
+      });
+
+      const form = document.querySelector('#availability-form');
+      const feedback = document.querySelector('#availability-feedback');
+      const tableBody = document.querySelector('#availability-body');
+      const listFeedback = document.querySelector('#availability-list-feedback');
+      let channel;
+
+      const formatDate = (value) => new Intl.DateTimeFormat('fr-FR').format(new Date(value));
+
+      const renderAvailabilities = (entries) => {
+        tableBody.innerHTML = '';
+        entries.forEach((entry) => {
+          const row = document.createElement('tr');
+          row.innerHTML = `
+            <td>${formatDate(entry.date)}</td>
+            <td><span class="badge">${entry.slot}</span></td>
+            <td>${entry.notes ?? ''}</td>
+            <td>
+              <div class="table-actions">
+                <button data-action="delete" data-id="${entry.id}" class="danger">Supprimer</button>
+              </div>
+            </td>
+          `;
+          tableBody.appendChild(row);
+        });
+      };
+
+      const loadAvailabilities = async () => {
+        await onSupabaseReady();
+        const supabase = getSupabaseClient();
+        const { data, error } = await supabase
+          .from('replacement_entries')
+          .select('id, date, slot, notes')
+          .eq('user_id', user.id)
+          .order('date', { ascending: true });
+        if (error) {
+          console.error(error);
+          listFeedback.textContent = 'Impossible de récupérer vos disponibilités.';
+          return;
+        }
+        listFeedback.textContent = `${data.length} disponibilité(s).`;
+        renderAvailabilities(data);
+      };
+
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        await onSupabaseReady();
+        const supabase = getSupabaseClient();
+        const formData = new FormData(form);
+        const payload = {
+          user_id: user.id,
+          date: formData.get('date'),
+          slot: formData.get('slot'),
+          notes: formData.get('notes')?.trim() || null
+        };
+
+        const { error } = await supabase.from('replacement_entries').insert(payload);
+        if (error) {
+          console.error(error);
+          feedback.textContent = "Impossible d'enregistrer la disponibilité.";
+          return;
+        }
+
+        feedback.textContent = 'Disponibilité enregistrée !';
+        form.reset();
+      });
+
+      tableBody.addEventListener('click', async (event) => {
+        const button = event.target.closest('button');
+        if (!button) {
+          return;
+        }
+        if (button.dataset.action === 'delete') {
+          if (!confirm('Supprimer cette disponibilité ?')) {
+            return;
+          }
+          await onSupabaseReady();
+          const supabase = getSupabaseClient();
+          const { error } = await supabase.from('replacement_entries').delete().eq('id', button.dataset.id);
+          if (error) {
+            console.error(error);
+            alert('Impossible de supprimer la disponibilité.');
+          }
+        }
+      });
+
+      const subscribe = async () => {
+        await onSupabaseReady();
+        const supabase = getSupabaseClient();
+        channel = supabase
+          .channel('replacement-entries')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'replacement_entries', filter: `user_id=eq.${user.id}` }, () => {
+            loadAvailabilities();
+          })
+          .subscribe();
+      };
+
+      loadAvailabilities();
+      subscribe();
+
+      window.addEventListener('beforeunload', () => {
+        channel?.unsubscribe();
+      });
+    </script>
+  </body>
+</html>
