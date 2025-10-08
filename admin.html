@@ -68,6 +68,7 @@
             </div>
           </form>
 
+          <div class="planning-config" id="planning-config" aria-live="polite"></div>
           <div class="planning-tables" id="planning-tables" aria-live="polite"></div>
         </section>
 
@@ -166,11 +167,18 @@
         <form id="slot-form">
           <input type="hidden" name="position" id="slot-position" />
 
-          <label for="slot-label">Nom du créneau</label>
+          <label for="slot-label">Nom de la colonne</label>
           <input id="slot-label" name="label" type="text" required />
 
-          <label for="slot-type">Type</label>
-          <input id="slot-type" name="slotType" type="text" placeholder="Visite, consultation, téléconsultation…" />
+          <label for="slot-type-code">Type de colonne (acronyme)</label>
+          <input id="slot-type-code" name="typeCode" type="text" required />
+
+          <label for="slot-type-category">Catégorie</label>
+          <select id="slot-type-category" name="typeCategory" required>
+            <option value="Visite">Visite</option>
+            <option value="Consultation">Consultation</option>
+            <option value="Téléconsultation">Téléconsultation</option>
+          </select>
 
           <div class="slot-times">
             <div>
@@ -184,26 +192,75 @@
           </div>
 
           <label for="slot-color">Couleur</label>
-          <input id="slot-color" name="color" type="color" value="#3498db" />
+          <input id="slot-color" name="color" type="color" value="#1e293b" />
+          <fieldset class="slot-qualities">
+            <legend>Qualité par période</legend>
+            <div class="slot-qualities-grid">
+              <label for="slot-quality-weekdays">Lun - Ven</label>
+              <select id="slot-quality-weekdays" name="qualityWeekdays" required>
+                <option value="Mauvaise">Mauvaise</option>
+                <option value="Bonus">Bonus</option>
+              </select>
 
-          <label for="slot-quality">Qualité de garde</label>
-          <input id="slot-quality" name="quality" type="text" placeholder="Bonne, normale…" />
+              <label for="slot-quality-saturday">Samedi</label>
+              <select id="slot-quality-saturday" name="qualitySaturday" required>
+                <option value="Mauvaise">Mauvaise</option>
+                <option value="Bonus">Bonus</option>
+              </select>
 
-          <fieldset class="slot-days">
-            <legend>Jours d'ouverture</legend>
-            <div class="slot-days-grid">
-              <label><input type="checkbox" name="activeDays" value="monday" /> Lundi</label>
-              <label><input type="checkbox" name="activeDays" value="tuesday" /> Mardi</label>
-              <label><input type="checkbox" name="activeDays" value="wednesday" /> Mercredi</label>
-              <label><input type="checkbox" name="activeDays" value="thursday" /> Jeudi</label>
-              <label><input type="checkbox" name="activeDays" value="friday" /> Vendredi</label>
-              <label><input type="checkbox" name="activeDays" value="saturday" /> Samedi</label>
-              <label><input type="checkbox" name="activeDays" value="sunday" /> Dimanche</label>
+              <label for="slot-quality-sunday">Dimanche / Férié</label>
+              <select id="slot-quality-sunday" name="qualitySunday" required>
+                <option value="Mauvaise">Mauvaise</option>
+                <option value="Bonus">Bonus</option>
+              </select>
             </div>
           </fieldset>
 
-          <label class="slot-toggle"><input type="checkbox" name="closedOnSundays" id="slot-closed-sundays" /> Fermer automatiquement les dimanches</label>
-          <label class="slot-toggle"><input type="checkbox" name="closedOnHolidays" id="slot-closed-holidays" checked /> Fermer automatiquement les jours fériés</label>
+          <fieldset class="slot-openings">
+            <legend>Ouverture des cases</legend>
+            <div class="slot-openings-grid">
+              <div>
+                <h3>Mauvaise</h3>
+                <label for="slot-open-mauvaise-weekdays">Lun - Ven</label>
+                <select id="slot-open-mauvaise-weekdays" name="openMauvaiseWeekdays" required>
+                  <option value="true">Oui</option>
+                  <option value="false">Non</option>
+                </select>
+
+                <label for="slot-open-mauvaise-saturday">Samedi</label>
+                <select id="slot-open-mauvaise-saturday" name="openMauvaiseSaturday" required>
+                  <option value="true">Oui</option>
+                  <option value="false">Non</option>
+                </select>
+
+                <label for="slot-open-mauvaise-sunday">Dimanche / Férié</label>
+                <select id="slot-open-mauvaise-sunday" name="openMauvaiseSunday" required>
+                  <option value="true">Oui</option>
+                  <option value="false">Non</option>
+                </select>
+              </div>
+              <div>
+                <h3>Bonus</h3>
+                <label for="slot-open-bonus-weekdays">Lun - Ven</label>
+                <select id="slot-open-bonus-weekdays" name="openBonusWeekdays" required>
+                  <option value="true">Oui</option>
+                  <option value="false">Non</option>
+                </select>
+
+                <label for="slot-open-bonus-saturday">Samedi</label>
+                <select id="slot-open-bonus-saturday" name="openBonusSaturday" required>
+                  <option value="true">Oui</option>
+                  <option value="false">Non</option>
+                </select>
+
+                <label for="slot-open-bonus-sunday">Dimanche / Férié</label>
+                <select id="slot-open-bonus-sunday" name="openBonusSunday" required>
+                  <option value="true">Oui</option>
+                  <option value="false">Non</option>
+                </select>
+              </div>
+            </div>
+          </fieldset>
 
           <div class="modal-actions">
             <button type="submit">Enregistrer</button>
@@ -224,10 +281,82 @@
         onSupabaseReady
       } from './js/supabaseClient.js';
 
-      const DEFAULT_COLOR = '#3498db';
-      const DEFAULT_COLORS = ['#3498db', '#9b59b6', '#1abc9c', '#e67e22', '#2ecc71', '#e84393'];
-      const DEFAULT_SLOT_TITLES = ['Visites matin', 'Visites après-midi', 'Consultations', 'Téléconsultations'];
-      const WEEKDAY_KEYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+      const DEFAULT_COLOR = '#1e293b';
+      const COLUMN_DEFAULTS = [
+        { position: 1, typeCode: '1N', color: '#1e293b' },
+        { position: 2, typeCode: '2N', color: '#1e293b' },
+        { position: 3, typeCode: '3N', color: '#1e293b' },
+        { position: 4, typeCode: '4C', color: '#1e293b' },
+        { position: 5, typeCode: '5S', color: '#1e293b' },
+        { position: 6, typeCode: '6S', color: '#1e293b' },
+        { position: 7, typeCode: 'VIS', color: '#1e293b' },
+        { position: 8, typeCode: 'VIS', color: '#1e293b' },
+        { position: 9, typeCode: 'VIS', color: '#1e293b' },
+        { position: 10, typeCode: 'VIS', color: '#1e293b' },
+        { position: 11, typeCode: 'VIS', color: '#1e293b' },
+        { position: 12, typeCode: 'TC', color: '#1e293b' },
+        { position: 13, typeCode: 'C1COU', color: '#1e293b' },
+        { position: 14, typeCode: 'C2COU', color: '#1e293b' },
+        { position: 15, typeCode: 'C1BOU', color: '#1e293b' },
+        { position: 16, typeCode: 'C2BOU', color: '#1e293b' },
+        { position: 17, typeCode: 'PFG', color: '#1e293b' },
+        { position: 18, typeCode: 'C1ANT', color: '#1e293b' },
+        { position: 19, typeCode: 'C2ANT', color: '#1e293b' },
+        { position: 20, typeCode: 'TC', color: '#1e293b' },
+        { position: 21, typeCode: 'N', color: '#1e293b' },
+        { position: 22, typeCode: 'C', color: '#1e293b' },
+        { position: 23, typeCode: 'S', color: '#1e293b' },
+        { position: 24, typeCode: 'VIS', color: '#1e293b' },
+        { position: 25, typeCode: 'VIS', color: '#1e293b' },
+        { position: 26, typeCode: 'VIS', color: '#1e293b' },
+        { position: 27, typeCode: 'C1COU', color: '#1e293b' },
+        { position: 28, typeCode: 'C2COU', color: '#1e293b' },
+        { position: 29, typeCode: 'C1BOU', color: '#1e293b' },
+        { position: 30, typeCode: 'C2BOU', color: '#1e293b' },
+        { position: 31, typeCode: 'PFG', color: '#1e293b' },
+        { position: 32, typeCode: 'C1ANT', color: '#1e293b' },
+        { position: 33, typeCode: 'C2ANT', color: '#1e293b' },
+        { position: 34, typeCode: 'TC', color: '#1e293b' },
+        { position: 35, typeCode: 'VIS', color: '#1e293b' },
+        { position: 36, typeCode: 'PFG', color: '#1e293b' },
+        { position: 37, typeCode: 'VIS', color: '#1e293b' },
+        { position: 38, typeCode: 'VIS', color: '#1e293b' },
+        { position: 39, typeCode: 'VIS', color: '#1e293b' },
+        { position: 40, typeCode: 'VIS', color: '#1e293b' },
+        { position: 41, typeCode: 'VIS', color: '#1e293b' },
+        { position: 42, typeCode: 'VIS', color: '#1e293b' },
+        { position: 43, typeCode: 'TCN', color: '#1e293b' },
+        { position: 44, typeCode: 'VIS', color: '#1e293b' },
+        { position: 45, typeCode: 'VIS', color: '#1e293b' },
+        { position: 46, typeCode: 'VIS', color: '#1e293b' }
+      ];
+      const TYPE_CATEGORY_MAP = new Map([
+        ...[
+          '1N',
+          '2N',
+          '3N',
+          '4C',
+          '5S',
+          '6S',
+          'N',
+          'C',
+          'S',
+          'VIS'
+        ].map((code) => [code, 'Visite']),
+        ...[
+          'C1COU',
+          'C2COU',
+          'C1BOU',
+          'C2BOU',
+          'PFG',
+          'C1ANT',
+          'C2ANT',
+          'C1',
+          'C2',
+          'C3'
+        ].map((code) => [code, 'Consultation']),
+        ...['TC', 'TCN'].map((code) => [code, 'Téléconsultation'])
+      ]);
       const WEEKDAY_LABELS = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
       const MONTH_NAMES = [
         'Janvier',
@@ -272,6 +401,7 @@
       const planningYearSelect = document.querySelector('#planning-year');
       const planningMonthOneSelect = document.querySelector('#planning-month-1');
       const planningMonthTwoSelect = document.querySelector('#planning-month-2');
+      const planningConfigContainer = document.querySelector('#planning-config');
       const planningTables = document.querySelector('#planning-tables');
       const planningFeedback = document.querySelector('#planning-feedback');
 
@@ -281,6 +411,18 @@
       const slotFeedback = document.querySelector('#slot-feedback');
       const closeSlotModalBtn = document.querySelector('#close-slot-modal');
       const cancelSlotBtn = document.querySelector('#cancel-slot');
+
+      const slotTypeCodeInput = slotForm?.elements['typeCode'];
+      if (slotTypeCodeInput) {
+        slotTypeCodeInput.addEventListener('input', () => {
+          const sanitized = slotTypeCodeInput.value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+          slotTypeCodeInput.value = sanitized;
+          const mappedCategory = TYPE_CATEGORY_MAP.get(sanitized);
+          if (mappedCategory && slotForm.elements['typeCategory']) {
+            slotForm.elements['typeCategory'].value = mappedCategory;
+          }
+        });
+      }
 
       const formatTrigram = (value) => value.replace(/[^a-zA-Z0-9]/g, '').slice(0, 3).toUpperCase();
       trigramInputs.forEach((input) => {
@@ -326,24 +468,63 @@
         return `rgba(${r}, ${g}, ${b}, ${alpha})`;
       };
 
-      const defaultActiveDays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
+      const inferTypeCategory = (typeCode) => {
+        if (typeof typeCode !== 'string') {
+          return 'Visite';
+        }
+        const normalized = typeCode.trim().toUpperCase();
+        return TYPE_CATEGORY_MAP.get(normalized) ?? 'Visite';
+      };
+
+      const sanitizeQuality = (value) => (value === 'Bonus' ? 'Bonus' : 'Mauvaise');
+
+      const toBoolean = (value, fallback = true) => {
+        if (value === null || value === undefined) {
+          return fallback;
+        }
+        if (typeof value === 'boolean') {
+          return value;
+        }
+        if (typeof value === 'number') {
+          return value !== 0;
+        }
+        const str = String(value).toLowerCase();
+        return str === 'true' || str === '1' || str === 'yes' || str === 'oui';
+      };
+
+      const formatBoolean = (value) => (value ? 'Oui' : 'Non');
+
+      const selectToBoolean = (value, fallback = true) => {
+        if (value === 'true') {
+          return true;
+        }
+        if (value === 'false') {
+          return false;
+        }
+        return fallback;
+      };
 
       const getDefaultSlot = (position) => {
-        const labelBase = DEFAULT_SLOT_TITLES[(position - 1) % DEFAULT_SLOT_TITLES.length];
-        const cycle = Math.floor((position - 1) / DEFAULT_SLOT_TITLES.length) + 1;
-        const label = cycle > 1 ? `${labelBase} ${cycle}` : labelBase;
-        const color = DEFAULT_COLORS[(position - 1) % DEFAULT_COLORS.length];
+        const defaults = COLUMN_DEFAULTS.find((item) => item.position === position);
+        const typeCode = defaults?.typeCode ?? `COL${String(position).padStart(2, '0')}`;
+        const category = inferTypeCategory(typeCode);
         return {
           position,
-          label,
-          slot_type: null,
+          label: typeCode,
+          type_code: typeCode,
+          type_category: category,
           start_time: null,
           end_time: null,
-          color,
-          quality: null,
-          active_days: defaultActiveDays,
-          closed_on_holidays: true,
-          closed_on_sundays: true
+          color: defaults?.color ?? DEFAULT_COLOR,
+          quality_weekdays: 'Mauvaise',
+          quality_saturday: 'Mauvaise',
+          quality_sunday: 'Mauvaise',
+          open_mauvaise_weekdays: true,
+          open_mauvaise_saturday: true,
+          open_mauvaise_sunday: true,
+          open_bonus_weekdays: true,
+          open_bonus_saturday: true,
+          open_bonus_sunday: true
         };
       };
 
@@ -406,34 +587,60 @@
         return days;
       };
 
-      const isSlotOpen = (slot, date, isHoliday) => {
-        const dayKey = WEEKDAY_KEYS[date.getDay()];
-        const allowedDays = Array.isArray(slot.active_days) && slot.active_days.length > 0 ? slot.active_days : defaultActiveDays;
-        if (!allowedDays.includes(dayKey)) {
-          return false;
+      const getDaySegment = (date, isHoliday) => {
+        if (isHoliday || date.getDay() === 0) {
+          return 'sunday';
         }
-        if (slot.closed_on_sundays && dayKey === 'sunday') {
-          return false;
+        if (date.getDay() === 6) {
+          return 'saturday';
         }
-        if (slot.closed_on_holidays && isHoliday) {
-          return false;
-        }
-        return true;
+        return 'weekday';
       };
 
-      const buildSlotTitle = (slot, dayLabel, isHoliday, holidayName, isOpen) => {
+      const getQualityForSegment = (slot, segment) => {
+        if (segment === 'saturday') {
+          return sanitizeQuality(slot.quality_saturday);
+        }
+        if (segment === 'sunday') {
+          return sanitizeQuality(slot.quality_sunday);
+        }
+        return sanitizeQuality(slot.quality_weekdays);
+      };
+
+      const isSlotOpen = (slot, segment) => {
+        const quality = getQualityForSegment(slot, segment);
+        if (quality === 'Bonus') {
+          if (segment === 'saturday') {
+            return toBoolean(slot.open_bonus_saturday);
+          }
+          if (segment === 'sunday') {
+            return toBoolean(slot.open_bonus_sunday);
+          }
+          return toBoolean(slot.open_bonus_weekdays);
+        }
+        if (segment === 'saturday') {
+          return toBoolean(slot.open_mauvaise_saturday);
+        }
+        if (segment === 'sunday') {
+          return toBoolean(slot.open_mauvaise_sunday);
+        }
+        return toBoolean(slot.open_mauvaise_weekdays);
+      };
+
+      const buildSlotTitle = (slot, dayLabel, isHoliday, holidayName, isOpen, quality) => {
         const details = [];
         const label = slot.label ?? `Créneau ${slot.position}`;
         details.push(label);
-        if (slot.slot_type) {
-          details.push(slot.slot_type);
+        if (slot.type_code) {
+          details.push(`Type : ${slot.type_code}`);
+        }
+        if (slot.type_category) {
+          details.push(slot.type_category);
         }
         if (slot.start_time && slot.end_time) {
           details.push(`${slot.start_time} – ${slot.end_time}`);
         }
-        if (slot.quality) {
-          details.push(`Qualité : ${slot.quality}`);
-        }
+        details.push(`Qualité : ${quality}`);
         details.push(isOpen ? 'Ouvert' : 'Fermé');
         if (isHoliday && holidayName) {
           details.push(holidayName);
@@ -462,10 +669,13 @@
           button.className = 'planning-slot-button';
           const slotColor = normalizeColor(slot.color);
           button.style.setProperty('--slot-color', slotColor);
-          const title = slot.label ?? `Créneau ${slot.position}`;
+          const title = slot.label ?? `Colonne ${slot.position}`;
           const metaParts = [];
-          if (slot.slot_type) {
-            metaParts.push(slot.slot_type);
+          if (slot.type_code) {
+            metaParts.push(slot.type_code);
+          }
+          if (slot.type_category) {
+            metaParts.push(slot.type_category);
           }
           if (slot.start_time && slot.end_time) {
             metaParts.push(`${slot.start_time} – ${slot.end_time}`);
@@ -516,7 +726,9 @@
             const cell = document.createElement('td');
             cell.className = 'planning-cell';
             const slotColor = normalizeColor(slot.color);
-            const open = isSlotOpen(slot, day, isHoliday);
+            const segment = getDaySegment(day, isHoliday);
+            const quality = getQualityForSegment(slot, segment);
+            const open = isSlotOpen(slot, segment);
             cell.classList.add(open ? 'planning-cell-open' : 'planning-cell-closed');
             cell.style.borderColor = hexToRgba(slotColor, open ? 0.35 : 0.18);
             cell.style.backgroundColor = hexToRgba(slotColor, open ? 0.16 : 0.05);
@@ -536,16 +748,17 @@
 
             cell.appendChild(status);
 
-            if (slot.quality) {
-              const quality = document.createElement('span');
-              quality.className = 'planning-cell-quality';
-              quality.textContent = slot.quality;
-              cell.appendChild(quality);
-            }
+            const qualityBadge = document.createElement('span');
+            qualityBadge.className = 'planning-cell-quality';
+            qualityBadge.textContent = quality;
+            cell.appendChild(qualityBadge);
 
             const infoParts = [];
-            if (slot.slot_type) {
-              infoParts.push(slot.slot_type);
+            if (slot.type_code) {
+              infoParts.push(slot.type_code);
+            }
+            if (slot.type_category) {
+              infoParts.push(slot.type_category);
             }
             if (slot.start_time && slot.end_time) {
               infoParts.push(`${slot.start_time} – ${slot.end_time}`);
@@ -557,7 +770,7 @@
               cell.appendChild(details);
             }
 
-            cell.title = buildSlotTitle(slot, dayName, isHoliday, holidayName, open);
+            cell.title = buildSlotTitle(slot, dayName, isHoliday, holidayName, open, quality);
             row.appendChild(cell);
           });
 
@@ -583,6 +796,157 @@
         planningMonthTwoSelect.innerHTML = options;
         planningMonthOneSelect.value = String(now.getMonth());
         planningMonthTwoSelect.value = String((now.getMonth() + 1) % 12);
+      };
+
+      const renderPlanningConfig = () => {
+        if (!planningConfigContainer) {
+          return;
+        }
+        if (!planningSlots.length) {
+          planningConfigContainer.innerHTML = '<p class="empty-planning">Chargement des colonnes…</p>';
+          return;
+        }
+
+        planningConfigContainer.innerHTML = '';
+        const wrapper = document.createElement('div');
+        wrapper.className = 'planning-config-list';
+
+        const table = document.createElement('table');
+        table.className = 'table planning-config-table';
+        const thead = document.createElement('thead');
+        thead.innerHTML = `
+          <tr>
+            <th scope="col">Colonne</th>
+            <th scope="col">Type</th>
+            <th scope="col">Horaires</th>
+            <th scope="col">Couleur</th>
+            <th scope="col">Qualités</th>
+            <th scope="col">Ouverture Mauvaise</th>
+            <th scope="col">Ouverture Bonus</th>
+            <th scope="col">Actions</th>
+          </tr>
+        `;
+        table.appendChild(thead);
+
+        const tbody = document.createElement('tbody');
+
+        planningSlots.forEach((slot) => {
+          const row = document.createElement('tr');
+
+          const colCell = document.createElement('td');
+          const posBadge = document.createElement('span');
+          posBadge.className = 'planning-config-position';
+          posBadge.textContent = String(slot.position).padStart(2, '0');
+          colCell.appendChild(posBadge);
+          const name = document.createElement('div');
+          name.className = 'planning-config-label';
+          name.textContent = slot.label ?? `Colonne ${slot.position}`;
+          colCell.appendChild(name);
+          row.appendChild(colCell);
+
+          const typeCell = document.createElement('td');
+          const typeCode = document.createElement('div');
+          typeCode.className = 'planning-config-type';
+          typeCode.textContent = slot.type_code ?? '—';
+          typeCell.appendChild(typeCode);
+          if (slot.type_category) {
+            const category = document.createElement('div');
+            category.className = 'planning-config-category';
+            category.textContent = slot.type_category;
+            typeCell.appendChild(category);
+          }
+          row.appendChild(typeCell);
+
+          const scheduleCell = document.createElement('td');
+          if (slot.start_time && slot.end_time) {
+            scheduleCell.textContent = `${slot.start_time} – ${slot.end_time}`;
+          } else {
+            scheduleCell.textContent = '—';
+          }
+          row.appendChild(scheduleCell);
+
+          const colorCell = document.createElement('td');
+          const swatch = document.createElement('span');
+          swatch.className = 'planning-config-color';
+          swatch.style.backgroundColor = normalizeColor(slot.color);
+          colorCell.appendChild(swatch);
+          const colorValue = document.createElement('span');
+          colorValue.textContent = normalizeColor(slot.color);
+          colorCell.appendChild(colorValue);
+          row.appendChild(colorCell);
+
+          const qualityCell = document.createElement('td');
+          const qualities = [
+            { label: 'Lun - Ven', value: slot.quality_weekdays },
+            { label: 'Samedi', value: slot.quality_saturday },
+            { label: 'Dim / Férié', value: slot.quality_sunday }
+          ];
+          qualities.forEach(({ label, value }) => {
+            const line = document.createElement('div');
+            line.className = 'planning-config-line';
+            const strong = document.createElement('strong');
+            strong.textContent = `${label} : `;
+            line.appendChild(strong);
+            const text = document.createElement('span');
+            text.textContent = value;
+            line.appendChild(text);
+            qualityCell.appendChild(line);
+          });
+          row.appendChild(qualityCell);
+
+          const mauvaiseCell = document.createElement('td');
+          const mauvaiseStatuses = [
+            { label: 'Lun - Ven', value: formatBoolean(slot.open_mauvaise_weekdays) },
+            { label: 'Samedi', value: formatBoolean(slot.open_mauvaise_saturday) },
+            { label: 'Dim / Férié', value: formatBoolean(slot.open_mauvaise_sunday) }
+          ];
+          mauvaiseStatuses.forEach(({ label, value }) => {
+            const line = document.createElement('div');
+            line.className = 'planning-config-line';
+            const strong = document.createElement('strong');
+            strong.textContent = `${label} : `;
+            line.appendChild(strong);
+            const text = document.createElement('span');
+            text.textContent = value;
+            line.appendChild(text);
+            mauvaiseCell.appendChild(line);
+          });
+          row.appendChild(mauvaiseCell);
+
+          const bonusCell = document.createElement('td');
+          const bonusStatuses = [
+            { label: 'Lun - Ven', value: formatBoolean(slot.open_bonus_weekdays) },
+            { label: 'Samedi', value: formatBoolean(slot.open_bonus_saturday) },
+            { label: 'Dim / Férié', value: formatBoolean(slot.open_bonus_sunday) }
+          ];
+          bonusStatuses.forEach(({ label, value }) => {
+            const line = document.createElement('div');
+            line.className = 'planning-config-line';
+            const strong = document.createElement('strong');
+            strong.textContent = `${label} : `;
+            line.appendChild(strong);
+            const text = document.createElement('span');
+            text.textContent = value;
+            line.appendChild(text);
+            bonusCell.appendChild(line);
+          });
+          row.appendChild(bonusCell);
+
+          const actionCell = document.createElement('td');
+          const editButton = document.createElement('button');
+          editButton.type = 'button';
+          editButton.className = 'planning-config-edit subtle-button';
+          editButton.dataset.position = slot.position;
+          editButton.textContent = 'Modifier';
+          actionCell.appendChild(editButton);
+          row.appendChild(actionCell);
+
+          tbody.appendChild(row);
+        });
+
+        table.appendChild(tbody);
+        wrapper.appendChild(table);
+        planningConfigContainer.appendChild(wrapper);
       };
 
       const renderPlanningTables = () => {
@@ -718,7 +1082,7 @@
         renderUsers(allUsers);
       };
 
-      const ensurePlanningSlots = async (supabase, slots) => {
+      const ensurePlanningColumns = async (supabase, slots) => {
         const missing = [];
         for (let position = 1; position <= 46; position += 1) {
           if (!slots.some((slot) => slot.position === position)) {
@@ -728,15 +1092,31 @@
         if (missing.length === 0) {
           return slots;
         }
-        const { error } = await supabase.from('planning_slots').upsert(missing, { onConflict: 'position' });
+        const { error } = await supabase.from('planning_columns').upsert(missing, { onConflict: 'position' });
         if (error) {
           console.error(error);
           return slots;
         }
         const { data, error: reloadError } = await supabase
-          .from('planning_slots')
+          .from('planning_columns')
           .select(
-            'id, position, label, slot_type, start_time, end_time, color, quality, active_days, closed_on_holidays, closed_on_sundays'
+            `id,
+            position,
+            label,
+            type_code,
+            type_category,
+            start_time,
+            end_time,
+            color,
+            quality_weekdays,
+            quality_saturday,
+            quality_sunday,
+            open_mauvaise_weekdays,
+            open_mauvaise_saturday,
+            open_mauvaise_sunday,
+            open_bonus_weekdays,
+            open_bonus_saturday,
+            open_bonus_sunday`
           )
           .order('position');
         if (reloadError) {
@@ -746,49 +1126,95 @@
         return data ?? slots;
       };
 
-      const loadPlanningSlots = async () => {
+      const loadPlanningColumns = async () => {
         if (planningLoading) {
           return;
         }
         planningLoading = true;
         if (planningFeedback) {
-          planningFeedback.textContent = 'Chargement des créneaux…';
+          planningFeedback.textContent = 'Chargement des colonnes…';
         }
         if (planningTables) {
           planningTables.innerHTML = '<p class="empty-planning">Chargement du planning…</p>';
         }
+        if (planningConfigContainer) {
+          planningConfigContainer.innerHTML = '<p class="empty-planning">Chargement des colonnes…</p>';
+        }
         await onSupabaseReady();
         const supabase = getSupabaseClient();
         const { data, error } = await supabase
-          .from('planning_slots')
+          .from('planning_columns')
           .select(
-            'id, position, label, slot_type, start_time, end_time, color, quality, active_days, closed_on_holidays, closed_on_sundays'
+            `id,
+            position,
+            label,
+            type_code,
+            type_category,
+            start_time,
+            end_time,
+            color,
+            quality_weekdays,
+            quality_saturday,
+            quality_sunday,
+            open_mauvaise_weekdays,
+            open_mauvaise_saturday,
+            open_mauvaise_sunday,
+            open_bonus_weekdays,
+            open_bonus_saturday,
+            open_bonus_sunday`
           )
           .order('position');
         if (error) {
           console.error(error);
           if (planningFeedback) {
-            planningFeedback.textContent = 'Impossible de charger les créneaux.';
+            planningFeedback.textContent = 'Impossible de charger les colonnes.';
           }
           if (planningTables) {
             planningTables.innerHTML = '<p class="empty-planning">Impossible de charger le planning.</p>';
+          }
+          if (planningConfigContainer) {
+            planningConfigContainer.innerHTML = '<p class="empty-planning">Impossible de charger les colonnes.</p>';
           }
           planningLoading = false;
           return;
         }
         let slots = data ?? [];
-        slots = await ensurePlanningSlots(supabase, slots);
+        slots = await ensurePlanningColumns(supabase, slots);
         planningSlots = slots.map((slot) => ({
           ...slot,
-          active_days: Array.isArray(slot.active_days)
-            ? slot.active_days.map((day) => day.toLowerCase()).sort((a, b) => WEEKDAY_KEYS.indexOf(a) - WEEKDAY_KEYS.indexOf(b))
-            : []
+          color: normalizeColor(slot.color),
+          label: (() => {
+            const rawLabel = typeof slot.label === 'string' ? slot.label.trim() : '';
+            if (rawLabel) {
+              return rawLabel;
+            }
+            const code = typeof slot.type_code === 'string' ? slot.type_code.trim() : '';
+            return code || `Colonne ${slot.position}`;
+          })(),
+          type_code: ((slot.type_code ?? '').trim().toUpperCase()) || null,
+          type_category: (() => {
+            const rawCategory = typeof slot.type_category === 'string' ? slot.type_category.trim() : '';
+            if (['Visite', 'Consultation', 'Téléconsultation'].includes(rawCategory)) {
+              return rawCategory;
+            }
+            return inferTypeCategory(slot.type_code);
+          })(),
+          quality_weekdays: sanitizeQuality(slot.quality_weekdays),
+          quality_saturday: sanitizeQuality(slot.quality_saturday),
+          quality_sunday: sanitizeQuality(slot.quality_sunday),
+          open_mauvaise_weekdays: toBoolean(slot.open_mauvaise_weekdays),
+          open_mauvaise_saturday: toBoolean(slot.open_mauvaise_saturday),
+          open_mauvaise_sunday: toBoolean(slot.open_mauvaise_sunday),
+          open_bonus_weekdays: toBoolean(slot.open_bonus_weekdays),
+          open_bonus_saturday: toBoolean(slot.open_bonus_saturday),
+          open_bonus_sunday: toBoolean(slot.open_bonus_sunday)
         }));
         const total = planningSlots.length;
         if (planningFeedback) {
-          planningFeedback.textContent = `${total} créneau${total > 1 ? 'x' : ''} configuré${total > 1 ? 's' : ''}.`;
+          planningFeedback.textContent = `${total} colonne${total > 1 ? 's' : ''} configurée${total > 1 ? 's' : ''}.`;
         }
         renderPlanningTables();
+        renderPlanningConfig();
         planningLoading = false;
       };
 
@@ -856,6 +1282,9 @@
           if (slotForm.elements['color']) {
             slotForm.elements['color'].value = DEFAULT_COLOR;
           }
+          if (slotForm.elements['position']) {
+            slotForm.elements['position'].value = '';
+          }
         }
         if (slotFeedback) {
           slotFeedback.textContent = '';
@@ -875,21 +1304,70 @@
         if (!slotForm) {
           return;
         }
-        slotForm.elements['position'].value = position;
-        slotForm.elements['label'].value = slot.label ?? `Créneau ${position}`;
-        slotForm.elements['slotType'].value = slot.slot_type ?? '';
-        slotForm.elements['startTime'].value = slot.start_time ?? '';
-        slotForm.elements['endTime'].value = slot.end_time ?? '';
-        slotForm.elements['color'].value = normalizeColor(slot.color);
-        slotForm.elements['quality'].value = slot.quality ?? '';
-        const active = new Set((slot.active_days ?? []).map((day) => day.toLowerCase()));
-        slotForm.querySelectorAll('input[name="activeDays"]').forEach((checkbox) => {
-          checkbox.checked = active.has(checkbox.value);
-        });
-        slotForm.elements['closedOnSundays'].checked = Boolean(slot.closed_on_sundays);
-        slotForm.elements['closedOnHolidays'].checked = slot.closed_on_holidays !== false;
-        slotModal?.classList.remove('hidden');
         const labelInput = slotForm.elements['label'];
+        if (labelInput) {
+          labelInput.value = slot.label ?? slot.type_code ?? `Colonne ${position}`;
+        }
+        const typeCodeInput = slotForm.elements['typeCode'];
+        if (typeCodeInput) {
+          typeCodeInput.value = (slot.type_code ?? '').toUpperCase();
+        }
+        const typeCategorySelect = slotForm.elements['typeCategory'];
+        if (typeCategorySelect) {
+          const normalizedCode = (slot.type_code ?? '').trim().toUpperCase();
+          const mapped = TYPE_CATEGORY_MAP.get(normalizedCode) ?? slot.type_category ?? 'Visite';
+          typeCategorySelect.value = mapped;
+        }
+        const startInput = slotForm.elements['startTime'];
+        if (startInput) {
+          startInput.value = slot.start_time ?? '';
+        }
+        const endInput = slotForm.elements['endTime'];
+        if (endInput) {
+          endInput.value = slot.end_time ?? '';
+        }
+        const colorInput = slotForm.elements['color'];
+        if (colorInput) {
+          colorInput.value = normalizeColor(slot.color);
+        }
+        const qualityWeekdays = slotForm.elements['qualityWeekdays'];
+        if (qualityWeekdays) {
+          qualityWeekdays.value = sanitizeQuality(slot.quality_weekdays);
+        }
+        const qualitySaturday = slotForm.elements['qualitySaturday'];
+        if (qualitySaturday) {
+          qualitySaturday.value = sanitizeQuality(slot.quality_saturday);
+        }
+        const qualitySunday = slotForm.elements['qualitySunday'];
+        if (qualitySunday) {
+          qualitySunday.value = sanitizeQuality(slot.quality_sunday);
+        }
+        const openMauvaiseWeekdays = slotForm.elements['openMauvaiseWeekdays'];
+        if (openMauvaiseWeekdays) {
+          openMauvaiseWeekdays.value = slot.open_mauvaise_weekdays ? 'true' : 'false';
+        }
+        const openMauvaiseSaturday = slotForm.elements['openMauvaiseSaturday'];
+        if (openMauvaiseSaturday) {
+          openMauvaiseSaturday.value = slot.open_mauvaise_saturday ? 'true' : 'false';
+        }
+        const openMauvaiseSunday = slotForm.elements['openMauvaiseSunday'];
+        if (openMauvaiseSunday) {
+          openMauvaiseSunday.value = slot.open_mauvaise_sunday ? 'true' : 'false';
+        }
+        const openBonusWeekdays = slotForm.elements['openBonusWeekdays'];
+        if (openBonusWeekdays) {
+          openBonusWeekdays.value = slot.open_bonus_weekdays ? 'true' : 'false';
+        }
+        const openBonusSaturday = slotForm.elements['openBonusSaturday'];
+        if (openBonusSaturday) {
+          openBonusSaturday.value = slot.open_bonus_saturday ? 'true' : 'false';
+        }
+        const openBonusSunday = slotForm.elements['openBonusSunday'];
+        if (openBonusSunday) {
+          openBonusSunday.value = slot.open_bonus_sunday ? 'true' : 'false';
+        }
+        slotForm.elements['position'].value = position;
+        slotModal?.classList.remove('hidden');
         labelInput?.focus();
       };
 
@@ -900,12 +1378,25 @@
         if (!position) {
           return;
         }
-        const label = formData.get('label').trim();
-        const activeDays = formData
-          .getAll('activeDays')
-          .map((day) => day.toLowerCase())
-          .sort((a, b) => WEEKDAY_KEYS.indexOf(a) - WEEKDAY_KEYS.indexOf(b));
+        const rawLabel = formData.get('label');
+        const label = typeof rawLabel === 'string' ? rawLabel.trim() : '';
+        const rawTypeCode = formData.get('typeCode');
+        const typeCode = typeof rawTypeCode === 'string' ? rawTypeCode.replace(/\s+/g, '').toUpperCase() : '';
+        const categoryValue = formData.get('typeCategory');
+        const allowedCategories = ['Visite', 'Consultation', 'Téléconsultation'];
+        const typeCategory = allowedCategories.includes(categoryValue) ? categoryValue : TYPE_CATEGORY_MAP.get(typeCode) ?? 'Visite';
         const color = normalizeColor(formData.get('color'));
+        const qualityWeekdays = sanitizeQuality(formData.get('qualityWeekdays'));
+        const qualitySaturday = sanitizeQuality(formData.get('qualitySaturday'));
+        const qualitySunday = sanitizeQuality(formData.get('qualitySunday'));
+        const openMauvaiseWeekdays = selectToBoolean(formData.get('openMauvaiseWeekdays'), true);
+        const openMauvaiseSaturday = selectToBoolean(formData.get('openMauvaiseSaturday'), true);
+        const openMauvaiseSunday = selectToBoolean(formData.get('openMauvaiseSunday'), true);
+        const openBonusWeekdays = selectToBoolean(formData.get('openBonusWeekdays'), true);
+        const openBonusSaturday = selectToBoolean(formData.get('openBonusSaturday'), true);
+        const openBonusSunday = selectToBoolean(formData.get('openBonusSunday'), true);
+        const startTime = formData.get('startTime') || null;
+        const endTime = formData.get('endTime') || null;
         if (slotFeedback) {
           slotFeedback.textContent = 'Enregistrement en cours…';
         }
@@ -913,25 +1404,31 @@
         const supabase = getSupabaseClient();
         const payload = {
           position,
-          label: label || `Créneau ${position}`,
-          slot_type: formData.get('slotType').trim() || null,
-          start_time: formData.get('startTime') || null,
-          end_time: formData.get('endTime') || null,
+          label: label || typeCode || `Colonne ${position}`,
+          type_code: typeCode || null,
+          type_category: typeCategory,
+          start_time: startTime && startTime !== '' ? startTime : null,
+          end_time: endTime && endTime !== '' ? endTime : null,
           color,
-          quality: formData.get('quality').trim() || null,
-          active_days: activeDays,
-          closed_on_sundays: formData.get('closedOnSundays') === 'on',
-          closed_on_holidays: formData.get('closedOnHolidays') === 'on'
+          quality_weekdays: qualityWeekdays,
+          quality_saturday: qualitySaturday,
+          quality_sunday: qualitySunday,
+          open_mauvaise_weekdays: openMauvaiseWeekdays,
+          open_mauvaise_saturday: openMauvaiseSaturday,
+          open_mauvaise_sunday: openMauvaiseSunday,
+          open_bonus_weekdays: openBonusWeekdays,
+          open_bonus_saturday: openBonusSaturday,
+          open_bonus_sunday: openBonusSunday
         };
-        const { error } = await supabase.from('planning_slots').upsert(payload, { onConflict: 'position' });
+        const { error } = await supabase.from('planning_columns').upsert(payload, { onConflict: 'position' });
         if (error) {
           console.error(error);
           if (slotFeedback) {
-            slotFeedback.textContent = "Impossible d'enregistrer le créneau.";
+            slotFeedback.textContent = "Impossible d'enregistrer la colonne.";
           }
           return;
         }
-        await loadPlanningSlots();
+        await loadPlanningColumns();
         closeSlotModal();
       };
 
@@ -961,6 +1458,20 @@
       if (planningTables) {
         planningTables.addEventListener('click', (event) => {
           const button = event.target.closest('.planning-slot-button');
+          if (!button) {
+            return;
+          }
+          const position = Number(button.dataset.position);
+          const slot = planningSlots.find((candidate) => candidate.position === position);
+          if (slot) {
+            openSlotModal(slot);
+          }
+        });
+      }
+
+      if (planningConfigContainer) {
+        planningConfigContainer.addEventListener('click', (event) => {
+          const button = event.target.closest('.planning-config-edit');
           if (!button) {
             return;
           }
@@ -1058,9 +1569,9 @@
         await onSupabaseReady();
         const supabase = getSupabaseClient();
         planningChannel = supabase
-          .channel('planning-slots-changes')
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'planning_slots' }, () => {
-            loadPlanningSlots();
+          .channel('planning-columns-changes')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'planning_columns' }, () => {
+            loadPlanningColumns();
           })
           .subscribe();
       };
@@ -1073,7 +1584,7 @@
       }
 
       loadUsers();
-      loadPlanningSlots();
+      loadPlanningColumns();
       subscribeToUserChanges();
       subscribeToPlanningChanges();
 
