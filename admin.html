@@ -68,8 +68,8 @@
             </div>
           </form>
 
-          <div class="planning-config" id="planning-config" aria-live="polite"></div>
           <div class="planning-tables" id="planning-tables" aria-live="polite"></div>
+          <div class="planning-config" id="planning-config" aria-live="polite"></div>
         </section>
 
         <footer class="admin-footer" aria-labelledby="create-title">
@@ -681,20 +681,33 @@
           const slotColor = normalizeColor(slot.color);
           button.style.setProperty('--slot-color', slotColor);
           const title = slot.label ?? `Colonne ${slot.position}`;
-          const metaParts = [];
-          if (slot.type_code) {
-            metaParts.push(slot.type_code);
+          const slotNumber = String(slot.position).padStart(2, '0');
+          const slotType = slot.type_code ?? '';
+          const slotTime = slot.start_time && slot.end_time ? `${slot.start_time} – ${slot.end_time}` : '';
+          button.innerHTML = '';
+          const numberSpan = document.createElement('span');
+          numberSpan.className = 'planning-slot-number';
+          numberSpan.textContent = slotNumber;
+          button.appendChild(numberSpan);
+
+          const labelSpan = document.createElement('span');
+          labelSpan.className = 'planning-slot-label';
+          labelSpan.textContent = title;
+          button.appendChild(labelSpan);
+
+          if (slotType) {
+            const typeSpan = document.createElement('span');
+            typeSpan.className = 'planning-slot-type';
+            typeSpan.textContent = slotType;
+            button.appendChild(typeSpan);
           }
-          if (slot.type_category) {
-            metaParts.push(slot.type_category);
+
+          if (slotTime) {
+            const timeSpan = document.createElement('span');
+            timeSpan.className = 'planning-slot-time';
+            timeSpan.textContent = slotTime;
+            button.appendChild(timeSpan);
           }
-          if (slot.start_time && slot.end_time) {
-            metaParts.push(`${slot.start_time} – ${slot.end_time}`);
-          }
-          button.innerHTML = `
-            <span class="planning-slot-label">${title}</span>
-            <span class="planning-slot-meta">${metaParts.join(' · ')}</span>
-          `;
           th.appendChild(button);
           headerRow.appendChild(th);
         });
@@ -742,10 +755,10 @@
             const open = isSlotOpen(slot, segment);
             const content = document.createElement('div');
             content.className = 'planning-summary-content';
-            const label = document.createElement('span');
-            label.className = 'planning-summary-label';
-            label.textContent = slot.label ?? slot.type_code ?? `Colonne ${slot.position}`;
-            content.appendChild(label);
+            const typeLabel = document.createElement('span');
+            typeLabel.className = 'planning-summary-label';
+            typeLabel.textContent = slot.type_code ?? slot.label ?? `Colonne ${slot.position}`;
+            content.appendChild(typeLabel);
             if (slot.start_time && slot.end_time) {
               const schedule = document.createElement('span');
               schedule.className = 'planning-summary-time';

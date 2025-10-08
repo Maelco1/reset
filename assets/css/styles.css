@@ -442,25 +442,40 @@ main {
   display: grid;
   gap: 4px;
   width: 100%;
-  background: transparent;
-  border: none;
   text-align: left;
-  padding: 8px;
-  border-radius: 8px;
-  border-left: 4px solid var(--slot-color, #3498db);
-  background: rgba(52, 152, 219, 0.12);
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  background: rgba(248, 250, 252, 0.85);
   color: inherit;
+  border-top: 4px solid var(--slot-color, #3498db);
 }
 
 .planning-slot-button:hover {
-  background: rgba(52, 152, 219, 0.2);
+  border-color: rgba(52, 152, 219, 0.45);
+  box-shadow: 0 10px 18px rgba(52, 152, 219, 0.18);
+}
+
+.planning-slot-number {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(15, 23, 42, 0.65);
 }
 
 .planning-slot-label {
   font-weight: 600;
+  color: #0f172a;
 }
 
-.planning-slot-meta {
+.planning-slot-type {
+  font-size: 0.85rem;
+  color: rgba(15, 23, 42, 0.85);
+  font-weight: 600;
+}
+
+.planning-slot-time {
   font-size: 0.85rem;
   color: rgba(44, 62, 80, 0.7);
 }
@@ -672,8 +687,11 @@ header nav {
   position: fixed;
   inset: 0;
   background: rgba(15, 23, 42, 0.55);
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  overflow-y: auto;
+  padding: 32px 16px;
   z-index: 1000;
 }
 
@@ -681,10 +699,21 @@ header nav {
   background: #fff;
   padding: 32px;
   border-radius: var(--radius);
-  width: min(480px, 90vw);
+  width: min(520px, 90vw);
   box-shadow: var(--shadow);
   display: grid;
   gap: 16px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.modal-actions {
+  position: sticky;
+  bottom: -32px;
+  background: linear-gradient(to top, #fff 70%, rgba(255, 255, 255, 0));
+  padding-top: 16px;
+  padding-bottom: 16px;
+  margin-bottom: -16px;
 }
 
 .hidden {
