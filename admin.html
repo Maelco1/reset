@@ -710,7 +710,6 @@
           const slotNumber = String(slot.position).padStart(2, '0');
           const slotType = slot.type_code ?? '';
           const slotTime = getSlotTimeRange(slot);
-          button.innerHTML = '';
           const buttonTitleParts = [slotNumber, title];
           if (slotType) {
             buttonTitleParts.push(slotType);
@@ -721,30 +720,10 @@
           const buttonTitle = buttonTitleParts.join(' · ');
           button.title = buttonTitle;
           button.setAttribute('aria-label', buttonTitle);
-          const numberSpan = document.createElement('span');
-          numberSpan.className = 'planning-slot-number';
-          numberSpan.setAttribute('aria-hidden', 'true');
-          numberSpan.textContent = slotNumber;
-          button.appendChild(numberSpan);
-
-          const labelSpan = document.createElement('span');
-          labelSpan.className = 'planning-slot-label';
-          labelSpan.textContent = title;
-          button.appendChild(labelSpan);
-
-          if (slotType) {
-            const typeSpan = document.createElement('span');
-            typeSpan.className = 'planning-slot-type';
-            typeSpan.textContent = slotType;
-            button.appendChild(typeSpan);
-          }
-
-          if (slotTime) {
-            const timeSpan = document.createElement('span');
-            timeSpan.className = 'planning-slot-time';
-            timeSpan.textContent = slotTime;
-            button.appendChild(timeSpan);
-          }
+          const srLabel = document.createElement('span');
+          srLabel.className = 'sr-only';
+          srLabel.textContent = buttonTitle;
+          button.appendChild(srLabel);
           th.appendChild(button);
           headerRow.appendChild(th);
         });
@@ -884,10 +863,14 @@
           posBadge.className = 'planning-config-position';
           posBadge.textContent = String(slot.position).padStart(2, '0');
           colCell.appendChild(posBadge);
-          const name = document.createElement('div');
-          name.className = 'planning-config-label';
-          name.textContent = slot.label ?? `Colonne ${slot.position}`;
-          colCell.appendChild(name);
+          const labelText = (slot.label ?? `Colonne ${slot.position}`).trim();
+          const typeText = (slot.type_code ?? '').trim();
+          if (labelText && labelText.toLowerCase() !== typeText.toLowerCase()) {
+            const name = document.createElement('div');
+            name.className = 'planning-config-label';
+            name.textContent = labelText;
+            colCell.appendChild(name);
+          }
           row.appendChild(colCell);
 
           const typeCell = document.createElement('td');
@@ -904,21 +887,22 @@
           row.appendChild(typeCell);
 
           const scheduleCell = document.createElement('td');
-          if (slot.start_time && slot.end_time) {
-            scheduleCell.textContent = `${slot.start_time} – ${slot.end_time}`;
-          } else {
-            scheduleCell.textContent = '—';
-          }
+          const schedule = getSlotTimeRange(slot);
+          scheduleCell.textContent = schedule || '—';
           row.appendChild(scheduleCell);
 
           const colorCell = document.createElement('td');
+          colorCell.className = 'planning-config-color-cell';
           const swatch = document.createElement('span');
           swatch.className = 'planning-config-color';
           swatch.style.backgroundColor = normalizeColor(slot.color);
+          swatch.setAttribute('aria-hidden', 'true');
           colorCell.appendChild(swatch);
           const colorValue = document.createElement('span');
+          colorValue.className = 'sr-only';
           colorValue.textContent = normalizeColor(slot.color);
           colorCell.appendChild(colorValue);
+          colorCell.title = normalizeColor(slot.color);
           row.appendChild(colorCell);
 
           const qualityCell = document.createElement('td');
