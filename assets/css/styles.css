@@ -223,6 +223,86 @@ main {
   padding-bottom: 8px;
 }
 
+.planning-config {
+  overflow-x: auto;
+}
+
+.planning-config-list {
+  min-width: max-content;
+}
+
+.planning-config-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: rgba(255, 255, 255, 0.85);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.planning-config-table th,
+.planning-config-table td {
+  padding: 12px;
+  border-bottom: 1px solid #ecf0f1;
+  vertical-align: top;
+}
+
+.planning-config-table th {
+  background: rgba(30, 41, 59, 0.08);
+  text-align: left;
+  font-size: 0.9rem;
+}
+
+.planning-config-position {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  margin-right: 8px;
+  border-radius: 999px;
+  background: rgba(30, 41, 59, 0.12);
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.planning-config-label {
+  font-weight: 600;
+}
+
+.planning-config-type {
+  font-weight: 600;
+}
+
+.planning-config-category {
+  font-size: 0.85rem;
+  color: rgba(44, 62, 80, 0.7);
+}
+
+.planning-config-color {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  margin-right: 8px;
+  border: 1px solid rgba(44, 62, 80, 0.12);
+}
+
+.planning-config-line {
+  display: flex;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: rgba(44, 62, 80, 0.75);
+}
+
+.planning-config-line strong {
+  font-weight: 600;
+  color: rgba(44, 62, 80, 0.85);
+}
+
+.planning-config-edit {
+  white-space: nowrap;
+}
+
 .planning-month {
   display: grid;
   gap: 12px;
