@@ -167,32 +167,42 @@
         <form id="slot-form">
           <input type="hidden" name="position" id="slot-position" />
 
-          <label for="slot-label">Nom de la colonne</label>
-          <input id="slot-label" name="label" type="text" required />
+          <div class="slot-grid">
+            <div class="slot-field-group">
+              <label for="slot-label">Nom de la colonne</label>
+              <input id="slot-label" name="label" type="text" required />
+            </div>
 
-          <label for="slot-type-code">Type de colonne (acronyme)</label>
-          <input id="slot-type-code" name="typeCode" type="text" required />
+            <div class="slot-field-group">
+              <label for="slot-type-code">Type de colonne (acronyme)</label>
+              <input id="slot-type-code" name="typeCode" type="text" required />
+            </div>
 
-          <label for="slot-type-category">Catégorie</label>
-          <select id="slot-type-category" name="typeCategory" required>
-            <option value="Visite">Visite</option>
-            <option value="Consultation">Consultation</option>
-            <option value="Téléconsultation">Téléconsultation</option>
-          </select>
+            <div class="slot-field-group">
+              <label for="slot-type-category">Catégorie</label>
+              <select id="slot-type-category" name="typeCategory" required>
+                <option value="Visite">Visite</option>
+                <option value="Consultation">Consultation</option>
+                <option value="Téléconsultation">Téléconsultation</option>
+              </select>
+            </div>
+
+            <div class="slot-field-group">
+              <label for="slot-color">Couleur</label>
+              <input id="slot-color" name="color" type="color" value="#1e293b" />
+            </div>
+          </div>
 
           <div class="slot-times">
-            <div>
+            <div class="slot-field-group">
               <label for="slot-start">Début</label>
               <input id="slot-start" name="startTime" type="time" />
             </div>
-            <div>
+            <div class="slot-field-group">
               <label for="slot-end">Fin</label>
               <input id="slot-end" name="endTime" type="time" />
             </div>
           </div>
-
-          <label for="slot-color">Couleur</label>
-          <input id="slot-color" name="color" type="color" value="#1e293b" />
           <fieldset class="slot-qualities">
             <legend>Qualité par période</legend>
             <div class="slot-qualities-grid">
@@ -505,6 +515,21 @@
 
       const formatBoolean = (value) => (value ? 'Oui' : 'Non');
 
+      const getSlotTimeRange = (slot) => {
+        const start = (slot.start_time ?? '').trim();
+        const end = (slot.end_time ?? '').trim();
+        if (start && end) {
+          return `${start} – ${end}`;
+        }
+        if (start) {
+          return `Début ${start}`;
+        }
+        if (end) {
+          return `Fin ${end}`;
+        }
+        return '';
+      };
+
       const selectToBoolean = (value, fallback = true) => {
         if (value === 'true') {
           return true;
@@ -648,8 +673,9 @@
         if (slot.type_category) {
           details.push(slot.type_category);
         }
-        if (slot.start_time && slot.end_time) {
-          details.push(`${slot.start_time} – ${slot.end_time}`);
+        const slotTime = getSlotTimeRange(slot);
+        if (slotTime) {
+          details.push(slotTime);
         }
         details.push(`Qualité : ${quality}`);
         details.push(isOpen ? 'Ouvert' : 'Fermé');
@@ -683,10 +709,21 @@
           const title = slot.label ?? `Colonne ${slot.position}`;
           const slotNumber = String(slot.position).padStart(2, '0');
           const slotType = slot.type_code ?? '';
-          const slotTime = slot.start_time && slot.end_time ? `${slot.start_time} – ${slot.end_time}` : '';
+          const slotTime = getSlotTimeRange(slot);
           button.innerHTML = '';
+          const buttonTitleParts = [slotNumber, title];
+          if (slotType) {
+            buttonTitleParts.push(slotType);
+          }
+          if (slotTime) {
+            buttonTitleParts.push(slotTime);
+          }
+          const buttonTitle = buttonTitleParts.join(' · ');
+          button.title = buttonTitle;
+          button.setAttribute('aria-label', buttonTitle);
           const numberSpan = document.createElement('span');
           numberSpan.className = 'planning-slot-number';
+          numberSpan.setAttribute('aria-hidden', 'true');
           numberSpan.textContent = slotNumber;
           button.appendChild(numberSpan);
 
@@ -759,10 +796,11 @@
             typeLabel.className = 'planning-summary-label';
             typeLabel.textContent = slot.type_code ?? slot.label ?? `Colonne ${slot.position}`;
             content.appendChild(typeLabel);
-            if (slot.start_time && slot.end_time) {
+            const slotTime = getSlotTimeRange(slot);
+            if (slotTime) {
               const schedule = document.createElement('span');
               schedule.className = 'planning-summary-time';
-              schedule.textContent = `${slot.start_time} – ${slot.end_time}`;
+              schedule.textContent = slotTime;
               content.appendChild(schedule);
             }
             cell.appendChild(content);

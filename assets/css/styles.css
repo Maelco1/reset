@@ -440,10 +440,11 @@ main {
 
 .planning-slot-button {
   display: grid;
-  gap: 4px;
+  gap: 8px;
   width: 100%;
-  text-align: left;
-  padding: 12px;
+  text-align: center;
+  justify-items: center;
+  padding: 16px 12px;
   border-radius: 12px;
   border: 1px solid rgba(15, 23, 42, 0.12);
   background: rgba(248, 250, 252, 0.85);
@@ -457,27 +458,37 @@ main {
 }
 
 .planning-slot-number {
-  font-size: 0.75rem;
-  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(52, 152, 219, 0.16);
+  color: var(--accent);
+  font-size: 0.85rem;
+  font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: rgba(15, 23, 42, 0.65);
 }
 
 .planning-slot-label {
   font-weight: 600;
   color: #0f172a;
+  text-align: center;
 }
 
 .planning-slot-type {
   font-size: 0.85rem;
   color: rgba(15, 23, 42, 0.85);
   font-weight: 600;
+  text-align: center;
 }
 
 .planning-slot-time {
   font-size: 0.85rem;
   color: rgba(44, 62, 80, 0.7);
+  text-align: center;
 }
 
 .planning-summary-cell {
@@ -554,13 +565,60 @@ main {
 }
 
 .planning-modal {
-  width: min(560px, 90vw);
+  width: min(720px, 95vw);
+  max-width: 720px;
+}
+
+.slot-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.slot-field-group {
+  display: grid;
+  gap: 8px;
 }
 
 .slot-times {
   display: grid;
-  gap: 12px;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.slot-qualities,
+.slot-openings {
+  display: grid;
+  gap: 16px;
+  padding: 16px;
+  border: 1px solid #ecf0f1;
+  border-radius: 12px;
+  background: rgba(248, 250, 252, 0.7);
+}
+
+.slot-qualities legend,
+.slot-openings legend {
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.slot-qualities-grid,
+.slot-openings-grid {
+  display: grid;
+  gap: 12px 20px;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+
+.slot-openings-grid > div {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+}
+
+.slot-openings-grid h3 {
+  margin: 0 0 4px 0;
+  font-size: 1rem;
+  color: var(--accent);
 }
 
 .slot-days {
@@ -688,10 +746,10 @@ header nav {
   inset: 0;
   background: rgba(15, 23, 42, 0.55);
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: center;
   overflow-y: auto;
-  padding: 32px 16px;
+  padding: 48px 16px;
   z-index: 1000;
 }
 
