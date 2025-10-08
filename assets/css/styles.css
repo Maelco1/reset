@@ -429,13 +429,14 @@ main {
 .planning-table th,
 .planning-table td {
   border: 1px solid #ecf0f1;
-  padding: 8px 6px;
+  padding: 6px 4px;
   vertical-align: top;
 }
 
 .planning-table thead th {
   background: rgba(52, 152, 219, 0.08);
-  font-size: 0.85rem;
+  font-size: 0.75rem;
+  line-height: 1.2;
   text-align: center;
   white-space: nowrap;
 }
@@ -480,10 +481,10 @@ main {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: 3px;
   width: 100%;
-  padding: 6px 4px;
-  border-radius: 10px;
+  padding: 4px 3px;
+  border-radius: 8px;
   border: 1px solid rgba(15, 23, 42, 0.18);
   background: var(--slot-color, #3498db);
   transition: transform var(--transition), box-shadow var(--transition);
@@ -513,11 +514,11 @@ main {
 
 .planning-slot-number {
   font-weight: 700;
-  font-size: 0.85rem;
+  font-size: 0.78rem;
 }
 
 .planning-slot-title {
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   font-weight: 600;
 }
 
@@ -529,27 +530,27 @@ main {
 }
 
 .planning-slot-toggle {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 72px;
-  min-height: 72px;
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  width: 70px;
+  min-height: 56px;
   margin: 0 auto;
-  border-radius: 14px;
+  border-radius: 12px;
   border: 1px solid rgba(148, 163, 184, 0.6);
   background: #ffffff;
   color: #1f2937;
   font: inherit;
   font-weight: 600;
-  font-size: 1.25rem;
-  padding: 0;
+  font-size: 0.95rem;
+  padding: 6px 4px;
   cursor: pointer;
   transition: background var(--transition), border-color var(--transition), box-shadow var(--transition), transform var(--transition);
 }
 
 .planning-slot-toggle:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 12px 24px rgba(37, 99, 235, 0.18);
+  transform: translateY(-1px);
+  box-shadow: 0 10px 18px rgba(37, 99, 235, 0.18);
 }
 
 .planning-slot-toggle:focus-visible {
@@ -557,13 +558,9 @@ main {
   outline-offset: 2px;
 }
 
-.planning-slot-toggle-symbol {
-  line-height: 1;
-}
-
 .planning-slot-toggle[data-state='available'] {
-  background: rgba(148, 163, 184, 0.12);
-  border-color: rgba(148, 163, 184, 0.6);
+  background: rgba(148, 163, 184, 0.08);
+  border-color: rgba(148, 163, 184, 0.55);
 }
 
 .planning-slot-toggle[data-state='available']:hover {
@@ -579,20 +576,39 @@ main {
   box-shadow: none;
 }
 
-.planning-slot-toggle[data-state='closed'] .planning-slot-toggle-symbol {
-  font-size: 0.9rem;
-  font-weight: 600;
+.planning-slot-toggle .sr-only {
+  position: absolute;
 }
 
-.planning-slot-toggle.is-selected {
-  background: #dbeafe;
-  border-color: #60a5fa;
+.planning-assignment-tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.16);
   color: #1d4ed8;
-  box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.35);
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
-.planning-slot-toggle.is-selected .planning-slot-toggle-symbol {
-  color: inherit;
+.planning-assignment-tag.is-empty {
+  background: rgba(148, 163, 184, 0.2);
+  color: #475569;
+}
+
+.planning-assignment-role {
+  font-size: 0.65rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.planning-slot-toggle[data-state='closed'] .planning-assignment-tag {
+  background: rgba(148, 163, 184, 0.24);
+  color: #475569;
 }
 
 .planning-holiday .planning-day-header {
@@ -616,6 +632,31 @@ main {
   display: grid;
   gap: 16px;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.assignment-form {
+  display: grid;
+  gap: 16px;
+}
+
+.assignment-select {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--planning-border, #d4dbe6);
+  background: var(--planning-bg, #ffffff);
+  font: inherit;
+}
+
+.assignment-select:focus-visible {
+  outline: 3px solid var(--planning-accent, #2563eb);
+  outline-offset: 2px;
+}
+
+#assignment-feedback {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--planning-sub, rgba(44, 62, 80, 0.7));
 }
 
 .slot-field-group {
@@ -1145,36 +1186,32 @@ main {
 }
 
 .planning-slot-toggle {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 72px;
-  min-height: 72px;
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  width: 70px;
+  min-height: 56px;
   margin: 0 auto;
-  border-radius: 14px;
+  border-radius: 12px;
   border: 1px solid var(--planning-border);
   background: var(--planning-surface, #ffffff);
   color: var(--planning-text);
   font: inherit;
   font-weight: 600;
-  font-size: 1.25rem;
-  padding: 0;
+  font-size: 0.95rem;
+  padding: 6px 4px;
   cursor: pointer;
   transition: background var(--transition), border-color var(--transition), box-shadow var(--transition), transform var(--transition);
 }
 
 .planning-slot-toggle:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 12px 24px rgba(37, 99, 235, 0.18);
+  transform: translateY(-1px);
+  box-shadow: 0 10px 18px rgba(37, 99, 235, 0.18);
 }
 
 .planning-slot-toggle:focus-visible {
   outline: 3px solid var(--planning-accent);
   outline-offset: 2px;
-}
-
-.planning-slot-toggle-symbol {
-  line-height: 1;
 }
 
 .planning-slot-toggle[data-state='available'] {
@@ -1195,20 +1232,39 @@ main {
   box-shadow: none;
 }
 
-.planning-slot-toggle[data-state='closed'] .planning-slot-toggle-symbol {
-  font-size: 0.9rem;
-  font-weight: 600;
+.planning-slot-toggle .sr-only {
+  position: absolute;
 }
 
-.planning-slot-toggle.is-selected {
-  background: #dbeafe;
-  border-color: #60a5fa;
+.planning-assignment-tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.16);
   color: #1d4ed8;
-  box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.35);
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
-.planning-slot-toggle.is-selected .planning-slot-toggle-symbol {
-  color: inherit;
+.planning-assignment-tag.is-empty {
+  background: rgba(148, 163, 184, 0.2);
+  color: #475569;
+}
+
+.planning-assignment-role {
+  font-size: 0.65rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.planning-slot-toggle[data-state='closed'] .planning-assignment-tag {
+  background: rgba(148, 163, 184, 0.24);
+  color: #475569;
 }
 
 .planning-holiday .planning-day-header {
