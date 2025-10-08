@@ -522,83 +522,84 @@ main {
 }
 
 .planning-summary-cell {
-  position: relative;
-  min-width: 0;
-  padding: 8px 6px;
-  border: 1px solid #ecf0f1;
-  border-radius: 10px;
-  background: rgba(148, 163, 184, 0.12);
-  transition: transform var(--transition), box-shadow var(--transition);
-  word-break: break-word;
-}
-
-.planning-summary-content {
-  display: grid;
-  gap: 4px;
-  align-content: start;
-  justify-items: center;
+  padding: 12px;
+  border: none;
+  background: transparent;
   text-align: center;
 }
 
-.planning-summary-label {
+.planning-slot-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  min-height: 72px;
+  margin: 0 auto;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.6);
+  background: #ffffff;
+  color: #1f2937;
+  font: inherit;
   font-weight: 600;
+  font-size: 1.25rem;
+  padding: 0;
+  cursor: pointer;
+  transition: background var(--transition), border-color var(--transition), box-shadow var(--transition), transform var(--transition);
 }
 
-.planning-summary-status {
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
+.planning-slot-toggle:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 24px rgba(37, 99, 235, 0.18);
 }
 
-.planning-summary-details {
-  font-size: 0.85rem;
-  color: rgba(44, 62, 80, 0.65);
+.planning-slot-toggle:focus-visible {
+  outline: 3px solid var(--focus-ring-color);
+  outline-offset: 2px;
 }
 
-.planning-summary-open {
-  background: var(--planning-cell-color, #1e293b);
-  border-color: rgba(255, 255, 255, 0.18);
-  color: var(--planning-cell-text, #ffffff);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+.planning-slot-toggle-symbol {
+  line-height: 1;
 }
 
-.planning-summary-open .planning-summary-status,
-.planning-summary-open .planning-summary-details {
-  color: inherit;
-  opacity: 0.85;
+.planning-slot-toggle[data-state='available'] {
+  background: rgba(148, 163, 184, 0.12);
+  border-color: rgba(148, 163, 184, 0.6);
 }
 
-.planning-summary-closed {
-  background: rgba(148, 163, 184, 0.22);
-  color: rgba(30, 41, 59, 0.6);
-  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.35);
+.planning-slot-toggle[data-state='available']:hover {
+  background: rgba(59, 130, 246, 0.16);
+  border-color: rgba(59, 130, 246, 0.45);
+}
+
+.planning-slot-toggle[data-state='closed'] {
   cursor: not-allowed;
+  background: #e2e8f0;
+  border-color: rgba(148, 163, 184, 0.5);
+  color: #94a3b8;
+  box-shadow: none;
 }
 
-.planning-summary-closed .planning-summary-status,
-.planning-summary-closed .planning-summary-details {
-  color: rgba(71, 85, 105, 0.75);
+.planning-slot-toggle[data-state='closed'] .planning-slot-toggle-symbol {
+  font-size: 0.9rem;
+  font-weight: 600;
 }
 
-.planning-summary-cell:hover {
-  transform: translateY(-1px);
+.planning-slot-toggle.is-selected {
+  background: #dbeafe;
+  border-color: #60a5fa;
+  color: #1d4ed8;
+  box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.35);
 }
 
-.planning-summary-closed:hover::after {
-  content: '🚫';
-  position: absolute;
-  top: 8px;
-  right: 10px;
-  font-size: 1rem;
-  opacity: 0.8;
+.planning-slot-toggle.is-selected .planning-slot-toggle-symbol {
+  color: inherit;
 }
 
 .planning-holiday .planning-day-header {
   background: rgba(231, 76, 60, 0.08);
 }
 
-.planning-holiday .planning-summary-cell {
+.planning-holiday .planning-slot-toggle {
   box-shadow: inset 0 0 0 1px rgba(231, 76, 60, 0.2);
 }
 
@@ -1137,74 +1138,77 @@ main {
 }
 
 .planning-summary-cell {
-  display: flex;
-  align-items: stretch;
-  justify-content: center;
-  min-height: 88px;
-  padding: 8px;
-  border: 1px solid var(--planning-border);
-  border-radius: 10px;
-  background: #ffffff;
-  transition: background var(--transition), box-shadow var(--transition), border-color var(--transition);
-}
-
-.planning-summary-content {
-  display: grid;
-  gap: 6px;
-  align-content: center;
-  justify-items: center;
+  padding: 12px;
+  border: none;
+  background: transparent;
   text-align: center;
 }
 
-.planning-summary-label {
-  display: block;
-  font-weight: 600;
+.planning-slot-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  min-height: 72px;
+  margin: 0 auto;
+  border-radius: 14px;
+  border: 1px solid var(--planning-border);
+  background: var(--planning-surface, #ffffff);
   color: var(--planning-text);
+  font: inherit;
+  font-weight: 600;
+  font-size: 1.25rem;
+  padding: 0;
+  cursor: pointer;
+  transition: background var(--transition), border-color var(--transition), box-shadow var(--transition), transform var(--transition);
 }
 
-.planning-summary-status {
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--planning-sub);
+.planning-slot-toggle:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 24px rgba(37, 99, 235, 0.18);
 }
 
-.planning-summary-details {
-  font-size: 0.8rem;
-  color: var(--planning-sub);
-  line-height: 1.3;
+.planning-slot-toggle:focus-visible {
+  outline: 3px solid var(--planning-accent);
+  outline-offset: 2px;
 }
 
-.planning-summary-open {
-  background: var(--planning-cell-color, #2563eb);
-  color: var(--planning-cell-text, #ffffff);
-  border-color: transparent;
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+.planning-slot-toggle-symbol {
+  line-height: 1;
 }
 
-.planning-summary-open .planning-summary-status,
-.planning-summary-open .planning-summary-details {
-  color: var(--planning-cell-text, #ffffff);
-  opacity: 0.9;
+.planning-slot-toggle[data-state='available'] {
+  background: rgba(37, 99, 235, 0.08);
+  border-color: rgba(37, 99, 235, 0.35);
 }
 
-.planning-summary-closed {
+.planning-slot-toggle[data-state='available']:hover {
+  background: rgba(37, 99, 235, 0.16);
+  border-color: rgba(37, 99, 235, 0.5);
+}
+
+.planning-slot-toggle[data-state='closed'] {
+  cursor: not-allowed;
   background: var(--planning-muted);
-  color: var(--planning-sub);
+  border-color: rgba(148, 163, 184, 0.5);
+  color: rgba(71, 85, 105, 0.9);
+  box-shadow: none;
 }
 
-.planning-summary-closed .planning-summary-status,
-.planning-summary-closed .planning-summary-details {
-  color: var(--planning-sub);
+.planning-slot-toggle[data-state='closed'] .planning-slot-toggle-symbol {
+  font-size: 0.9rem;
+  font-weight: 600;
 }
 
-.planning-summary-cell:hover {
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+.planning-slot-toggle.is-selected {
+  background: #dbeafe;
+  border-color: #60a5fa;
+  color: #1d4ed8;
+  box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.35);
 }
 
-.planning-summary-closed:hover::after {
-  content: none;
+.planning-slot-toggle.is-selected .planning-slot-toggle-symbol {
+  color: inherit;
 }
 
 .planning-holiday .planning-day-header {
@@ -1212,7 +1216,7 @@ main {
   border-left: 3px solid rgba(37, 99, 235, 0.5);
 }
 
-.planning-holiday .planning-summary-cell {
+.planning-holiday .planning-slot-toggle {
   border-color: rgba(37, 99, 235, 0.3);
 }
 
@@ -1221,7 +1225,7 @@ main {
   border-left: 3px solid var(--planning-danger);
 }
 
-.planning-sunday .planning-summary-cell {
+.planning-sunday .planning-slot-toggle {
   border-color: rgba(220, 38, 38, 0.3);
 }
 
