@@ -1,25 +1,25 @@
 :root {
-  color-scheme: light dark;
-  --primary: #2c3e50;
-  --accent: #3498db;
-  --danger: #e74c3c;
-  --success: #27ae60;
-  --bg: #f5f7fa;
-  --text: #2c3e50;
+  color-scheme: light;
+  --primary: #1f2937;
+  --accent: #2563eb;
+  --danger: #dc2626;
+  --success: #16a34a;
+  --bg: #f8fafc;
+  --text: #1f2937;
   --radius: 12px;
-  --shadow: 0 12px 32px rgba(0, 0, 0, 0.08);
+  --shadow: 0 12px 32px rgba(15, 23, 42, 0.08);
   --transition: 0.2s ease-in-out;
   --focus-ring-color: #2563eb;
-  --planning-bg: #0b0e14;
-  --planning-panel: #0f1320;
-  --planning-muted: #0c1120;
-  --planning-border: #1f2536;
-  --planning-text: #dce3f1;
-  --planning-sub: #8f9bb9;
-  --planning-accent: #7c9cff;
-  --planning-success: #34d399;
-  --planning-danger: #ef4444;
-  --planning-grey: #475569;
+  --planning-bg: #ffffff;
+  --planning-panel: #ffffff;
+  --planning-muted: #f1f5f9;
+  --planning-border: #d4dbe6;
+  --planning-text: #1f2937;
+  --planning-sub: #475569;
+  --planning-accent: #2563eb;
+  --planning-success: #22c55e;
+  --planning-danger: #dc2626;
+  --planning-grey: #94a3b8;
 }
 
 * {
@@ -679,7 +679,7 @@ main {
   font-style: italic;
 }
 
-/* Dark planning theme overrides inspired by Supabase planning UI */
+/* Light planning theme styling */
 .planning-section {
   color: var(--planning-text);
 }
@@ -691,7 +691,7 @@ main {
   padding: 24px;
   display: grid;
   gap: 24px;
-  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
 }
 
 .planning-section-header h2 {
@@ -710,11 +710,11 @@ main {
   flex-wrap: wrap;
   gap: 16px;
   align-items: flex-end;
-  background: var(--planning-muted);
+  background: #ffffff;
   border: 1px solid var(--planning-border);
   border-radius: 16px;
   padding: 16px 20px;
-  box-shadow: inset 0 0 0 1px rgba(124, 156, 255, 0.08);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
 }
 
 .planning-control {
@@ -740,12 +740,12 @@ main {
   font-size: 0.95rem;
   font-weight: 600;
   appearance: none;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
-  transition: border-color var(--transition), box-shadow var(--transition), transform 0.15s ease;
+  transition: border-color var(--transition), box-shadow var(--transition);
 }
 
 .planning-control select:hover {
   border-color: var(--planning-accent);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.12);
 }
 
 .planning-control select:focus-visible {
@@ -763,11 +763,11 @@ main {
 .planning-board {
   flex: 1 1 640px;
   min-width: 0;
-  background: var(--planning-muted);
+  background: #ffffff;
   border: 1px solid var(--planning-border);
   border-radius: 18px;
   padding: 20px;
-  box-shadow: inset 0 0 0 1px rgba(124, 156, 255, 0.05);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
   overflow: auto;
 }
 
@@ -784,7 +784,7 @@ main {
   border: 1px solid var(--planning-border);
   border-radius: 16px;
   padding: 16px;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.1);
   min-width: max-content;
 }
 
@@ -806,11 +806,11 @@ main {
 .planning-sidebar {
   flex: 0 0 320px;
   max-width: 100%;
-  background: var(--planning-muted);
+  background: #ffffff;
   border: 1px solid var(--planning-border);
   border-radius: 18px;
   padding: 20px;
-  box-shadow: inset 0 0 0 1px rgba(124, 156, 255, 0.05);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -818,23 +818,23 @@ main {
 
 .planning-sidebar-header h3 {
   margin: 0;
-  font-size: 1rem;
+  font-size: 1.1rem;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
   color: var(--planning-text);
 }
 
 .planning-sidebar-header p {
   margin: 0;
   color: var(--planning-sub);
-  font-size: 0.85rem;
-  line-height: 1.5;
 }
 
 .planning-config {
   max-height: 540px;
   overflow: auto;
   padding-right: 6px;
+  display: grid;
+  gap: 16px;
 }
 
 .planning-config-list {
@@ -846,22 +846,22 @@ main {
   border-collapse: collapse;
   background: var(--planning-bg);
   border: 1px solid var(--planning-border);
-  border-radius: 12px;
+  border-radius: 14px;
   overflow: hidden;
   color: var(--planning-text);
 }
 
 .planning-config-table th,
 .planning-config-table td {
-  padding: 14px 16px;
   border-bottom: 1px solid var(--planning-border);
+  padding: 12px 16px;
   vertical-align: top;
 }
 
 .planning-config-table th {
-  background: #0c1120;
+  background: var(--planning-muted);
   text-align: left;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--planning-sub);
@@ -871,11 +871,11 @@ main {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   margin-right: 10px;
   border-radius: 999px;
-  background: rgba(124, 156, 255, 0.2);
+  background: rgba(37, 99, 235, 0.1);
   font-weight: 700;
   color: var(--planning-text);
 }
@@ -888,22 +888,27 @@ main {
 .planning-config-type {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   font-weight: 600;
   color: var(--planning-accent);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.85rem;
 }
 
 .planning-config-category {
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   color: var(--planning-sub);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
 }
 
 .planning-config-color {
   display: inline-block;
-  width: 16px;
-  height: 16px;
-  border-radius: 4px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  border: 1px solid rgba(148, 163, 184, 0.4);
 }
 
 .planning-config-color-cell {
@@ -914,7 +919,7 @@ main {
 .planning-config-line {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
   font-size: 0.85rem;
   color: var(--planning-sub);
 }
@@ -942,17 +947,17 @@ main {
   font-size: 0.85rem;
   padding: 8px 12px;
   border-radius: 999px;
-  border: 1px solid var(--planning-border);
-  background: rgba(124, 156, 255, 0.12);
+  border: 1px solid transparent;
+  background: rgba(37, 99, 235, 0.1);
   color: var(--planning-text);
-  transition: background var(--transition), transform 0.15s ease, box-shadow var(--transition);
+  transition: background var(--transition), box-shadow var(--transition), color var(--transition);
 }
 
 .planning-config-trigger:hover,
 .planning-config-menu.is-open .planning-config-trigger {
   background: var(--planning-accent);
-  color: #0b0e14;
-  box-shadow: 0 8px 18px rgba(124, 156, 255, 0.35);
+  color: #ffffff;
+  box-shadow: 0 12px 24px rgba(37, 99, 235, 0.2);
 }
 
 .planning-config-trigger span[aria-hidden='true'] {
@@ -968,12 +973,12 @@ main {
   top: calc(100% + 8px);
   right: 0;
   min-width: 200px;
-  padding: 10px;
+  padding: 12px;
   display: none;
   background: var(--planning-panel);
-  border-radius: 14px;
+  border-radius: 12px;
   border: 1px solid var(--planning-border);
-  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.12);
   z-index: 40;
 }
 
@@ -985,18 +990,17 @@ main {
 .planning-config-popover button {
   background: transparent;
   border: none;
-  border-radius: 10px;
-  padding: 10px 12px;
+  border-radius: 8px;
+  padding: 8px 10px;
   text-align: left;
   font-weight: 600;
   color: var(--planning-text);
   cursor: pointer;
-  transition: background var(--transition), transform 0.15s ease;
+  transition: background var(--transition);
 }
 
 .planning-config-popover button:hover {
-  background: rgba(124, 156, 255, 0.12);
-  transform: translateY(-1px);
+  background: rgba(37, 99, 235, 0.1);
 }
 
 .planning-config-edit {
@@ -1008,7 +1012,7 @@ main {
   width: max-content;
   min-width: 100%;
   table-layout: fixed;
-  background: var(--planning-bg);
+  background: var(--planning-panel);
   border-radius: 12px;
   overflow: hidden;
   border: 1px solid var(--planning-border);
@@ -1018,47 +1022,48 @@ main {
 .planning-table th,
 .planning-table td {
   border: 1px solid var(--planning-border);
-  padding: 10px;
+  padding: 0;
   position: relative;
 }
 
 .planning-table thead th {
-  background: #0c1120;
-  color: var(--planning-text);
+  background: var(--planning-muted);
+  text-align: center;
   font-size: 0.8rem;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  position: sticky;
-  top: 0;
-  z-index: 3;
+  letter-spacing: 0.06em;
+  color: var(--planning-sub);
+  padding: 12px 8px;
 }
 
 .planning-day-col {
   position: sticky;
   left: 0;
-  background: #0c1120;
+  background: #ffffff;
   z-index: 4;
   text-align: left;
-  width: 180px;
-  min-width: 180px;
+  width: 200px;
+  min-width: 200px;
 }
 
 .planning-table thead th:not(.planning-day-col),
 .planning-table tbody td {
-  width: 5.25ch;
-  min-width: 5.25ch;
-  max-width: 5.25ch;
+  width: 56px;
+  min-width: 56px;
+  max-width: 56px;
 }
 
 .planning-day-header {
   position: sticky;
   left: 0;
-  background: var(--planning-muted);
+  background: #ffffff;
   text-align: left;
-  padding: 12px 14px;
+  padding: 12px 16px;
   color: var(--planning-text);
   font-weight: 600;
   z-index: 3;
+  display: grid;
+  gap: 4px;
 }
 
 .planning-day-header .day-name {
@@ -1072,7 +1077,6 @@ main {
 .planning-day-header .day-number {
   display: block;
   font-size: 0.95rem;
-  margin-top: 2px;
 }
 
 .planning-slot-button {
@@ -1082,21 +1086,20 @@ main {
   flex-direction: column;
   align-items: flex-start;
   gap: 8px;
-  background: rgba(124, 156, 255, 0.12);
-  border: 1px solid var(--planning-border);
+  background: rgba(37, 99, 235, 0.08);
+  border: 1px solid rgba(37, 99, 235, 0.2);
   border-radius: 12px;
   color: var(--planning-text);
   padding: 10px 12px;
   font: inherit;
   cursor: pointer;
-  transition: background var(--transition), transform 0.15s ease, box-shadow var(--transition);
-  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.02);
+  transition: background var(--transition), box-shadow var(--transition), transform var(--transition);
 }
 
 .planning-slot-button:hover {
-  background: rgba(124, 156, 255, 0.22);
+  background: rgba(37, 99, 235, 0.16);
   transform: translateY(-2px);
-  box-shadow: 0 12px 28px rgba(124, 156, 255, 0.28);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
 }
 
 .planning-slot-button:focus-visible {
@@ -1125,78 +1128,59 @@ main {
 }
 
 .planning-summary-cell {
-  min-height: 64px;
-  padding: 0;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid var(--planning-border);
-  transition: background var(--transition), box-shadow var(--transition);
-}
-
-.planning-summary-content {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
-  align-items: flex-start;
+  align-items: center;
   justify-content: center;
-  height: 100%;
-  padding: 10px 12px;
+  height: 56px;
+  padding: 0;
+  border: 1px solid var(--planning-border);
+  border-radius: 10px;
+  background: #ffffff;
+  transition: background var(--transition), box-shadow var(--transition), border-color var(--transition);
 }
 
-.planning-summary-label {
-  font-weight: 600;
-  font-size: 0.85rem;
-  color: var(--planning-text);
-}
-
+.planning-summary-content,
+.planning-summary-label,
 .planning-summary-time {
-  font-size: 0.8rem;
-  color: var(--planning-sub);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  display: none;
 }
 
 .planning-summary-open {
-  background: var(--planning-cell-color, rgba(124, 156, 255, 0.25));
-  color: var(--planning-cell-text, var(--planning-text));
-  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.08);
-}
-
-.planning-summary-open .planning-summary-time {
-  color: inherit;
+  background: var(--planning-cell-color, #2563eb);
+  color: var(--planning-cell-text, #ffffff);
+  border-color: transparent;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
 }
 
 .planning-summary-closed {
-  background: rgba(71, 85, 105, 0.3);
-  color: var(--planning-text);
-}
-
-.planning-summary-closed .planning-summary-time {
+  background: var(--planning-muted);
   color: var(--planning-sub);
 }
 
 .planning-summary-cell:hover {
-  background: rgba(124, 156, 255, 0.18);
-  box-shadow: inset 0 0 0 1px rgba(124, 156, 255, 0.45);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
 }
 
 .planning-summary-closed:hover::after {
-  content: 'Fermé';
-  position: absolute;
-  top: 8px;
-  right: 10px;
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: rgba(255, 255, 255, 0.6);
+  content: none;
 }
 
 .planning-holiday .planning-day-header {
-  background: rgba(139, 92, 246, 0.25);
-  border-left: 3px solid #8b5cf6;
+  background: rgba(59, 130, 246, 0.12);
+  border-left: 3px solid rgba(37, 99, 235, 0.5);
 }
 
 .planning-holiday .planning-summary-cell {
-  background: rgba(139, 92, 246, 0.08);
+  border-color: rgba(37, 99, 235, 0.3);
+}
+
+.planning-sunday .planning-day-header {
+  background: rgba(220, 38, 38, 0.12);
+  border-left: 3px solid var(--planning-danger);
+}
+
+.planning-sunday .planning-summary-cell {
+  border-color: rgba(220, 38, 38, 0.3);
 }
 
 .holiday-badge {
@@ -1205,20 +1189,11 @@ main {
   margin-top: 6px;
   padding: 4px 10px;
   border-radius: 999px;
-  background: rgba(139, 92, 246, 0.25);
+  background: rgba(37, 99, 235, 0.1);
   color: var(--planning-text);
   font-size: 0.7rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-}
-
-.planning-sunday .planning-day-header {
-  background: rgba(239, 68, 68, 0.18);
-  border-left: 3px solid var(--planning-danger);
-}
-
-.planning-sunday .planning-summary-cell {
-  background: rgba(239, 68, 68, 0.08);
 }
 
 .empty-planning {
