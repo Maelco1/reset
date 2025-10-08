@@ -706,11 +706,12 @@
           button.className = 'planning-slot-button';
           const slotColor = normalizeColor(slot.color);
           button.style.setProperty('--slot-color', slotColor);
-          const title = slot.label ?? `Colonne ${slot.position}`;
           const slotNumber = String(slot.position).padStart(2, '0');
+          const rawLabel = (slot.label ?? '').trim();
+          const slotLabel = rawLabel || `Colonne ${slot.position}`;
           const slotType = slot.type_code ?? '';
           const slotTime = getSlotTimeRange(slot);
-          const buttonTitleParts = [slotNumber, title];
+          const buttonTitleParts = [slotNumber, slotLabel];
           if (slotType) {
             buttonTitleParts.push(slotType);
           }
@@ -720,6 +721,17 @@
           const buttonTitle = buttonTitleParts.join(' · ');
           button.title = buttonTitle;
           button.setAttribute('aria-label', buttonTitle);
+          const heading = document.createElement('span');
+          heading.className = 'planning-slot-heading';
+          const numberLabel = document.createElement('span');
+          numberLabel.className = 'planning-slot-number';
+          numberLabel.textContent = slotNumber;
+          heading.appendChild(numberLabel);
+          const titleLabel = document.createElement('span');
+          titleLabel.className = 'planning-slot-title';
+          titleLabel.textContent = slotLabel;
+          heading.appendChild(titleLabel);
+          button.appendChild(heading);
           const srLabel = document.createElement('span');
           srLabel.className = 'sr-only';
           srLabel.textContent = buttonTitle;
