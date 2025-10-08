@@ -459,6 +459,7 @@
       let planningChannel;
       let allUsers = [];
       let planningSlots = [];
+      const selectedPlanningCells = new Set();
       let planningLoading = false;
       let openPlanningConfigMenu = null;
 
@@ -481,25 +482,6 @@
       };
 
       const normalizeColor = (value) => sanitizeColor(value) ?? DEFAULT_COLOR;
-
-      const hexToRgba = (hex, alpha) => {
-        const sanitized = sanitizeColor(hex) ?? DEFAULT_COLOR;
-        const numeric = sanitized.slice(1);
-        const r = parseInt(numeric.slice(0, 2), 16);
-        const g = parseInt(numeric.slice(2, 4), 16);
-        const b = parseInt(numeric.slice(4, 6), 16);
-        return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-      };
-
-      const getContrastingTextColor = (hex) => {
-        const sanitized = sanitizeColor(hex) ?? DEFAULT_COLOR;
-        const numeric = sanitized.slice(1);
-        const r = parseInt(numeric.slice(0, 2), 16);
-        const g = parseInt(numeric.slice(2, 4), 16);
-        const b = parseInt(numeric.slice(4, 6), 16);
-        const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-        return luminance > 0.6 ? '#1e293b' : '#ffffff';
-      };
 
       const inferTypeCategory = (typeCode) => {
         if (typeof typeCode !== 'string') {
@@ -798,62 +780,50 @@
           orderedSlots.forEach((slot) => {
             const cell = document.createElement('td');
             cell.className = 'planning-summary-cell';
-            const slotColor = normalizeColor(slot.color);
             const segment = getDaySegment(day, isHoliday);
             const quality = getQualityForSegment(slot, segment);
             const open = isSlotOpen(slot, segment);
 
-            if (open) {
-              const textColor = getContrastingTextColor(slotColor);
-              cell.classList.add('planning-summary-open');
-              cell.style.setProperty('--planning-cell-color', slotColor);
-              cell.style.setProperty('--planning-cell-text', textColor);
-              cell.style.color = textColor;
+            const summaryTitle = buildSlotTitle(slot, dayName, isHoliday, holidayName, open, quality);
+            const slotKey = `${isoKey}:${slot.position}`;
+            const isSelected = selectedPlanningCells.has(slotKey);
+
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'planning-slot-toggle';
+            button.dataset.slotKey = slotKey;
+            button.dataset.day = isoKey;
+            button.dataset.position = String(slot.position);
+            button.dataset.state = open ? 'available' : 'closed';
+            button.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
+
+            if (!open) {
+              button.disabled = true;
+              button.title = 'Fermé';
             } else {
-              cell.classList.add('planning-summary-closed');
+              button.title = summaryTitle;
             }
 
-            const summaryTitle = buildSlotTitle(slot, dayName, isHoliday, holidayName, open, quality);
+            if (isSelected && open) {
+              button.classList.add('is-selected');
+            }
+
+            const symbol = document.createElement('span');
+            symbol.className = 'planning-slot-toggle-symbol';
+            symbol.setAttribute('aria-hidden', 'true');
+            if (!open) {
+              symbol.textContent = 'Fermé';
+            } else {
+              symbol.textContent = isSelected ? '✔' : '○';
+            }
+            button.appendChild(symbol);
+
             const srLabel = document.createElement('span');
             srLabel.className = 'sr-only';
             srLabel.textContent = summaryTitle;
-            cell.appendChild(srLabel);
+            button.appendChild(srLabel);
 
-            const slotLabel = (slot.label ?? '').trim() || `Colonne ${slot.position}`;
-            const content = document.createElement('div');
-            content.className = 'planning-summary-content';
-
-            const label = document.createElement('div');
-            label.className = 'planning-summary-label';
-            label.textContent = slotLabel;
-            content.appendChild(label);
-
-            const status = document.createElement('div');
-            status.className = 'planning-summary-status';
-            status.textContent = open ? 'Disponible' : 'Fermé';
-            content.appendChild(status);
-
-            const metaDetails = [];
-            const slotType = (slot.type_code ?? '').trim();
-            if (slotType) {
-              metaDetails.push(slotType);
-            }
-            if (quality) {
-              metaDetails.push(`Qualité : ${quality}`);
-            }
-            const slotTime = getSlotTimeRange(slot);
-            if (slotTime) {
-              metaDetails.push(slotTime);
-            }
-            if (metaDetails.length) {
-              const details = document.createElement('div');
-              details.className = 'planning-summary-details';
-              details.textContent = metaDetails.join(' • ');
-              content.appendChild(details);
-            }
-
-            cell.appendChild(content);
-            cell.title = summaryTitle;
+            cell.appendChild(button);
             row.appendChild(cell);
           });
 
@@ -1577,6 +1547,42 @@
 
       if (planningTables) {
         planningTables.addEventListener('click', (event) => {
+          const toggle = event.target.closest('.planning-slot-toggle');
+          if (toggle) {
+            if (toggle.disabled) {
+              return;
+            }
+            const key = toggle.dataset.slotKey;
+            if (!key) {
+              return;
+            }
+            const symbol = toggle.querySelector('.planning-slot-toggle-symbol');
+            const srLabel = toggle.querySelector('.sr-only');
+            const summaryText = srLabel?.textContent?.trim() ?? '';
+            if (selectedPlanningCells.has(key)) {
+              selectedPlanningCells.delete(key);
+              toggle.classList.remove('is-selected');
+              toggle.setAttribute('aria-pressed', 'false');
+              if (symbol) {
+                symbol.textContent = '○';
+              }
+              if (summaryText) {
+                toggle.title = summaryText;
+              }
+            } else {
+              selectedPlanningCells.add(key);
+              toggle.classList.add('is-selected');
+              toggle.setAttribute('aria-pressed', 'true');
+              if (symbol) {
+                symbol.textContent = '✔';
+              }
+              if (summaryText) {
+                toggle.title = `${summaryText} · Sélectionné`;
+              }
+            }
+            return;
+          }
+
           const button = event.target.closest('.planning-slot-button');
           if (!button) {
             return;
