@@ -1396,6 +1396,7 @@ button.secondary {
 .table {
   width: 100%;
   border-collapse: collapse;
+  table-layout: fixed;
 }
 
 .table thead {
@@ -1406,16 +1407,20 @@ button.secondary {
   padding: 12px;
   text-align: left;
   border-bottom: 1px solid #ecf0f1;
+  vertical-align: top;
+  word-break: break-word;
 }
 
 .guard-cell {
   display: grid;
   gap: 8px;
+  width: 100%;
 }
 
 .guard-note {
   margin: 0;
   color: rgba(31, 41, 55, 0.7);
+  white-space: pre-wrap;
 }
 
 .guard-empty-cell {
