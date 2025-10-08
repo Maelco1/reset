@@ -299,6 +299,79 @@ main {
   color: rgba(44, 62, 80, 0.85);
 }
 
+.planning-config-actions {
+  width: 1%;
+  white-space: nowrap;
+}
+
+.planning-config-menu {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.planning-config-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.9rem;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(44, 62, 80, 0.2);
+  background: rgba(255, 255, 255, 0.65);
+  color: var(--primary);
+}
+
+.planning-config-menu.is-open .planning-config-trigger,
+.planning-config-trigger:hover {
+  background: rgba(52, 152, 219, 0.12);
+  border-color: rgba(52, 152, 219, 0.45);
+  transform: none;
+}
+
+.planning-config-trigger span[aria-hidden='true'] {
+  font-size: 1.1rem;
+}
+
+.planning-config-trigger-label {
+  font-weight: 600;
+}
+
+.planning-config-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 200px;
+  padding: 8px;
+  display: none;
+  background: #fff;
+  border-radius: 12px;
+  border: 1px solid rgba(44, 62, 80, 0.12);
+  box-shadow: var(--shadow);
+  z-index: 20;
+}
+
+.planning-config-menu.is-open .planning-config-popover {
+  display: grid;
+  gap: 4px;
+}
+
+.planning-config-popover button {
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 12px;
+  text-align: left;
+  font-weight: 600;
+  color: var(--primary);
+  cursor: pointer;
+}
+
+.planning-config-popover button:hover {
+  background: rgba(52, 152, 219, 0.12);
+  transform: none;
+}
+
 .planning-config-edit {
   white-space: nowrap;
 }
@@ -392,52 +465,72 @@ main {
   color: rgba(44, 62, 80, 0.7);
 }
 
-.planning-cell {
-  min-width: 140px;
+.planning-summary-cell {
+  position: relative;
+  min-width: 150px;
+  padding: 12px;
+  border: 1px solid #ecf0f1;
+  border-radius: 10px;
+  background: rgba(148, 163, 184, 0.12);
+  transition: transform var(--transition), box-shadow var(--transition);
+}
+
+.planning-summary-content {
   display: grid;
-  gap: 6px;
+  gap: 4px;
   align-content: start;
-  border-radius: 8px;
 }
 
-.planning-cell-status {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
+.planning-summary-label {
   font-weight: 600;
 }
 
-.planning-cell-open {
-  color: var(--text);
-}
-
-.planning-cell-closed {
-  color: rgba(44, 62, 80, 0.6);
-}
-
-.planning-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  display: inline-block;
-}
-
-.planning-cell-quality {
+.planning-summary-time {
   font-size: 0.85rem;
-  font-weight: 600;
-  color: rgba(44, 62, 80, 0.75);
+  color: rgba(44, 62, 80, 0.65);
 }
 
-.planning-cell-details {
-  font-size: 0.8rem;
-  color: rgba(44, 62, 80, 0.65);
+.planning-summary-open {
+  background: var(--planning-cell-color, #1e293b);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: var(--planning-cell-text, #ffffff);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+
+.planning-summary-open .planning-summary-time {
+  color: inherit;
+  opacity: 0.85;
+}
+
+.planning-summary-closed {
+  background: rgba(148, 163, 184, 0.22);
+  color: rgba(30, 41, 59, 0.6);
+  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.35);
+  cursor: not-allowed;
+}
+
+.planning-summary-closed .planning-summary-time {
+  color: rgba(71, 85, 105, 0.75);
+}
+
+.planning-summary-cell:hover {
+  transform: translateY(-1px);
+}
+
+.planning-summary-closed:hover::after {
+  content: '🚫';
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  font-size: 1rem;
+  opacity: 0.8;
 }
 
 .planning-holiday .planning-day-header {
   background: rgba(231, 76, 60, 0.08);
 }
 
-.planning-holiday .planning-cell {
+.planning-holiday .planning-summary-cell {
   box-shadow: inset 0 0 0 1px rgba(231, 76, 60, 0.2);
 }
 
