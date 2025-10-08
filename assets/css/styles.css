@@ -1306,6 +1306,28 @@ button.secondary {
   border-bottom: 1px solid #ecf0f1;
 }
 
+.guard-cell {
+  display: grid;
+  gap: 8px;
+}
+
+.guard-note {
+  margin: 0;
+  color: rgba(31, 41, 55, 0.7);
+}
+
+.guard-empty-cell {
+  text-align: center;
+  color: rgba(31, 41, 55, 0.45);
+  font-style: italic;
+}
+
+.guards-empty-cell {
+  text-align: center;
+  color: rgba(31, 41, 55, 0.6);
+  font-style: italic;
+}
+
 .badge {
   display: inline-block;
   padding: 4px 10px;

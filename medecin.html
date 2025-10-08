@@ -61,12 +61,7 @@
           <div class="card">
             <table class="table">
               <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Type</th>
-                  <th>Notes</th>
-                  <th>Actions</th>
-                </tr>
+                <tr id="guards-header-row"></tr>
               </thead>
               <tbody id="guards-body"></tbody>
             </table>
@@ -101,25 +96,126 @@
       const form = document.querySelector('#guard-form');
       const feedback = document.querySelector('#guard-feedback');
       const tableBody = document.querySelector('#guards-body');
+      const tableHeaderRow = document.querySelector('#guards-header-row');
       const listFeedback = document.querySelector('#guards-feedback');
       let channel;
 
       const formatDate = (value) => new Intl.DateTimeFormat('fr-FR').format(new Date(value));
 
+      const DEFAULT_GUARD_TYPES = ['Jour', 'Nuit', 'Week-end'];
+
+      const sortGuardTypes = (types) =>
+        [...types].sort((a, b) => {
+          const indexA = DEFAULT_GUARD_TYPES.indexOf(a);
+          const indexB = DEFAULT_GUARD_TYPES.indexOf(b);
+          if (indexA === -1 && indexB === -1) {
+            return a.localeCompare(b);
+          }
+          if (indexA === -1) {
+            return 1;
+          }
+          if (indexB === -1) {
+            return -1;
+          }
+          return indexA - indexB;
+        });
+
+      const updateGuardHeader = (types) => {
+        if (!tableHeaderRow) {
+          return;
+        }
+        tableHeaderRow.innerHTML = '';
+        const dateHeader = document.createElement('th');
+        dateHeader.scope = 'col';
+        dateHeader.textContent = 'Date';
+        tableHeaderRow.appendChild(dateHeader);
+        types.forEach((type) => {
+          const th = document.createElement('th');
+          th.scope = 'col';
+          th.textContent = type;
+          tableHeaderRow.appendChild(th);
+        });
+      };
+
+      updateGuardHeader(DEFAULT_GUARD_TYPES);
+
       const renderGuards = (guards) => {
         tableBody.innerHTML = '';
+        const typeSet = new Set(DEFAULT_GUARD_TYPES);
         guards.forEach((guard) => {
+          if (guard.type) {
+            typeSet.add(guard.type);
+          }
+        });
+        const orderedTypes = sortGuardTypes(typeSet);
+        updateGuardHeader(orderedTypes);
+
+        if (!guards.length) {
           const row = document.createElement('tr');
-          row.innerHTML = `
-            <td>${formatDate(guard.date)}</td>
-            <td><span class="badge">${guard.type}</span></td>
-            <td>${guard.notes ?? ''}</td>
-            <td>
-              <div class="table-actions">
-                <button data-action="delete" data-id="${guard.id}" class="danger">Supprimer</button>
-              </div>
-            </td>
-          `;
+          const cell = document.createElement('td');
+          cell.colSpan = orderedTypes.length + 1;
+          cell.className = 'guards-empty-cell';
+          cell.textContent = 'Aucune garde enregistrée.';
+          row.appendChild(cell);
+          tableBody.appendChild(row);
+          return;
+        }
+
+        const groupedByDate = new Map();
+        guards.forEach((guard) => {
+          const key = guard.date;
+          if (!groupedByDate.has(key)) {
+            groupedByDate.set(key, new Map());
+          }
+          groupedByDate.get(key).set(guard.type, guard);
+        });
+
+        const sortedDates = [...groupedByDate.keys()].sort((a, b) => new Date(a) - new Date(b));
+
+        sortedDates.forEach((dateKey) => {
+          const row = document.createElement('tr');
+          const dateHeader = document.createElement('th');
+          dateHeader.scope = 'row';
+          dateHeader.textContent = formatDate(dateKey);
+          row.appendChild(dateHeader);
+
+          const guardsByType = groupedByDate.get(dateKey);
+          orderedTypes.forEach((type) => {
+            const cell = document.createElement('td');
+            const entry = guardsByType.get(type);
+            if (entry) {
+              const wrapper = document.createElement('div');
+              wrapper.className = 'guard-cell';
+
+              const badge = document.createElement('span');
+              badge.className = 'badge';
+              badge.textContent = entry.type;
+              wrapper.appendChild(badge);
+
+              const note = document.createElement('p');
+              note.className = 'guard-note';
+              note.textContent = entry.notes?.trim() || '—';
+              wrapper.appendChild(note);
+
+              const actions = document.createElement('div');
+              actions.className = 'table-actions';
+              const deleteButton = document.createElement('button');
+              deleteButton.type = 'button';
+              deleteButton.className = 'danger';
+              deleteButton.dataset.action = 'delete';
+              deleteButton.dataset.id = entry.id;
+              deleteButton.textContent = 'Supprimer';
+              actions.appendChild(deleteButton);
+              wrapper.appendChild(actions);
+
+              cell.appendChild(wrapper);
+            } else {
+              cell.className = 'guard-empty-cell';
+              cell.textContent = '—';
+            }
+            row.appendChild(cell);
+          });
+
           tableBody.appendChild(row);
         });
       };
