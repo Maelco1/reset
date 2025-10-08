@@ -293,6 +293,38 @@
       </section>
     </div>
 
+    <div
+      id="assignment-modal"
+      class="modal-backdrop hidden"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="assignment-modal-title"
+    >
+      <section class="modal planning-modal">
+        <header class="modal-header">
+          <div>
+            <h2 id="assignment-modal-title">Attribuer la garde</h2>
+            <p id="assignment-modal-subtitle"></p>
+          </div>
+          <button type="button" class="icon-button" id="close-assignment-modal" aria-label="Fermer">&times;</button>
+        </header>
+
+        <form id="assignment-form" class="assignment-form">
+          <input type="hidden" name="slotKey" id="assignment-slot-key" />
+
+          <label for="assignment-select">Sélectionner un médecin ou un remplaçant</label>
+          <select id="assignment-select" name="userId" class="assignment-select"></select>
+
+          <p id="assignment-feedback" role="status"></p>
+
+          <div class="modal-actions">
+            <button type="submit">Enregistrer</button>
+            <button type="button" id="cancel-assignment" class="secondary">Annuler</button>
+          </div>
+        </form>
+      </section>
+    </div>
+
     <script type="module">
       import {
         initializeConnectionModal,
@@ -395,6 +427,11 @@
         'Décembre'
       ];
 
+      const ASSIGNMENT_ROLE_LABELS = {
+        medecin: 'Médecin',
+        remplacant: 'Remplaçant'
+      };
+
       const currentUser = getCurrentUser();
       if (!currentUser) {
         window.location.replace('index.html');
@@ -434,6 +471,14 @@
       const closeSlotModalBtn = document.querySelector('#close-slot-modal');
       const cancelSlotBtn = document.querySelector('#cancel-slot');
 
+      const assignmentModal = document.querySelector('#assignment-modal');
+      const assignmentModalSubtitle = document.querySelector('#assignment-modal-subtitle');
+      const closeAssignmentModalBtn = document.querySelector('#close-assignment-modal');
+      const assignmentForm = document.querySelector('#assignment-form');
+      const assignmentSelect = document.querySelector('#assignment-select');
+      const assignmentFeedback = document.querySelector('#assignment-feedback');
+      const cancelAssignmentBtn = document.querySelector('#cancel-assignment');
+
       const slotTypeCodeInput = slotForm?.elements['typeCode'];
       if (slotTypeCodeInput) {
         slotTypeCodeInput.addEventListener('input', () => {
@@ -453,13 +498,28 @@
         });
       });
 
+      const getUserTrigram = (user) => {
+        if (!user) {
+          return '';
+        }
+        const raw = typeof user.trigram === 'string' ? user.trigram.trim() : '';
+        if (raw) {
+          return raw.toUpperCase();
+        }
+        if (typeof user.username === 'string' && user.username.length) {
+          return user.username.slice(0, 3).toUpperCase();
+        }
+        return '';
+      };
+
       let editingUser = null;
       let editingSlot = null;
       let usersChannel;
       let planningChannel;
       let allUsers = [];
       let planningSlots = [];
-      const selectedPlanningCells = new Set();
+      const planningAssignments = new Map();
+      let activeAssignmentButton = null;
       let planningLoading = false;
       let openPlanningConfigMenu = null;
 
@@ -686,6 +746,163 @@
         return `${dayLabel} · ${details.join(' · ')}`;
       };
 
+      const updateAssignmentButton = (button) => {
+        if (!button) {
+          return;
+        }
+        const slotKey = button.dataset.slotKey;
+        const summary = button.dataset.summary ?? '';
+        const srLabel = button.querySelector('.sr-only');
+        const tag = button.querySelector('.planning-assignment-tag');
+        const roleLabel = button.querySelector('.planning-assignment-role');
+        if (!slotKey) {
+          return;
+        }
+        if (button.disabled || button.dataset.state === 'closed') {
+          if (tag) {
+            tag.textContent = 'Fermé';
+            tag.classList.remove('is-empty');
+          }
+          if (roleLabel) {
+            roleLabel.textContent = '';
+          }
+          if (srLabel) {
+            srLabel.textContent = summary ? `${summary} · Fermé` : 'Créneau fermé';
+          }
+          button.title = summary ? `${summary} · Fermé` : 'Fermé';
+          button.dataset.assignmentUserId = '';
+          return;
+        }
+        const assignment = planningAssignments.get(slotKey);
+        if (!assignment) {
+          if (tag) {
+            tag.textContent = 'Libre';
+            tag.classList.add('is-empty');
+          }
+          if (roleLabel) {
+            roleLabel.textContent = 'Non attribué';
+          }
+          if (srLabel) {
+            srLabel.textContent = summary ? `${summary} · Libre` : 'Créneau libre';
+          }
+          button.title = summary ? `${summary} · Libre` : 'Créneau libre';
+          button.dataset.assignmentUserId = '';
+          return;
+        }
+        if (tag) {
+          tag.textContent = assignment.trigram;
+          tag.classList.remove('is-empty');
+        }
+        if (roleLabel) {
+          roleLabel.textContent = ASSIGNMENT_ROLE_LABELS[assignment.role] ?? '';
+        }
+        if (srLabel) {
+          srLabel.textContent = summary ? `${summary} · ${assignment.trigram}` : assignment.trigram;
+        }
+        button.title = summary ? `${summary} · ${assignment.trigram}` : assignment.trigram;
+        button.dataset.assignmentUserId = String(assignment.id);
+      };
+
+      const populateAssignmentSelect = (currentUserId) => {
+        if (!assignmentSelect) {
+          return;
+        }
+        assignmentSelect.innerHTML = '';
+        const noneOption = document.createElement('option');
+        noneOption.value = '';
+        noneOption.textContent = 'Aucune affectation';
+        assignmentSelect.appendChild(noneOption);
+
+        const medecins = allUsers.filter((user) => user.role === 'medecin');
+        const remplacants = allUsers.filter((user) => user.role === 'remplacant');
+
+        const appendGroup = (label, users) => {
+          if (!users.length) {
+            return;
+          }
+          const group = document.createElement('optgroup');
+          group.label = label;
+          users
+            .slice()
+            .sort((a, b) => getUserTrigram(a).localeCompare(getUserTrigram(b)))
+            .forEach((user) => {
+              const option = document.createElement('option');
+              option.value = String(user.id);
+              const trigram = getUserTrigram(user);
+              option.textContent = `${trigram} · ${user.username}`;
+              group.appendChild(option);
+            });
+          assignmentSelect.appendChild(group);
+        };
+
+        appendGroup('Médecins', medecins);
+        appendGroup('Remplaçants', remplacants);
+
+        if (currentUserId) {
+          assignmentSelect.value = currentUserId;
+          if (assignmentSelect.value !== currentUserId) {
+            assignmentSelect.value = '';
+          }
+        } else {
+          assignmentSelect.value = '';
+        }
+
+        if (assignmentFeedback) {
+          if (medecins.length === 0 && remplacants.length === 0) {
+            assignmentFeedback.textContent = 'Aucun médecin ou remplaçant disponible pour le moment.';
+          } else {
+            assignmentFeedback.textContent = '';
+          }
+        }
+      };
+
+      const refreshAssignmentButtons = () => {
+        if (!planningTables) {
+          return;
+        }
+        const buttons = planningTables.querySelectorAll('.planning-slot-toggle');
+        buttons.forEach((button) => updateAssignmentButton(button));
+      };
+
+      const cleanupAssignments = () => {
+        const validIds = new Set(allUsers.map((user) => String(user.id)));
+        [...planningAssignments.entries()].forEach(([slotKey, assignment]) => {
+          if (!validIds.has(String(assignment.id))) {
+            planningAssignments.delete(slotKey);
+          }
+        });
+      };
+
+      const closeAssignmentModal = () => {
+        activeAssignmentButton = null;
+        if (assignmentForm) {
+          assignmentForm.reset();
+        }
+        if (assignmentFeedback) {
+          assignmentFeedback.textContent = '';
+        }
+        assignmentModal?.classList.add('hidden');
+      };
+
+      const openAssignmentModal = (button) => {
+        if (!assignmentModal || !assignmentForm || !assignmentSelect) {
+          return;
+        }
+        activeAssignmentButton = button;
+        const slotKey = button.dataset.slotKey ?? '';
+        const summary = button.dataset.summary ?? '';
+        if (assignmentForm.elements['slotKey']) {
+          assignmentForm.elements['slotKey'].value = slotKey;
+        }
+        if (assignmentModalSubtitle) {
+          assignmentModalSubtitle.textContent = summary;
+        }
+        const currentUserId = button.dataset.assignmentUserId ?? '';
+        populateAssignmentSelect(currentUserId);
+        assignmentModal.classList.remove('hidden');
+        assignmentSelect.focus();
+      };
+
       const buildPlanningTable = (year, month, holidays) => {
         const table = document.createElement('table');
         table.className = 'planning-table';
@@ -786,7 +1003,6 @@
 
             const summaryTitle = buildSlotTitle(slot, dayName, isHoliday, holidayName, open, quality);
             const slotKey = `${isoKey}:${slot.position}`;
-            const isSelected = selectedPlanningCells.has(slotKey);
 
             const button = document.createElement('button');
             button.type = 'button';
@@ -795,33 +1011,25 @@
             button.dataset.day = isoKey;
             button.dataset.position = String(slot.position);
             button.dataset.state = open ? 'available' : 'closed';
-            button.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
+            button.dataset.summary = summaryTitle;
 
             if (!open) {
               button.disabled = true;
-              button.title = 'Fermé';
-            } else {
-              button.title = summaryTitle;
             }
 
-            if (isSelected && open) {
-              button.classList.add('is-selected');
-            }
+            const tag = document.createElement('span');
+            tag.className = 'planning-assignment-tag';
+            button.appendChild(tag);
 
-            const symbol = document.createElement('span');
-            symbol.className = 'planning-slot-toggle-symbol';
-            symbol.setAttribute('aria-hidden', 'true');
-            if (!open) {
-              symbol.textContent = 'Fermé';
-            } else {
-              symbol.textContent = isSelected ? '✔' : '○';
-            }
-            button.appendChild(symbol);
+            const roleLabel = document.createElement('span');
+            roleLabel.className = 'planning-assignment-role';
+            button.appendChild(roleLabel);
 
             const srLabel = document.createElement('span');
             srLabel.className = 'sr-only';
-            srLabel.textContent = summaryTitle;
             button.appendChild(srLabel);
+
+            updateAssignmentButton(button);
 
             cell.appendChild(button);
             row.appendChild(cell);
@@ -1169,6 +1377,8 @@
         allUsers = data;
         usersFeedback.textContent = `${data.length} utilisateur(s).`;
         renderUsers(allUsers);
+        cleanupAssignments();
+        refreshAssignmentButtons();
       };
 
       const ensurePlanningColumns = async (supabase, slots) => {
@@ -1545,6 +1755,61 @@
         });
       }
 
+      if (assignmentModal) {
+        assignmentModal.addEventListener('click', (event) => {
+          if (event.target === assignmentModal) {
+            closeAssignmentModal();
+          }
+        });
+      }
+
+      if (closeAssignmentModalBtn) {
+        closeAssignmentModalBtn.addEventListener('click', () => {
+          closeAssignmentModal();
+        });
+      }
+
+      if (cancelAssignmentBtn) {
+        cancelAssignmentBtn.addEventListener('click', () => {
+          closeAssignmentModal();
+        });
+      }
+
+      if (assignmentForm) {
+        assignmentForm.addEventListener('submit', (event) => {
+          event.preventDefault();
+          if (!activeAssignmentButton) {
+            closeAssignmentModal();
+            return;
+          }
+          const slotKey = activeAssignmentButton.dataset.slotKey;
+          if (!slotKey) {
+            closeAssignmentModal();
+            return;
+          }
+          const selectedValue = assignmentSelect?.value ?? '';
+          if (!selectedValue) {
+            planningAssignments.delete(slotKey);
+          } else {
+            const user = allUsers.find((candidate) => String(candidate.id) === selectedValue);
+            if (!user) {
+              if (assignmentFeedback) {
+                assignmentFeedback.textContent = 'Utilisateur introuvable.';
+              }
+              return;
+            }
+            planningAssignments.set(slotKey, {
+              id: user.id,
+              trigram: getUserTrigram(user),
+              role: user.role,
+              username: user.username
+            });
+          }
+          updateAssignmentButton(activeAssignmentButton);
+          closeAssignmentModal();
+        });
+      }
+
       if (planningTables) {
         planningTables.addEventListener('click', (event) => {
           const toggle = event.target.closest('.planning-slot-toggle');
@@ -1552,34 +1817,7 @@
             if (toggle.disabled) {
               return;
             }
-            const key = toggle.dataset.slotKey;
-            if (!key) {
-              return;
-            }
-            const symbol = toggle.querySelector('.planning-slot-toggle-symbol');
-            const srLabel = toggle.querySelector('.sr-only');
-            const summaryText = srLabel?.textContent?.trim() ?? '';
-            if (selectedPlanningCells.has(key)) {
-              selectedPlanningCells.delete(key);
-              toggle.classList.remove('is-selected');
-              toggle.setAttribute('aria-pressed', 'false');
-              if (symbol) {
-                symbol.textContent = '○';
-              }
-              if (summaryText) {
-                toggle.title = summaryText;
-              }
-            } else {
-              selectedPlanningCells.add(key);
-              toggle.classList.add('is-selected');
-              toggle.setAttribute('aria-pressed', 'true');
-              if (symbol) {
-                symbol.textContent = '✔';
-              }
-              if (summaryText) {
-                toggle.title = `${summaryText} · Sélectionné`;
-              }
-            }
+            openAssignmentModal(toggle);
             return;
           }
 
