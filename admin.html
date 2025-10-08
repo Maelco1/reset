@@ -438,6 +438,7 @@
       let allUsers = [];
       let planningSlots = [];
       let planningLoading = false;
+      let openPlanningConfigMenu = null;
 
       const sanitizeColor = (value) => {
         if (typeof value !== 'string') {
@@ -466,6 +467,16 @@
         const g = parseInt(numeric.slice(2, 4), 16);
         const b = parseInt(numeric.slice(4, 6), 16);
         return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+      };
+
+      const getContrastingTextColor = (hex) => {
+        const sanitized = sanitizeColor(hex) ?? DEFAULT_COLOR;
+        const numeric = sanitized.slice(1);
+        const r = parseInt(numeric.slice(0, 2), 16);
+        const g = parseInt(numeric.slice(2, 4), 16);
+        const b = parseInt(numeric.slice(4, 6), 16);
+        const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+        return luminance > 0.6 ? '#1e293b' : '#ffffff';
       };
 
       const inferTypeCategory = (typeCode) => {
@@ -724,50 +735,33 @@
 
           planningSlots.forEach((slot) => {
             const cell = document.createElement('td');
-            cell.className = 'planning-cell';
+            cell.className = 'planning-summary-cell';
             const slotColor = normalizeColor(slot.color);
             const segment = getDaySegment(day, isHoliday);
             const quality = getQualityForSegment(slot, segment);
             const open = isSlotOpen(slot, segment);
-            cell.classList.add(open ? 'planning-cell-open' : 'planning-cell-closed');
-            cell.style.borderColor = hexToRgba(slotColor, open ? 0.35 : 0.18);
-            cell.style.backgroundColor = hexToRgba(slotColor, open ? 0.16 : 0.05);
-
-            const status = document.createElement('span');
-            status.className = 'planning-cell-status';
-
-            const dot = document.createElement('span');
-            dot.className = 'planning-dot';
-            dot.style.backgroundColor = slotColor;
-            status.appendChild(dot);
-
+            const content = document.createElement('div');
+            content.className = 'planning-summary-content';
             const label = document.createElement('span');
-            label.className = 'planning-cell-label';
-            label.textContent = open ? 'Ouvert' : 'Fermé';
-            status.appendChild(label);
-
-            cell.appendChild(status);
-
-            const qualityBadge = document.createElement('span');
-            qualityBadge.className = 'planning-cell-quality';
-            qualityBadge.textContent = quality;
-            cell.appendChild(qualityBadge);
-
-            const infoParts = [];
-            if (slot.type_code) {
-              infoParts.push(slot.type_code);
-            }
-            if (slot.type_category) {
-              infoParts.push(slot.type_category);
-            }
+            label.className = 'planning-summary-label';
+            label.textContent = slot.label ?? slot.type_code ?? `Colonne ${slot.position}`;
+            content.appendChild(label);
             if (slot.start_time && slot.end_time) {
-              infoParts.push(`${slot.start_time} – ${slot.end_time}`);
+              const schedule = document.createElement('span');
+              schedule.className = 'planning-summary-time';
+              schedule.textContent = `${slot.start_time} – ${slot.end_time}`;
+              content.appendChild(schedule);
             }
-            if (infoParts.length > 0) {
-              const details = document.createElement('span');
-              details.className = 'planning-cell-details';
-              details.textContent = infoParts.join(' · ');
-              cell.appendChild(details);
+            cell.appendChild(content);
+
+            if (open) {
+              const textColor = getContrastingTextColor(slotColor);
+              cell.classList.add('planning-summary-open');
+              cell.style.setProperty('--planning-cell-color', slotColor);
+              cell.style.setProperty('--planning-cell-text', textColor);
+              cell.style.color = textColor;
+            } else {
+              cell.classList.add('planning-summary-closed');
             }
 
             cell.title = buildSlotTitle(slot, dayName, isHoliday, holidayName, open, quality);
@@ -802,6 +796,7 @@
         if (!planningConfigContainer) {
           return;
         }
+        closePlanningConfigMenu();
         if (!planningSlots.length) {
           planningConfigContainer.innerHTML = '<p class="empty-planning">Chargement des colonnes…</p>';
           return;
@@ -933,12 +928,31 @@
           row.appendChild(bonusCell);
 
           const actionCell = document.createElement('td');
+          actionCell.className = 'planning-config-actions';
+          const menu = document.createElement('div');
+          menu.className = 'planning-config-menu';
+          const trigger = document.createElement('button');
+          trigger.type = 'button';
+          trigger.className = 'planning-config-trigger';
+          trigger.setAttribute('aria-haspopup', 'true');
+          trigger.setAttribute('aria-expanded', 'false');
+          trigger.innerHTML = `
+            <span aria-hidden="true">⚙️</span>
+            <span class="planning-config-trigger-label">Paramètres</span>
+          `;
+          menu.appendChild(trigger);
+          const menuList = document.createElement('div');
+          menuList.className = 'planning-config-popover';
+          menuList.setAttribute('role', 'menu');
           const editButton = document.createElement('button');
           editButton.type = 'button';
-          editButton.className = 'planning-config-edit subtle-button';
+          editButton.className = 'planning-config-edit';
           editButton.dataset.position = slot.position;
-          editButton.textContent = 'Modifier';
-          actionCell.appendChild(editButton);
+          editButton.textContent = 'Configurer la colonne';
+          editButton.setAttribute('role', 'menuitem');
+          menuList.appendChild(editButton);
+          menu.appendChild(menuList);
+          actionCell.appendChild(menu);
           row.appendChild(actionCell);
 
           tbody.appendChild(row);
@@ -947,6 +961,16 @@
         table.appendChild(tbody);
         wrapper.appendChild(table);
         planningConfigContainer.appendChild(wrapper);
+      };
+
+      const closePlanningConfigMenu = () => {
+        if (!openPlanningConfigMenu) {
+          return;
+        }
+        openPlanningConfigMenu.classList.remove('is-open');
+        const trigger = openPlanningConfigMenu.querySelector('.planning-config-trigger');
+        trigger?.setAttribute('aria-expanded', 'false');
+        openPlanningConfigMenu = null;
       };
 
       const renderPlanningTables = () => {
@@ -1471,17 +1495,40 @@
 
       if (planningConfigContainer) {
         planningConfigContainer.addEventListener('click', (event) => {
+          const trigger = event.target.closest('.planning-config-trigger');
+          if (trigger) {
+            const menu = trigger.closest('.planning-config-menu');
+            if (!menu) {
+              return;
+            }
+            if (openPlanningConfigMenu && openPlanningConfigMenu !== menu) {
+              closePlanningConfigMenu();
+            }
+            const isOpen = menu.classList.toggle('is-open');
+            trigger.setAttribute('aria-expanded', String(isOpen));
+            openPlanningConfigMenu = isOpen ? menu : null;
+            event.stopPropagation();
+            return;
+          }
+
           const button = event.target.closest('.planning-config-edit');
           if (!button) {
             return;
           }
           const position = Number(button.dataset.position);
           const slot = planningSlots.find((candidate) => candidate.position === position);
+          closePlanningConfigMenu();
           if (slot) {
             openSlotModal(slot);
           }
         });
       }
+
+      document.addEventListener('click', (event) => {
+        if (!event.target.closest('.planning-config-menu')) {
+          closePlanningConfigMenu();
+        }
+      });
 
       window.addEventListener('keydown', (event) => {
         if (event.key === 'Escape') {
@@ -1491,6 +1538,7 @@
           if (slotModal && !slotModal.classList.contains('hidden')) {
             closeSlotModal();
           }
+          closePlanningConfigMenu();
         }
       });
 
