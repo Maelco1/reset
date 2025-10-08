@@ -576,6 +576,13 @@
         };
       };
 
+      const sortSlotsByPosition = (slots) =>
+        [...slots].sort((a, b) => {
+          const positionA = Number(a?.position ?? Number.POSITIVE_INFINITY);
+          const positionB = Number(b?.position ?? Number.POSITIVE_INFINITY);
+          return positionA - positionB;
+        });
+
       const addDays = (date, days) => {
         const clone = new Date(date);
         clone.setDate(clone.getDate() + days);
@@ -701,6 +708,8 @@
         const table = document.createElement('table');
         table.className = 'planning-table';
 
+        const orderedSlots = sortSlotsByPosition(planningSlots);
+
         const thead = document.createElement('thead');
         const headerRow = document.createElement('tr');
         const dayHeader = document.createElement('th');
@@ -709,7 +718,7 @@
         dayHeader.textContent = 'Jour';
         headerRow.appendChild(dayHeader);
 
-        planningSlots.forEach((slot) => {
+        orderedSlots.forEach((slot) => {
           const th = document.createElement('th');
           th.scope = 'col';
           const button = document.createElement('button');
@@ -786,7 +795,7 @@
           }
           row.appendChild(dayCell);
 
-          planningSlots.forEach((slot) => {
+          orderedSlots.forEach((slot) => {
             const cell = document.createElement('td');
             cell.className = 'planning-summary-cell';
             const slotColor = normalizeColor(slot.color);
@@ -869,8 +878,9 @@
         table.appendChild(thead);
 
         const tbody = document.createElement('tbody');
+        const orderedSlots = sortSlotsByPosition(planningSlots);
 
-        planningSlots.forEach((slot) => {
+        orderedSlots.forEach((slot) => {
           const row = document.createElement('tr');
 
           const colCell = document.createElement('td');
@@ -1254,7 +1264,8 @@
         }
         let slots = data ?? [];
         slots = await ensurePlanningColumns(supabase, slots);
-        planningSlots = slots.map((slot) => ({
+        const sortedSlots = sortSlotsByPosition(slots);
+        planningSlots = sortedSlots.map((slot) => ({
           ...slot,
           color: normalizeColor(slot.color),
           label: (() => {
