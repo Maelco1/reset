@@ -818,6 +818,41 @@
             srLabel.className = 'sr-only';
             srLabel.textContent = summaryTitle;
             cell.appendChild(srLabel);
+
+            const slotLabel = (slot.label ?? '').trim() || `Colonne ${slot.position}`;
+            const content = document.createElement('div');
+            content.className = 'planning-summary-content';
+
+            const label = document.createElement('div');
+            label.className = 'planning-summary-label';
+            label.textContent = slotLabel;
+            content.appendChild(label);
+
+            const status = document.createElement('div');
+            status.className = 'planning-summary-status';
+            status.textContent = open ? 'Disponible' : 'Fermé';
+            content.appendChild(status);
+
+            const metaDetails = [];
+            const slotType = (slot.type_code ?? '').trim();
+            if (slotType) {
+              metaDetails.push(slotType);
+            }
+            if (quality) {
+              metaDetails.push(`Qualité : ${quality}`);
+            }
+            const slotTime = getSlotTimeRange(slot);
+            if (slotTime) {
+              metaDetails.push(slotTime);
+            }
+            if (metaDetails.length) {
+              const details = document.createElement('div');
+              details.className = 'planning-summary-details';
+              details.textContent = metaDetails.join(' • ');
+              content.appendChild(details);
+            }
+
+            cell.appendChild(content);
             cell.title = summaryTitle;
             row.appendChild(cell);
           });
