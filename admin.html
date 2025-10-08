@@ -793,20 +793,6 @@
             const segment = getDaySegment(day, isHoliday);
             const quality = getQualityForSegment(slot, segment);
             const open = isSlotOpen(slot, segment);
-            const content = document.createElement('div');
-            content.className = 'planning-summary-content';
-            const typeLabel = document.createElement('span');
-            typeLabel.className = 'planning-summary-label';
-            typeLabel.textContent = slot.type_code ?? slot.label ?? `Colonne ${slot.position}`;
-            content.appendChild(typeLabel);
-            const slotTime = getSlotTimeRange(slot);
-            if (slotTime) {
-              const schedule = document.createElement('span');
-              schedule.className = 'planning-summary-time';
-              schedule.textContent = slotTime;
-              content.appendChild(schedule);
-            }
-            cell.appendChild(content);
 
             if (open) {
               const textColor = getContrastingTextColor(slotColor);
@@ -818,7 +804,12 @@
               cell.classList.add('planning-summary-closed');
             }
 
-            cell.title = buildSlotTitle(slot, dayName, isHoliday, holidayName, open, quality);
+            const summaryTitle = buildSlotTitle(slot, dayName, isHoliday, holidayName, open, quality);
+            const srLabel = document.createElement('span');
+            srLabel.className = 'sr-only';
+            srLabel.textContent = summaryTitle;
+            cell.appendChild(srLabel);
+            cell.title = summaryTitle;
             row.appendChild(cell);
           });
 
