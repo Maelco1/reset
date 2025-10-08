@@ -46,30 +46,42 @@
         </section>
 
         <section aria-labelledby="planning-title" class="planning-section">
-          <div class="section-header">
-            <h2 id="planning-title">Planning des gardes</h2>
-            <p id="planning-feedback" role="status"></p>
+          <div class="planning-surface">
+            <div class="section-header planning-section-header">
+              <h2 id="planning-title">Planning des gardes</h2>
+              <p id="planning-feedback" role="status"></p>
+            </div>
+
+            <form id="planning-controls" class="planning-controls" aria-label="Filtres du planning">
+              <div class="planning-control">
+                <label for="planning-year">Année</label>
+                <select id="planning-year" name="year"></select>
+              </div>
+
+              <div class="planning-control">
+                <label for="planning-month-1">Mois 1</label>
+                <select id="planning-month-1" name="month-1"></select>
+              </div>
+
+              <div class="planning-control">
+                <label for="planning-month-2">Mois 2</label>
+                <select id="planning-month-2" name="month-2"></select>
+              </div>
+            </form>
+
+            <div class="planning-layout">
+              <div class="planning-board" role="region" aria-labelledby="planning-title">
+                <div class="planning-tables" id="planning-tables" aria-live="polite"></div>
+              </div>
+              <aside class="planning-sidebar" aria-labelledby="planning-config-title">
+                <div class="planning-sidebar-header">
+                  <h3 id="planning-config-title">Configuration des colonnes</h3>
+                  <p>Ajoutez, modifiez ou supprimez les colonnes de votre planning.</p>
+                </div>
+                <div class="planning-config" id="planning-config" aria-live="polite"></div>
+              </aside>
+            </div>
           </div>
-
-          <form id="planning-controls" class="planning-controls" aria-label="Filtres du planning">
-            <div class="planning-control">
-              <label for="planning-year">Année</label>
-              <select id="planning-year" name="year"></select>
-            </div>
-
-            <div class="planning-control">
-              <label for="planning-month-1">Mois 1</label>
-              <select id="planning-month-1" name="month-1"></select>
-            </div>
-
-            <div class="planning-control">
-              <label for="planning-month-2">Mois 2</label>
-              <select id="planning-month-2" name="month-2"></select>
-            </div>
-          </form>
-
-          <div class="planning-tables" id="planning-tables" aria-live="polite"></div>
-          <div class="planning-config" id="planning-config" aria-live="polite"></div>
         </section>
 
         <footer class="admin-footer" aria-labelledby="create-title">

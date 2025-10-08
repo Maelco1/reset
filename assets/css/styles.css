@@ -10,6 +10,16 @@
   --shadow: 0 12px 32px rgba(0, 0, 0, 0.08);
   --transition: 0.2s ease-in-out;
   --focus-ring-color: #2563eb;
+  --planning-bg: #0b0e14;
+  --planning-panel: #0f1320;
+  --planning-muted: #0c1120;
+  --planning-border: #1f2536;
+  --planning-text: #dce3f1;
+  --planning-sub: #8f9bb9;
+  --planning-accent: #7c9cff;
+  --planning-success: #34d399;
+  --planning-danger: #ef4444;
+  --planning-grey: #475569;
 }
 
 * {
@@ -669,6 +679,554 @@ main {
   font-style: italic;
 }
 
+/* Dark planning theme overrides inspired by Supabase planning UI */
+.planning-section {
+  color: var(--planning-text);
+}
+
+.planning-surface {
+  background: var(--planning-panel);
+  border: 1px solid var(--planning-border);
+  border-radius: 20px;
+  padding: 24px;
+  display: grid;
+  gap: 24px;
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.35);
+}
+
+.planning-section-header h2 {
+  margin: 0;
+  color: var(--planning-text);
+  font-size: clamp(1.4rem, 2vw, 1.8rem);
+}
+
+.planning-section-header p {
+  margin: 0;
+  color: var(--planning-sub);
+}
+
+.planning-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-end;
+  background: var(--planning-muted);
+  border: 1px solid var(--planning-border);
+  border-radius: 16px;
+  padding: 16px 20px;
+  box-shadow: inset 0 0 0 1px rgba(124, 156, 255, 0.08);
+}
+
+.planning-control {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 160px;
+}
+
+.planning-control label {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.75rem;
+  color: var(--planning-sub);
+}
+
+.planning-control select {
+  background: var(--planning-bg);
+  color: var(--planning-text);
+  border: 1px solid var(--planning-border);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  appearance: none;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  transition: border-color var(--transition), box-shadow var(--transition), transform 0.15s ease;
+}
+
+.planning-control select:hover {
+  border-color: var(--planning-accent);
+}
+
+.planning-control select:focus-visible {
+  outline: 2px solid var(--planning-accent);
+  outline-offset: 2px;
+}
+
+.planning-layout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+.planning-board {
+  flex: 1 1 640px;
+  min-width: 0;
+  background: var(--planning-muted);
+  border: 1px solid var(--planning-border);
+  border-radius: 18px;
+  padding: 20px;
+  box-shadow: inset 0 0 0 1px rgba(124, 156, 255, 0.05);
+  overflow: auto;
+}
+
+.planning-tables {
+  display: grid;
+  gap: 24px;
+  min-width: max-content;
+}
+
+.planning-month {
+  display: grid;
+  gap: 16px;
+  background: var(--planning-panel);
+  border: 1px solid var(--planning-border);
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+  min-width: max-content;
+}
+
+.planning-month-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--planning-text);
+}
+
+.planning-month-header h3 {
+  margin: 0;
+  font-size: clamp(1.1rem, 2vw, 1.35rem);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.planning-sidebar {
+  flex: 0 0 320px;
+  max-width: 100%;
+  background: var(--planning-muted);
+  border: 1px solid var(--planning-border);
+  border-radius: 18px;
+  padding: 20px;
+  box-shadow: inset 0 0 0 1px rgba(124, 156, 255, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.planning-sidebar-header h3 {
+  margin: 0;
+  font-size: 1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--planning-text);
+}
+
+.planning-sidebar-header p {
+  margin: 0;
+  color: var(--planning-sub);
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.planning-config {
+  max-height: 540px;
+  overflow: auto;
+  padding-right: 6px;
+}
+
+.planning-config-list {
+  min-width: 100%;
+}
+
+.planning-config-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--planning-bg);
+  border: 1px solid var(--planning-border);
+  border-radius: 12px;
+  overflow: hidden;
+  color: var(--planning-text);
+}
+
+.planning-config-table th,
+.planning-config-table td {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--planning-border);
+  vertical-align: top;
+}
+
+.planning-config-table th {
+  background: #0c1120;
+  text-align: left;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--planning-sub);
+}
+
+.planning-config-position {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  margin-right: 10px;
+  border-radius: 999px;
+  background: rgba(124, 156, 255, 0.2);
+  font-weight: 700;
+  color: var(--planning-text);
+}
+
+.planning-config-label {
+  font-weight: 600;
+  color: var(--planning-text);
+}
+
+.planning-config-type {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: var(--planning-accent);
+}
+
+.planning-config-category {
+  font-size: 0.85rem;
+  color: var(--planning-sub);
+}
+
+.planning-config-color {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.planning-config-color-cell {
+  text-align: center;
+  vertical-align: middle;
+}
+
+.planning-config-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: var(--planning-sub);
+}
+
+.planning-config-line strong {
+  font-weight: 600;
+  color: var(--planning-text);
+}
+
+.planning-config-actions {
+  width: 1%;
+  white-space: nowrap;
+}
+
+.planning-config-menu {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.planning-config-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--planning-border);
+  background: rgba(124, 156, 255, 0.12);
+  color: var(--planning-text);
+  transition: background var(--transition), transform 0.15s ease, box-shadow var(--transition);
+}
+
+.planning-config-trigger:hover,
+.planning-config-menu.is-open .planning-config-trigger {
+  background: var(--planning-accent);
+  color: #0b0e14;
+  box-shadow: 0 8px 18px rgba(124, 156, 255, 0.35);
+}
+
+.planning-config-trigger span[aria-hidden='true'] {
+  font-size: 1rem;
+}
+
+.planning-config-trigger-label {
+  font-weight: 600;
+}
+
+.planning-config-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 200px;
+  padding: 10px;
+  display: none;
+  background: var(--planning-panel);
+  border-radius: 14px;
+  border: 1px solid var(--planning-border);
+  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.45);
+  z-index: 40;
+}
+
+.planning-config-menu.is-open .planning-config-popover {
+  display: grid;
+  gap: 6px;
+}
+
+.planning-config-popover button {
+  background: transparent;
+  border: none;
+  border-radius: 10px;
+  padding: 10px 12px;
+  text-align: left;
+  font-weight: 600;
+  color: var(--planning-text);
+  cursor: pointer;
+  transition: background var(--transition), transform 0.15s ease;
+}
+
+.planning-config-popover button:hover {
+  background: rgba(124, 156, 255, 0.12);
+  transform: translateY(-1px);
+}
+
+.planning-config-edit {
+  white-space: nowrap;
+}
+
+.planning-table {
+  border-collapse: collapse;
+  width: max-content;
+  min-width: 100%;
+  table-layout: fixed;
+  background: var(--planning-bg);
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--planning-border);
+  color: var(--planning-text);
+}
+
+.planning-table th,
+.planning-table td {
+  border: 1px solid var(--planning-border);
+  padding: 10px;
+  position: relative;
+}
+
+.planning-table thead th {
+  background: #0c1120;
+  color: var(--planning-text);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  position: sticky;
+  top: 0;
+  z-index: 3;
+}
+
+.planning-day-col {
+  position: sticky;
+  left: 0;
+  background: #0c1120;
+  z-index: 4;
+  text-align: left;
+  width: 180px;
+  min-width: 180px;
+}
+
+.planning-table thead th:not(.planning-day-col),
+.planning-table tbody td {
+  width: 5.25ch;
+  min-width: 5.25ch;
+  max-width: 5.25ch;
+}
+
+.planning-day-header {
+  position: sticky;
+  left: 0;
+  background: var(--planning-muted);
+  text-align: left;
+  padding: 12px 14px;
+  color: var(--planning-text);
+  font-weight: 600;
+  z-index: 3;
+}
+
+.planning-day-header .day-name {
+  display: block;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--planning-sub);
+}
+
+.planning-day-header .day-number {
+  display: block;
+  font-size: 0.95rem;
+  margin-top: 2px;
+}
+
+.planning-slot-button {
+  width: 100%;
+  min-height: 72px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  background: rgba(124, 156, 255, 0.12);
+  border: 1px solid var(--planning-border);
+  border-radius: 12px;
+  color: var(--planning-text);
+  padding: 10px 12px;
+  font: inherit;
+  cursor: pointer;
+  transition: background var(--transition), transform 0.15s ease, box-shadow var(--transition);
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.02);
+}
+
+.planning-slot-button:hover {
+  background: rgba(124, 156, 255, 0.22);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(124, 156, 255, 0.28);
+}
+
+.planning-slot-button:focus-visible {
+  outline: 2px solid var(--planning-accent);
+  outline-offset: 2px;
+}
+
+.planning-slot-heading {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.planning-slot-number {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--planning-sub);
+}
+
+.planning-slot-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--planning-text);
+}
+
+.planning-summary-cell {
+  min-height: 64px;
+  padding: 0;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--planning-border);
+  transition: background var(--transition), box-shadow var(--transition);
+}
+
+.planning-summary-content {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+  justify-content: center;
+  height: 100%;
+  padding: 10px 12px;
+}
+
+.planning-summary-label {
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--planning-text);
+}
+
+.planning-summary-time {
+  font-size: 0.8rem;
+  color: var(--planning-sub);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.planning-summary-open {
+  background: var(--planning-cell-color, rgba(124, 156, 255, 0.25));
+  color: var(--planning-cell-text, var(--planning-text));
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.08);
+}
+
+.planning-summary-open .planning-summary-time {
+  color: inherit;
+}
+
+.planning-summary-closed {
+  background: rgba(71, 85, 105, 0.3);
+  color: var(--planning-text);
+}
+
+.planning-summary-closed .planning-summary-time {
+  color: var(--planning-sub);
+}
+
+.planning-summary-cell:hover {
+  background: rgba(124, 156, 255, 0.18);
+  box-shadow: inset 0 0 0 1px rgba(124, 156, 255, 0.45);
+}
+
+.planning-summary-closed:hover::after {
+  content: 'Fermé';
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.planning-holiday .planning-day-header {
+  background: rgba(139, 92, 246, 0.25);
+  border-left: 3px solid #8b5cf6;
+}
+
+.planning-holiday .planning-summary-cell {
+  background: rgba(139, 92, 246, 0.08);
+}
+
+.holiday-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(139, 92, 246, 0.25);
+  color: var(--planning-text);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.planning-sunday .planning-day-header {
+  background: rgba(239, 68, 68, 0.18);
+  border-left: 3px solid var(--planning-danger);
+}
+
+.planning-sunday .planning-summary-cell {
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.empty-planning {
+  margin: 0;
+  font-style: italic;
+  color: var(--planning-sub);
+}
+
 h1, h2, h3 {
   margin-top: 0;
   color: var(--primary);
@@ -708,6 +1266,44 @@ button {
 button:hover {
   transform: translateY(-1px);
   box-shadow: 0 10px 20px rgba(52, 152, 219, 0.25);
+}
+
+button.planning-slot-button {
+  background: rgba(124, 156, 255, 0.12);
+  color: var(--planning-text);
+  border: 1px solid var(--planning-border);
+  font-weight: 500;
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.02);
+}
+
+button.planning-slot-button:hover {
+  background: rgba(124, 156, 255, 0.22);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(124, 156, 255, 0.28);
+}
+
+.planning-config-trigger {
+  background: rgba(124, 156, 255, 0.12);
+  color: var(--planning-text);
+  border: 1px solid var(--planning-border);
+}
+
+.planning-config-trigger:hover,
+.planning-config-menu.is-open .planning-config-trigger {
+  background: var(--planning-accent);
+  color: #0b0e14;
+  box-shadow: 0 8px 18px rgba(124, 156, 255, 0.35);
+}
+
+.planning-config-popover button {
+  background: transparent;
+  color: var(--planning-text);
+  border: none;
+}
+
+.planning-config-popover button:hover {
+  background: rgba(124, 156, 255, 0.12);
+  transform: translateY(-1px);
 }
 
 button.danger {
