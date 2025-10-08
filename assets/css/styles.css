@@ -533,6 +533,7 @@ main {
   display: grid;
   justify-items: center;
   align-content: center;
+  gap: 6px;
   width: 70px;
   min-height: 56px;
   margin: 0 auto;
@@ -1189,6 +1190,7 @@ main {
   display: grid;
   justify-items: center;
   align-content: center;
+  gap: 6px;
   width: 100%;
   min-height: 56px;
   margin: 0;
