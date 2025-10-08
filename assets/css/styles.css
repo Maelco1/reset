@@ -1179,7 +1179,7 @@ main {
 }
 
 .planning-summary-cell {
-  padding: 12px;
+  padding: 6px;
   border: none;
   background: transparent;
   text-align: center;
@@ -1189,9 +1189,9 @@ main {
   display: grid;
   justify-items: center;
   align-content: center;
-  width: 70px;
+  width: 100%;
   min-height: 56px;
-  margin: 0 auto;
+  margin: 0;
   border-radius: 12px;
   border: 1px solid var(--planning-border);
   background: var(--planning-surface, #ffffff);
@@ -1251,8 +1251,7 @@ main {
 }
 
 .planning-assignment-tag.is-empty {
-  background: rgba(148, 163, 184, 0.2);
-  color: #475569;
+  display: none;
 }
 
 .planning-assignment-role {
@@ -1260,6 +1259,10 @@ main {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: #64748b;
+}
+
+.planning-assignment-role.is-empty {
+  display: none;
 }
 
 .planning-slot-toggle[data-state='closed'] .planning-assignment-tag {

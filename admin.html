@@ -765,6 +765,7 @@
           }
           if (roleLabel) {
             roleLabel.textContent = '';
+            roleLabel.classList.add('is-empty');
           }
           if (srLabel) {
             srLabel.textContent = summary ? `${summary} · Fermé` : 'Créneau fermé';
@@ -776,11 +777,12 @@
         const assignment = planningAssignments.get(slotKey);
         if (!assignment) {
           if (tag) {
-            tag.textContent = 'Libre';
             tag.classList.add('is-empty');
+            tag.textContent = '';
           }
           if (roleLabel) {
-            roleLabel.textContent = 'Non attribué';
+            roleLabel.textContent = '';
+            roleLabel.classList.add('is-empty');
           }
           if (srLabel) {
             srLabel.textContent = summary ? `${summary} · Libre` : 'Créneau libre';
@@ -795,6 +797,7 @@
         }
         if (roleLabel) {
           roleLabel.textContent = ASSIGNMENT_ROLE_LABELS[assignment.role] ?? '';
+          roleLabel.classList.remove('is-empty');
         }
         if (srLabel) {
           srLabel.textContent = summary ? `${summary} · ${assignment.trigram}` : assignment.trigram;
