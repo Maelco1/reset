@@ -476,12 +476,12 @@ main {
 
 .planning-slot-button {
   position: relative;
-  display: inline-flex;
+  display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 4px;
-  width: 72px;
+  width: 100%;
   padding: 6px 4px;
   border-radius: 10px;
   border: 1px solid rgba(15, 23, 42, 0.18);
