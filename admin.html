@@ -796,8 +796,14 @@
           tag.classList.remove('is-empty');
         }
         if (roleLabel) {
-          roleLabel.textContent = ASSIGNMENT_ROLE_LABELS[assignment.role] ?? '';
-          roleLabel.classList.remove('is-empty');
+          const roleText = ASSIGNMENT_ROLE_LABELS[assignment.role] ?? '';
+          if (assignment.role === 'medecin' || !roleText) {
+            roleLabel.textContent = '';
+            roleLabel.classList.add('is-empty');
+          } else {
+            roleLabel.textContent = roleText;
+            roleLabel.classList.remove('is-empty');
+          }
         }
         if (srLabel) {
           srLabel.textContent = summary ? `${summary} · ${assignment.trigram}` : assignment.trigram;
