@@ -429,7 +429,7 @@ main {
 .planning-table th,
 .planning-table td {
   border: 1px solid #ecf0f1;
-  padding: 6px 4px;
+  padding: 4px 3px;
   vertical-align: top;
 }
 
@@ -1391,7 +1391,7 @@ button.planning-slot-button:hover {
 /* --- Ajustements d'alignement du planning --- */
 .planning-table th,
 .planning-table td {
-  padding: 8px 6px;
+  padding: 4px 3px;
   vertical-align: middle;
   text-align: center;
   word-break: break-word;
