@@ -450,7 +450,7 @@ main {
 
 .planning-table thead th:not(.planning-day-col),
 .planning-table tbody td {
-  width: 64px;
+  width: 60px;
 }
 
 .planning-day-header {
@@ -534,8 +534,8 @@ main {
   justify-items: center;
   align-content: center;
   gap: 4px;
-  width: 58px;
-  min-height: 48px;
+  width: 54px;
+  min-height: 44px;
   margin: 0 auto;
   border-radius: 12px;
   border: 1px solid rgba(148, 163, 184, 0.6);
@@ -589,16 +589,15 @@ main {
   min-width: 0;
   padding: 2px 0;
   border-radius: 999px;
-  background: rgba(37, 99, 235, 0.16);
-  color: #1d4ed8;
-  font-size: 0.75rem;
+  background: transparent;
+  color: var(--planning-text);
+  font-size: 0.7rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
 .planning-assignment-tag.is-empty {
-  background: rgba(148, 163, 184, 0.2);
-  color: #475569;
+  display: none;
 }
 
 .planning-assignment-role {
@@ -609,7 +608,7 @@ main {
 }
 
 .planning-slot-toggle[data-state='closed'] .planning-assignment-tag {
-  background: rgba(148, 163, 184, 0.24);
+  background: transparent;
   color: #475569;
 }
 
@@ -1101,9 +1100,9 @@ main {
 
 .planning-table thead th:not(.planning-day-col),
 .planning-table tbody td {
-  width: 56px;
-  min-width: 56px;
-  max-width: 56px;
+  width: 52px;
+  min-width: 52px;
+  max-width: 52px;
 }
 
 .planning-day-header {
@@ -1193,7 +1192,7 @@ main {
   align-content: center;
   gap: 6px;
   width: 100%;
-  min-height: 56px;
+  min-height: 52px;
   margin: 0;
   border-radius: 12px;
   border: 1px solid var(--planning-border);
@@ -1246,9 +1245,9 @@ main {
   min-width: 44px;
   padding: 2px 10px;
   border-radius: 999px;
-  background: rgba(37, 99, 235, 0.16);
-  color: #1d4ed8;
-  font-size: 0.78rem;
+  background: transparent;
+  color: var(--planning-text);
+  font-size: 0.7rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -1269,7 +1268,7 @@ main {
 }
 
 .planning-slot-toggle[data-state='closed'] .planning-assignment-tag {
-  background: rgba(148, 163, 184, 0.24);
+  background: transparent;
   color: #475569;
 }
 
