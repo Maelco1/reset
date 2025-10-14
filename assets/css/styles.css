@@ -1514,6 +1514,10 @@ header {
   gap: 16px;
 }
 
+header h1 {
+  font-size: clamp(1.5rem, 2vw + 1rem, 2.25rem);
+}
+
 header nav {
   display: flex;
   gap: 12px;
