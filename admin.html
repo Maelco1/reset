@@ -739,7 +739,7 @@
           details.push(slotTime);
         }
         details.push(`Qualité : ${quality}`);
-        details.push(isOpen ? 'Ouvert' : 'Fermé');
+        details.push(isOpen ? 'Ouvert' : 'Indisponible');
         if (isHoliday && holidayName) {
           details.push(holidayName);
         }
@@ -760,17 +760,19 @@
         }
         if (button.disabled || button.dataset.state === 'closed') {
           if (tag) {
-            tag.textContent = 'Fermé';
-            tag.classList.remove('is-empty');
+            tag.textContent = '';
+            tag.classList.add('is-empty');
           }
           if (roleLabel) {
             roleLabel.textContent = '';
             roleLabel.classList.add('is-empty');
           }
           if (srLabel) {
-            srLabel.textContent = summary ? `${summary} · Fermé` : 'Créneau fermé';
+            srLabel.textContent = summary
+              ? `${summary} · Créneau indisponible`
+              : 'Créneau indisponible';
           }
-          button.title = summary ? `${summary} · Fermé` : 'Fermé';
+          button.title = summary ? `${summary} · Indisponible` : 'Créneau indisponible';
           button.dataset.assignmentUserId = '';
           return;
         }
