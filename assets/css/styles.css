@@ -438,7 +438,9 @@ main {
   font-size: 0.75rem;
   line-height: 1.2;
   text-align: center;
-  white-space: nowrap;
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .planning-day-col {
@@ -510,6 +512,9 @@ main {
   text-transform: uppercase;
   line-height: 1.1;
   text-align: center;
+  width: 100%;
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .planning-slot-number {
@@ -518,8 +523,11 @@ main {
 }
 
 .planning-slot-title {
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   font-weight: 600;
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .planning-summary-cell {
@@ -587,13 +595,14 @@ main {
   justify-content: center;
   width: 100%;
   min-width: 0;
-  padding: 2px 0;
+  padding: 2px 4px;
   border-radius: 999px;
   background: transparent;
   color: var(--planning-text);
-  font-size: 0.7rem;
-  letter-spacing: 0.08em;
+  font-size: 0.68rem;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .planning-assignment-tag.is-empty {
