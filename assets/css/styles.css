@@ -1252,3 +1252,39 @@ a:hover {
     flex-direction: column;
   }
 }
+
+/* ===== Compact planning overrides (2025-10-21) ===== */
+.planning-table thead th {
+  background: var(--slot-header-background, rgba(52, 152, 219, 0.08));
+  font-size: 0.55rem;      /* was 0.65rem */
+  line-height: 1.1;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 2px 1px;        /* tighter header padding */
+}
+
+.planning-table thead th:not(.planning-day-col),
+.planning-table tbody td {
+  width: 32px;             /* was 44px */
+  height: 32px;            /* enforce square cells */
+  padding: 1px;            /* tighter inner padding */
+}
+
+.planning-slot-toggle {
+  width: 28px;             /* was 38px */
+  min-height: 28px;        /* was 32px */
+  font-size: 0.65rem;      /* was 0.75rem */
+  padding: 1px 0;
+}
+
+.planning-slot-title {
+  font-size: 0.5rem;       /* was 0.6rem */
+  line-height: 1.1;
+}
+
+.planning-tables {
+  gap: 12px;               /* was 24px */
+}
+/* ===== End compact planning overrides ===== */
