@@ -326,8 +326,9 @@ main {
 
 .planning-slot-header {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
+  justify-content: center;
   gap: 8px;
   padding: 8px 4px 10px;
   color: var(--slot-text-color, var(--planning-text));
