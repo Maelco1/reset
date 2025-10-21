@@ -1130,6 +1130,11 @@ button.secondary {
   word-break: break-word;
 }
 
+.table th {
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
 .guard-cell {
   display: grid;
   gap: 8px;
