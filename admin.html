@@ -478,63 +478,6 @@
       const planningTables = document.querySelector('#planning-tables');
       const planningFeedback = document.querySelector('#planning-feedback');
 
-      let planningCellSizingFrame = null;
-
-      const measurePlanningCellSize = () => {
-        if (!planningTables) {
-          return;
-        }
-        planningTables.style.removeProperty('--planning-cell-width');
-        planningTables.style.removeProperty('--planning-cell-height');
-        const widthElements = new Set([
-          ...planningTables.querySelectorAll('.planning-slot-toggle'),
-          ...planningTables.querySelectorAll('.planning-slot-button'),
-          ...planningTables.querySelectorAll('.planning-slot-index')
-        ]);
-        const heightElements = new Set([
-          ...planningTables.querySelectorAll('.planning-slot-toggle'),
-          ...planningTables.querySelectorAll('.planning-slot-button')
-        ]);
-        if (!widthElements.size && !heightElements.size) {
-          return;
-        }
-        let maxWidth = 0;
-        let maxHeight = 0;
-        widthElements.forEach((element) => {
-          if (!element.isConnected) {
-            return;
-          }
-          element.style.removeProperty('width');
-          element.style.removeProperty('height');
-          const rect = element.getBoundingClientRect();
-          maxWidth = Math.max(maxWidth, rect.width);
-        });
-        heightElements.forEach((element) => {
-          if (!element.isConnected) {
-            return;
-          }
-          element.style.removeProperty('height');
-          const rect = element.getBoundingClientRect();
-          maxHeight = Math.max(maxHeight, rect.height);
-        });
-        if (maxWidth > 0) {
-          planningTables.style.setProperty('--planning-cell-width', `${Math.ceil(maxWidth)}px`);
-        }
-        if (maxHeight > 0) {
-          planningTables.style.setProperty('--planning-cell-height', `${Math.ceil(maxHeight)}px`);
-        }
-      };
-
-      const schedulePlanningCellSize = () => {
-        if (planningCellSizingFrame) {
-          cancelAnimationFrame(planningCellSizingFrame);
-        }
-        planningCellSizingFrame = requestAnimationFrame(() => {
-          planningCellSizingFrame = null;
-          measurePlanningCellSize();
-        });
-      };
-
       const slotModal = document.querySelector('#slot-modal');
       const slotModalSubtitle = document.querySelector('#slot-modal-subtitle');
       const slotForm = document.querySelector('#slot-form');
@@ -733,26 +676,6 @@
         }
         const alpha = 0.14;
         return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha})`;
-      };
-
-      const getRelativeLuminance = ({ r, g, b }) => {
-        const transform = (channel) => {
-          const scaled = channel / 255;
-          return scaled <= 0.03928 ? scaled / 12.92 : Math.pow((scaled + 0.055) / 1.055, 2.4);
-        };
-        const red = transform(r);
-        const green = transform(g);
-        const blue = transform(b);
-        return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
-      };
-
-      const getSlotTextColor = (color) => {
-        const rgb = hexToRgb(color);
-        if (!rgb) {
-          return '#1f2937';
-        }
-        const luminance = getRelativeLuminance(rgb);
-        return luminance > 0.55 ? '#0f172a' : '#f8fafc';
       };
 
       const inferTypeCategory = (typeCode) => {
@@ -968,12 +891,9 @@
         const tag = button.querySelector('.planning-assignment-tag');
         const roleLabel = button.querySelector('.planning-assignment-role');
         if (!slotKey) {
-          schedulePlanningCellSize();
           return;
         }
-        const isClosed =
-          button.disabled || button.dataset.state === 'closed' || button.getAttribute('aria-disabled') === 'true';
-        if (isClosed) {
+        if (button.disabled || button.dataset.state === 'closed') {
           if (tag) {
             tag.textContent = '';
             tag.classList.add('is-empty');
@@ -989,7 +909,6 @@
           }
           button.title = summary ? `${summary} · Indisponible` : 'Créneau indisponible';
           button.dataset.assignmentUserId = '';
-          schedulePlanningCellSize();
           return;
         }
         const assignment = planningAssignments.get(slotKey);
@@ -1007,7 +926,6 @@
           }
           button.title = summary ? `${summary} · Libre` : 'Créneau libre';
           button.dataset.assignmentUserId = '';
-          schedulePlanningCellSize();
           return;
         }
         if (tag) {
@@ -1029,7 +947,6 @@
         }
         button.title = summary ? `${summary} · ${assignment.trigram}` : assignment.trigram;
         button.dataset.assignmentUserId = String(assignment.id);
-        schedulePlanningCellSize();
       };
 
       const populateAssignmentSelect = (currentUserId) => {
@@ -1091,7 +1008,6 @@
         }
         const buttons = planningTables.querySelectorAll('.planning-slot-toggle');
         buttons.forEach((button) => updateAssignmentButton(button));
-        schedulePlanningCellSize();
       };
 
       const cleanupAssignments = () => {
@@ -1139,7 +1055,6 @@
 
         const orderedSlots = sortSlotsByPosition(planningSlots);
         const columnStyles = new Map();
-        const columnColors = new Map();
 
         const thead = document.createElement('thead');
         const headerRow = document.createElement('tr');
@@ -1153,14 +1068,15 @@
           const th = document.createElement('th');
           th.scope = 'col';
           th.classList.add('planning-slot-header');
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.dataset.position = slot.position;
+          button.className = 'planning-slot-button';
           const slotColor = normalizeColor(slot.color);
-          const slotTextColor = getSlotTextColor(slotColor);
           const columnTint = getSlotColumnTint(slotColor);
           columnStyles.set(slot.position, columnTint);
-          columnColors.set(slot.position, { color: slotColor, text: slotTextColor });
+          button.style.setProperty('--slot-color', slotColor);
           th.style.setProperty('--slot-header-background', columnTint);
-          th.style.setProperty('--slot-color', slotColor);
-          th.style.setProperty('--slot-text-color', slotTextColor);
           const slotNumber = String(slot.position).padStart(2, '0');
           const rawLabel = (slot.label ?? '').trim();
           const slotLabel = rawLabel || `Colonne ${slot.position}`;
@@ -1174,38 +1090,18 @@
             buttonTitleParts.push(slotTime);
           }
           const buttonTitle = buttonTitleParts.join(' · ');
-          const indexBadge = document.createElement('span');
-          indexBadge.className = 'planning-slot-index';
-          indexBadge.textContent = slotNumber;
-          indexBadge.setAttribute('aria-hidden', 'true');
-          th.appendChild(indexBadge);
-          const button = document.createElement('button');
-          button.type = 'button';
-          button.dataset.position = String(slot.position);
-          button.className = 'planning-slot-button';
-          button.style.setProperty('--slot-color', slotColor);
-          button.style.setProperty('--slot-text-color', slotTextColor);
           button.title = buttonTitle;
           button.setAttribute('aria-label', buttonTitle);
           const heading = document.createElement('span');
           heading.className = 'planning-slot-heading';
+          const numberLabel = document.createElement('span');
+          numberLabel.className = 'planning-slot-number';
+          numberLabel.textContent = slotNumber;
+          heading.appendChild(numberLabel);
           const titleLabel = document.createElement('span');
           titleLabel.className = 'planning-slot-title';
           titleLabel.textContent = slotLabel;
           heading.appendChild(titleLabel);
-          const metaParts = [];
-          if (slotType) {
-            metaParts.push(slotType);
-          }
-          if (slotTime) {
-            metaParts.push(slotTime);
-          }
-          if (metaParts.length) {
-            const metaLabel = document.createElement('span');
-            metaLabel.className = 'planning-slot-meta';
-            metaLabel.textContent = metaParts.join(' · ');
-            heading.appendChild(metaLabel);
-          }
           button.appendChild(heading);
           const srLabel = document.createElement('span');
           srLabel.className = 'sr-only';
@@ -1256,7 +1152,6 @@
             if (columnTint) {
               cell.style.setProperty('--slot-column-background', columnTint);
             }
-            const columnColor = columnColors.get(slot.position);
             const segment = getDaySegment(day, isHoliday);
             const quality = getQualityForSegment(slot, segment);
             const open = isSlotOpen(slot, segment);
@@ -1270,20 +1165,11 @@
             button.dataset.slotKey = slotKey;
             button.dataset.day = isoKey;
             button.dataset.position = String(slot.position);
+            button.dataset.state = open ? 'available' : 'closed';
             button.dataset.summary = summaryTitle;
-            if (columnColor) {
-              button.style.setProperty('--slot-color', columnColor.color);
-              button.style.setProperty('--slot-text-color', columnColor.text);
-            }
 
-            if (open) {
-              button.dataset.state = 'available';
-              button.removeAttribute('aria-disabled');
-              button.removeAttribute('tabindex');
-            } else {
-              button.dataset.state = 'closed';
-              button.setAttribute('aria-disabled', 'true');
-              button.tabIndex = -1;
+            if (!open) {
+              button.disabled = true;
             }
 
             const tag = document.createElement('span');
@@ -1521,8 +1407,6 @@
         }
         if (!planningSlots.length) {
           planningTables.innerHTML = '<p class="empty-planning">Chargement du planning…</p>';
-          planningTables.style.removeProperty('--planning-cell-width');
-          planningTables.style.removeProperty('--planning-cell-height');
           return;
         }
         const baseYear = Number(planningYearSelect?.value ?? new Date().getFullYear());
@@ -1558,7 +1442,6 @@
           monthSection.appendChild(table);
           planningTables.appendChild(monthSection);
         });
-        schedulePlanningCellSize();
       };
 
       const closeUserModal = () => {
@@ -2153,7 +2036,7 @@
         planningTables.addEventListener('click', (event) => {
           const toggle = event.target.closest('.planning-slot-toggle');
           if (toggle) {
-            if (toggle.dataset.state === 'closed' || toggle.getAttribute('aria-disabled') === 'true') {
+            if (toggle.disabled) {
               return;
             }
             openAssignmentModal(toggle);
@@ -2170,18 +2053,6 @@
             openSlotModal(slot);
           }
         });
-      }
-
-      window.addEventListener('resize', schedulePlanningCellSize);
-
-      if (document.fonts && document.fonts.ready && typeof document.fonts.ready.then === 'function') {
-        document.fonts.ready
-          .then(() => {
-            schedulePlanningCellSize();
-          })
-          .catch(() => {
-            /* ignore font loading errors for sizing */
-          });
       }
 
       if (planningConfigContainer) {
