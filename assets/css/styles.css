@@ -20,8 +20,6 @@
   --planning-success: #22c55e;
   --planning-danger: #dc2626;
   --planning-grey: #94a3b8;
-  --planning-cell-width: 160px;
-  --planning-cell-height: 120px;
 }
 
 * {
@@ -266,7 +264,7 @@ main {
 .planning-table {
   border-collapse: collapse;
   width: 100%;
-  table-layout: fixed;
+  table-layout: auto;
   background: rgba(255, 255, 255, 0.85);
   border-radius: 12px;
   overflow: hidden;
@@ -293,8 +291,6 @@ main {
 .planning-table tbody td {
   width: var(--planning-cell-width, auto);
   min-width: var(--planning-cell-width, auto);
-  height: var(--planning-cell-height, auto);
-  min-height: var(--planning-cell-height, auto);
 }
 
 .planning-day-col {
