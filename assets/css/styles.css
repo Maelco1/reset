@@ -1253,38 +1253,78 @@ a:hover {
   }
 }
 
-/* ===== Compact planning overrides (2025-10-21) ===== */
+/* ===== Compact v2 (cell-as-button, 2025-10-21) ===== */
+/* 1) En-tÃªtes un peu plus grands mais compacts */
 .planning-table thead th {
-  background: var(--slot-header-background, rgba(52, 152, 219, 0.08));
-  font-size: 0.55rem;      /* was 0.65rem */
-  line-height: 1.1;
-  text-align: center;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  padding: 2px 1px;        /* tighter header padding */
+  font-size: 0.60rem;    /* up from 0.55rem */
+  padding: 3px 2px;
 }
 
+/* 2) Cases carrÃ©es, zero padding autour, la cellule s'occupe du dimensionnement */
 .planning-table thead th:not(.planning-day-col),
 .planning-table tbody td {
-  width: 32px;             /* was 44px */
-  height: 32px;            /* enforce square cells */
-  padding: 1px;            /* tighter inner padding */
+  width: 34px;           /* up from 32px for slightly larger text */
+  height: 34px;          /* enforce square cells */
+  min-height: 34px;
+  padding: 0;            /* remove extra space around clickable area */
 }
 
+/* 3) La "bulle" devient la cellule entiÃ¨re : le bouton remplit 100% */
 .planning-slot-toggle {
-  width: 28px;             /* was 38px */
-  min-height: 28px;        /* was 32px */
-  font-size: 0.65rem;      /* was 0.75rem */
-  padding: 1px 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 34px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;      /* no bubble bg */
+  box-shadow: none;
+  cursor: pointer;
+  transition: none;
 }
 
+/* Hover/Focus sobres sur la cellule entiÃ¨re */
+.planning-table tbody td:hover .planning-slot-toggle {
+  outline: 1px solid rgba(15, 23, 42, 0.20);
+  outline-offset: -1px;
+}
+.planning-slot-toggle:focus-visible {
+  outline: 2px solid var(--focus-ring-color);
+  outline-offset: -2px;
+}
+
+/* 4) LÃ©gÃ¨re hausse des tailles de texte Ã  l'intÃ©rieur */
+.planning-slot-number {
+  font-size: 0.72rem;  /* was 0.70rem */
+  line-height: 1.05;
+}
 .planning-slot-title {
-  font-size: 0.5rem;       /* was 0.6rem */
-  line-height: 1.1;
+  font-size: 0.56rem;  /* was 0.50-0.60rem previously */
+  line-height: 1.05;
 }
 
-.planning-tables {
-  gap: 12px;               /* was 24px */
+/* 5) Ajustements d'empilement interne */
+.planning-slot-heading {
+  gap: 1px;
+  padding: 0 2px;   /* un peu de respiration interne sans Ã©largir la cellule */
 }
-/* ===== End compact planning overrides ===== */
+
+/* 6) Nettoyage des anciens effets qui crÃ©aient l'effet "bulle" */
+.planning-slot-toggle:hover {
+  transform: none;
+  box-shadow: none;
+}
+.planning-slot-toggle[data-state='available'],
+.planning-slot-toggle[data-state='closed'] {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
+/* 7) Espacement global inchangÃ©, mais on peut compacter si besoin */
+.planning-tables {
+  gap: 12px;
+}
+/* ===== End Compact v2 ===== */
