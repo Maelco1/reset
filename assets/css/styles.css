@@ -326,12 +326,16 @@ main {
 
 .planning-slot-header {
   display: flex;
-  flex-direction: row;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
   justify-content: center;
-  gap: 8px;
+  gap: 6px;
   padding: 8px 4px 10px;
   color: var(--slot-text-color, var(--planning-text));
+}
+
+.planning-slot-header .planning-slot-button {
+  width: 100%;
 }
 
 .planning-slot-index {
