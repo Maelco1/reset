@@ -273,18 +273,18 @@ main {
 .planning-table th,
 .planning-table td {
   border: 1px solid #ecf0f1;
-  padding: 4px 3px;
+  padding: 2px 2px;
   vertical-align: top;
 }
 
 .planning-table thead th {
   background: var(--slot-header-background, rgba(52, 152, 219, 0.08));
-  font-size: 0.75rem;
-  line-height: 1.2;
+  font-size: 0.65rem;
+  line-height: 1;
   text-align: center;
-  white-space: normal;
-  word-break: break-word;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .planning-day-col {
@@ -297,7 +297,7 @@ main {
 
 .planning-table thead th:not(.planning-day-col),
 .planning-table tbody td {
-  width: 60px;
+  width: 44px;
 }
 
 .planning-day-header {
@@ -330,7 +330,7 @@ main {
   justify-content: center;
   gap: 3px;
   width: 100%;
-  padding: 4px 3px;
+  padding: 2px 2px;
   border-radius: 8px;
   border: 1px solid rgba(15, 23, 42, 0.18);
   background: var(--slot-color, #3498db);
@@ -364,11 +364,11 @@ main {
 
 .planning-slot-number {
   font-weight: 700;
-  font-size: 0.78rem;
+  font-size: 0.7rem;
 }
 
 .planning-slot-title {
-  font-size: 0.68rem;
+  font-size: 0.6rem;
   font-weight: 600;
   white-space: normal;
   word-break: break-word;
@@ -387,8 +387,8 @@ main {
   justify-items: center;
   align-content: center;
   gap: 4px;
-  width: 54px;
-  min-height: 44px;
+  width: 38px;
+  min-height: 32px;
   margin: 0 auto;
   border-radius: 12px;
   border: 1px solid rgba(148, 163, 184, 0.6);
@@ -396,8 +396,8 @@ main {
   color: #1f2937;
   font: inherit;
   font-weight: 600;
-  font-size: 0.9rem;
-  padding: 4px 2px;
+  font-size: 0.75rem;
+  padding: 2px 0;
   cursor: pointer;
   transition: background var(--transition), border-color var(--transition), box-shadow var(--transition), transform var(--transition);
 }
