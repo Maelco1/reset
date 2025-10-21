@@ -1,5 +1,10 @@
 set role postgres;
 
+create table if not exists public.planning_state (
+    id text primary key,
+    label text not null
+);
+
 create unique index if not exists planning_state_id_key
     on public.planning_state (id);
 
