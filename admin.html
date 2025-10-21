@@ -329,6 +329,7 @@
       } from './js/supabaseClient.js';
 
       const DEFAULT_COLOR = '#1e293b';
+      const DEFAULT_COLUMN_TINT = 'rgba(30, 41, 59, 0.12)';
       const COLUMN_DEFAULTS = [
         { position: 1, typeCode: '1N', color: '#1e293b' },
         { position: 2, typeCode: '2N', color: '#1e293b' },
@@ -535,6 +536,32 @@
       };
 
       const normalizeColor = (value) => sanitizeColor(value) ?? DEFAULT_COLOR;
+
+      const hexToRgb = (value) => {
+        const sanitized = sanitizeColor(value);
+        if (!sanitized) {
+          return null;
+        }
+        const hex = sanitized.slice(1);
+        const numeric = Number.parseInt(hex, 16);
+        if (Number.isNaN(numeric)) {
+          return null;
+        }
+        return {
+          r: (numeric >> 16) & 255,
+          g: (numeric >> 8) & 255,
+          b: numeric & 255
+        };
+      };
+
+      const getSlotColumnTint = (color) => {
+        const rgb = hexToRgb(color);
+        if (!rgb) {
+          return DEFAULT_COLUMN_TINT;
+        }
+        const alpha = 0.14;
+        return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha})`;
+      };
 
       const inferTypeCategory = (typeCode) => {
         if (typeof typeCode !== 'string') {
@@ -912,6 +939,7 @@
         table.className = 'planning-table';
 
         const orderedSlots = sortSlotsByPosition(planningSlots);
+        const columnStyles = new Map();
 
         const thead = document.createElement('thead');
         const headerRow = document.createElement('tr');
@@ -924,12 +952,16 @@
         orderedSlots.forEach((slot) => {
           const th = document.createElement('th');
           th.scope = 'col';
+          th.classList.add('planning-slot-header');
           const button = document.createElement('button');
           button.type = 'button';
           button.dataset.position = slot.position;
           button.className = 'planning-slot-button';
           const slotColor = normalizeColor(slot.color);
+          const columnTint = getSlotColumnTint(slotColor);
+          columnStyles.set(slot.position, columnTint);
           button.style.setProperty('--slot-color', slotColor);
+          th.style.setProperty('--slot-header-background', columnTint);
           const slotNumber = String(slot.position).padStart(2, '0');
           const rawLabel = (slot.label ?? '').trim();
           const slotLabel = rawLabel || `Colonne ${slot.position}`;
@@ -1001,6 +1033,10 @@
           orderedSlots.forEach((slot) => {
             const cell = document.createElement('td');
             cell.className = 'planning-summary-cell';
+            const columnTint = columnStyles.get(slot.position);
+            if (columnTint) {
+              cell.style.setProperty('--slot-column-background', columnTint);
+            }
             const segment = getDaySegment(day, isHoliday);
             const quality = getQualityForSegment(slot, segment);
             const open = isSlotOpen(slot, segment);

@@ -278,7 +278,7 @@ main {
 }
 
 .planning-table thead th {
-  background: rgba(52, 152, 219, 0.08);
+  background: var(--slot-header-background, rgba(52, 152, 219, 0.08));
   font-size: 0.75rem;
   line-height: 1.2;
   text-align: center;
@@ -290,7 +290,8 @@ main {
 .planning-day-col {
   width: 220px;
   min-width: 220px;
-  background: rgba(52, 152, 219, 0.1);
+  --slot-header-background: rgba(52, 152, 219, 0.1);
+  background: var(--slot-header-background);
   text-align: left;
 }
 
@@ -377,7 +378,7 @@ main {
 .planning-summary-cell {
   padding: 12px;
   border: none;
-  background: transparent;
+  background: var(--slot-column-background, transparent);
   text-align: center;
 }
 
@@ -727,7 +728,7 @@ main {
 }
 
 .planning-table thead th {
-  background: var(--planning-muted);
+  background: var(--slot-header-background, var(--planning-muted));
   text-align: center;
   font-size: 0.8rem;
   text-transform: uppercase;
@@ -739,7 +740,8 @@ main {
 .planning-day-col {
   position: sticky;
   left: 0;
-  background: #ffffff;
+  --slot-header-background: #ffffff;
+  background: var(--slot-header-background, #ffffff);
   z-index: 4;
   text-align: left;
   width: 200px;
@@ -830,7 +832,7 @@ main {
 .planning-summary-cell {
   padding: 6px;
   border: none;
-  background: transparent;
+  background: var(--slot-column-background, transparent);
   text-align: center;
 }
 
