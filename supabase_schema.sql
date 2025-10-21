@@ -88,6 +88,61 @@ before update on public.planning_columns
 for each row
 execute function public.update_planning_columns_timestamp();
 
+create table if not exists public.planning_columns_tour2 (
+  like public.planning_columns including defaults including constraints including identity
+);
+
+create table if not exists public.planning_columns_tour3 (
+  like public.planning_columns including defaults including constraints including identity
+);
+
+create table if not exists public.planning_columns_tour4 (
+  like public.planning_columns including defaults including constraints including identity
+);
+
+create table if not exists public.planning_columns_tour5 (
+  like public.planning_columns including defaults including constraints including identity
+);
+
+create table if not exists public.planning_columns_tour6 (
+  like public.planning_columns including defaults including constraints including identity
+);
+
+drop trigger if exists trg_planning_columns_tour2_updated_at on public.planning_columns_tour2;
+
+create trigger trg_planning_columns_tour2_updated_at
+before update on public.planning_columns_tour2
+for each row
+execute function public.update_planning_columns_timestamp();
+
+drop trigger if exists trg_planning_columns_tour3_updated_at on public.planning_columns_tour3;
+
+create trigger trg_planning_columns_tour3_updated_at
+before update on public.planning_columns_tour3
+for each row
+execute function public.update_planning_columns_timestamp();
+
+drop trigger if exists trg_planning_columns_tour4_updated_at on public.planning_columns_tour4;
+
+create trigger trg_planning_columns_tour4_updated_at
+before update on public.planning_columns_tour4
+for each row
+execute function public.update_planning_columns_timestamp();
+
+drop trigger if exists trg_planning_columns_tour5_updated_at on public.planning_columns_tour5;
+
+create trigger trg_planning_columns_tour5_updated_at
+before update on public.planning_columns_tour5
+for each row
+execute function public.update_planning_columns_timestamp();
+
+drop trigger if exists trg_planning_columns_tour6_updated_at on public.planning_columns_tour6;
+
+create trigger trg_planning_columns_tour6_updated_at
+before update on public.planning_columns_tour6
+for each row
+execute function public.update_planning_columns_timestamp();
+
 with defaults(position, type_code, color) as (
   values
     (1, '1N', '#1e293b'),
@@ -149,6 +204,196 @@ select
   end,
   color
 from defaults
+on conflict (position) do nothing;
+
+insert into public.planning_columns_tour2 (
+  position,
+  label,
+  type_code,
+  type_category,
+  start_time,
+  end_time,
+  color,
+  quality_weekdays,
+  quality_saturday,
+  quality_sunday,
+  open_mauvaise_weekdays,
+  open_mauvaise_saturday,
+  open_mauvaise_sunday,
+  open_bonus_weekdays,
+  open_bonus_saturday,
+  open_bonus_sunday
+)
+select
+  position,
+  label,
+  type_code,
+  type_category,
+  start_time,
+  end_time,
+  color,
+  quality_weekdays,
+  quality_saturday,
+  quality_sunday,
+  open_mauvaise_weekdays,
+  open_mauvaise_saturday,
+  open_mauvaise_sunday,
+  open_bonus_weekdays,
+  open_bonus_saturday,
+  open_bonus_sunday
+from public.planning_columns
+on conflict (position) do nothing;
+
+insert into public.planning_columns_tour3 (
+  position,
+  label,
+  type_code,
+  type_category,
+  start_time,
+  end_time,
+  color,
+  quality_weekdays,
+  quality_saturday,
+  quality_sunday,
+  open_mauvaise_weekdays,
+  open_mauvaise_saturday,
+  open_mauvaise_sunday,
+  open_bonus_weekdays,
+  open_bonus_saturday,
+  open_bonus_sunday
+)
+select
+  position,
+  label,
+  type_code,
+  type_category,
+  start_time,
+  end_time,
+  color,
+  quality_weekdays,
+  quality_saturday,
+  quality_sunday,
+  open_mauvaise_weekdays,
+  open_mauvaise_saturday,
+  open_mauvaise_sunday,
+  open_bonus_weekdays,
+  open_bonus_saturday,
+  open_bonus_sunday
+from public.planning_columns
+on conflict (position) do nothing;
+
+insert into public.planning_columns_tour4 (
+  position,
+  label,
+  type_code,
+  type_category,
+  start_time,
+  end_time,
+  color,
+  quality_weekdays,
+  quality_saturday,
+  quality_sunday,
+  open_mauvaise_weekdays,
+  open_mauvaise_saturday,
+  open_mauvaise_sunday,
+  open_bonus_weekdays,
+  open_bonus_saturday,
+  open_bonus_sunday
+)
+select
+  position,
+  label,
+  type_code,
+  type_category,
+  start_time,
+  end_time,
+  color,
+  quality_weekdays,
+  quality_saturday,
+  quality_sunday,
+  open_mauvaise_weekdays,
+  open_mauvaise_saturday,
+  open_mauvaise_sunday,
+  open_bonus_weekdays,
+  open_bonus_saturday,
+  open_bonus_sunday
+from public.planning_columns
+on conflict (position) do nothing;
+
+insert into public.planning_columns_tour5 (
+  position,
+  label,
+  type_code,
+  type_category,
+  start_time,
+  end_time,
+  color,
+  quality_weekdays,
+  quality_saturday,
+  quality_sunday,
+  open_mauvaise_weekdays,
+  open_mauvaise_saturday,
+  open_mauvaise_sunday,
+  open_bonus_weekdays,
+  open_bonus_saturday,
+  open_bonus_sunday
+)
+select
+  position,
+  label,
+  type_code,
+  type_category,
+  start_time,
+  end_time,
+  color,
+  quality_weekdays,
+  quality_saturday,
+  quality_sunday,
+  open_mauvaise_weekdays,
+  open_mauvaise_saturday,
+  open_mauvaise_sunday,
+  open_bonus_weekdays,
+  open_bonus_saturday,
+  open_bonus_sunday
+from public.planning_columns
+on conflict (position) do nothing;
+
+insert into public.planning_columns_tour6 (
+  position,
+  label,
+  type_code,
+  type_category,
+  start_time,
+  end_time,
+  color,
+  quality_weekdays,
+  quality_saturday,
+  quality_sunday,
+  open_mauvaise_weekdays,
+  open_mauvaise_saturday,
+  open_mauvaise_sunday,
+  open_bonus_weekdays,
+  open_bonus_saturday,
+  open_bonus_sunday
+)
+select
+  position,
+  label,
+  type_code,
+  type_category,
+  start_time,
+  end_time,
+  color,
+  quality_weekdays,
+  quality_saturday,
+  quality_sunday,
+  open_mauvaise_weekdays,
+  open_mauvaise_saturday,
+  open_mauvaise_sunday,
+  open_bonus_weekdays,
+  open_bonus_saturday,
+  open_bonus_sunday
+from public.planning_columns
 on conflict (position) do nothing;
 
 reset role;
