@@ -659,6 +659,40 @@ main {
   outline-offset: 2px;
 }
 
+.planning-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--planning-border);
+}
+
+.planning-tab {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--planning-sub);
+  font-weight: 600;
+  padding: 8px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background-color var(--transition), color var(--transition);
+}
+
+.planning-tab:hover,
+.planning-tab:focus-visible {
+  background: var(--planning-muted);
+  color: var(--planning-text);
+  outline: none;
+}
+
+.planning-tab.is-active {
+  background: var(--planning-accent);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+}
+
 .planning-layout {
   display: block;
 }

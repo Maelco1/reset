@@ -52,6 +52,8 @@
               <p id="planning-feedback" role="status"></p>
             </div>
 
+            <nav class="planning-tabs" id="planning-tour-tabs" role="tablist" aria-label="Tours du planning"></nav>
+
             <form id="planning-controls" class="planning-controls" aria-label="Filtres du planning">
               <div class="planning-control">
                 <label for="planning-year">Année</label>
@@ -70,7 +72,7 @@
             </form>
 
             <div class="planning-layout">
-              <div class="planning-board" role="region" aria-labelledby="planning-title">
+              <div class="planning-board" id="planning-board" role="region" aria-labelledby="planning-title">
                 <div class="planning-tables" id="planning-tables" aria-live="polite"></div>
               </div>
             </div>
@@ -405,6 +407,22 @@
         ].map((code) => [code, 'Consultation']),
         ...['TC', 'TCN'].map((code) => [code, 'Téléconsultation'])
       ]);
+
+      const PLANNING_TOURS = [
+        { id: 1, label: 'Tour 1', table: 'planning_columns' },
+        { id: 2, label: 'Tour 2', table: 'planning_columns_tour2' },
+        { id: 3, label: 'Tour 3', table: 'planning_columns_tour3' },
+        { id: 4, label: 'Tour 4', table: 'planning_columns_tour4' },
+        { id: 5, label: 'Tour 5', table: 'planning_columns_tour5' },
+        { id: 6, label: 'Tour 6', table: 'planning_columns_tour6' }
+      ];
+
+      let selectedTourId = PLANNING_TOURS[0].id;
+
+      const getTourConfig = (tourId = selectedTourId) =>
+        PLANNING_TOURS.find((tour) => tour.id === tourId) ?? PLANNING_TOURS[0];
+
+      const getPlanningTableName = (tourId = selectedTourId) => getTourConfig(tourId).table;
       const WEEKDAY_LABELS = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
       const MONTH_NAMES = [
         'Janvier',
@@ -451,6 +469,7 @@
       const closeUserModalBtn = document.querySelector('#close-user-modal');
       const trigramInputs = document.querySelectorAll('.uppercase-input');
 
+      const planningTourTabs = document.querySelector('#planning-tour-tabs');
       const planningYearSelect = document.querySelector('#planning-year');
       const planningMonthOneSelect = document.querySelector('#planning-month-1');
       const planningMonthTwoSelect = document.querySelector('#planning-month-2');
@@ -516,6 +535,101 @@
       let activeAssignmentButton = null;
       let planningLoading = false;
       let openPlanningConfigMenu = null;
+      let planningLoadToken = 0;
+
+      const focusPlanningTourButton = (index) => {
+        if (!planningTourTabs) {
+          return;
+        }
+        const button = planningTourTabs.querySelector(`button[data-index="${index}"]`);
+        if (button) {
+          button.focus();
+        }
+      };
+
+      const handlePlanningTourKeydown = (event, index, tourId) => {
+        const total = PLANNING_TOURS.length;
+        if (!total) {
+          return;
+        }
+        switch (event.key) {
+          case 'ArrowRight': {
+            event.preventDefault();
+            focusPlanningTourButton((index + 1) % total);
+            break;
+          }
+          case 'ArrowLeft': {
+            event.preventDefault();
+            focusPlanningTourButton((index - 1 + total) % total);
+            break;
+          }
+          case 'Home': {
+            event.preventDefault();
+            focusPlanningTourButton(0);
+            break;
+          }
+          case 'End': {
+            event.preventDefault();
+            focusPlanningTourButton(total - 1);
+            break;
+          }
+          case ' ':
+          case 'Enter': {
+            event.preventDefault();
+            selectPlanningTour(tourId);
+            break;
+          }
+          default:
+            break;
+        }
+      };
+
+      const renderPlanningTourTabs = () => {
+        if (!planningTourTabs) {
+          return;
+        }
+        const activeTour = getTourConfig();
+        planningTourTabs.innerHTML = '';
+        PLANNING_TOURS.forEach((tour, index) => {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = 'planning-tab';
+          button.dataset.index = String(index);
+          button.id = `planning-tour-${tour.id}`;
+          button.setAttribute('role', 'tab');
+          button.setAttribute('aria-controls', 'planning-board');
+          button.textContent = tour.label;
+          const isActive = tour.id === activeTour.id;
+          if (isActive) {
+            button.classList.add('is-active');
+          }
+          button.setAttribute('aria-selected', isActive ? 'true' : 'false');
+          button.setAttribute('tabindex', isActive ? '0' : '-1');
+          button.addEventListener('click', () => {
+            selectPlanningTour(tour.id);
+          });
+          button.addEventListener('keydown', (event) => {
+            handlePlanningTourKeydown(event, index, tour.id);
+          });
+          planningTourTabs.appendChild(button);
+        });
+      };
+
+      const selectPlanningTour = async (tourId) => {
+        if (tourId === selectedTourId) {
+          return;
+        }
+        selectedTourId = tourId;
+        planningAssignments.clear();
+        cleanupAssignments();
+        closePlanningConfigMenu();
+        renderPlanningTourTabs();
+        if (planningFeedback) {
+          planningFeedback.textContent = 'Chargement des colonnes…';
+        }
+        await subscribeToPlanningChanges();
+        loadPlanningColumns(true);
+      };
 
       const sanitizeColor = (value) => {
         if (typeof value !== 'string') {
@@ -1421,7 +1535,7 @@
         refreshAssignmentButtons();
       };
 
-      const ensurePlanningColumns = async (supabase, slots) => {
+      const ensurePlanningColumns = async (supabase, slots, tableName) => {
         const missing = [];
         for (let position = 1; position <= 46; position += 1) {
           if (!slots.some((slot) => slot.position === position)) {
@@ -1431,13 +1545,13 @@
         if (missing.length === 0) {
           return slots;
         }
-        const { error } = await supabase.from('planning_columns').upsert(missing, { onConflict: 'position' });
+        const { error } = await supabase.from(tableName).upsert(missing, { onConflict: 'position' });
         if (error) {
           console.error(error);
           return slots;
         }
         const { data, error: reloadError } = await supabase
-          .from('planning_columns')
+          .from(tableName)
           .select(
             `id,
             position,
@@ -1465,11 +1579,13 @@
         return data ?? slots;
       };
 
-      const loadPlanningColumns = async () => {
-        if (planningLoading) {
+      const loadPlanningColumns = async (force = false) => {
+        if (planningLoading && !force) {
           return;
         }
         planningLoading = true;
+        const requestToken = ++planningLoadToken;
+        const tableName = getPlanningTableName();
         if (planningFeedback) {
           planningFeedback.textContent = 'Chargement des colonnes…';
         }
@@ -1482,7 +1598,7 @@
         await onSupabaseReady();
         const supabase = getSupabaseClient();
         const { data, error } = await supabase
-          .from('planning_columns')
+          .from(tableName)
           .select(
             `id,
             position,
@@ -1514,11 +1630,16 @@
           if (planningConfigContainer) {
             planningConfigContainer.innerHTML = '<p class="empty-planning">Impossible de charger les colonnes.</p>';
           }
-          planningLoading = false;
+          if (requestToken === planningLoadToken) {
+            planningLoading = false;
+          }
           return;
         }
         let slots = data ?? [];
-        slots = await ensurePlanningColumns(supabase, slots);
+        slots = await ensurePlanningColumns(supabase, slots, tableName);
+        if (requestToken !== planningLoadToken) {
+          return;
+        }
         const sortedSlots = sortSlotsByPosition(slots);
         planningSlots = sortedSlots.map((slot) => ({
           ...slot,
@@ -1555,7 +1676,9 @@
         }
         renderPlanningTables();
         renderPlanningConfig();
-        planningLoading = false;
+        if (requestToken === planningLoadToken) {
+          planningLoading = false;
+        }
       };
 
       createForm.addEventListener('submit', async (event) => {
@@ -1760,7 +1883,8 @@
           open_bonus_saturday: openBonusSaturday,
           open_bonus_sunday: openBonusSunday
         };
-        const { error } = await supabase.from('planning_columns').upsert(payload, { onConflict: 'position' });
+        const tableName = getPlanningTableName();
+        const { error } = await supabase.from(tableName).upsert(payload, { onConflict: 'position' });
         if (error) {
           console.error(error);
           if (slotFeedback) {
@@ -1768,7 +1892,7 @@
           }
           return;
         }
-        await loadPlanningColumns();
+        await loadPlanningColumns(true);
         closeSlotModal();
       };
 
@@ -1996,10 +2120,14 @@
       const subscribeToPlanningChanges = async () => {
         await onSupabaseReady();
         const supabase = getSupabaseClient();
+        const tableName = getPlanningTableName();
+        if (planningChannel) {
+          await planningChannel.unsubscribe();
+        }
         planningChannel = supabase
-          .channel('planning-columns-changes')
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'planning_columns' }, () => {
-            loadPlanningColumns();
+          .channel(`planning-columns-changes-${tableName}`)
+          .on('postgres_changes', { event: '*', schema: 'public', table: tableName }, () => {
+            loadPlanningColumns(true);
           })
           .subscribe();
       };
@@ -2011,6 +2139,7 @@
         });
       }
 
+      renderPlanningTourTabs();
       loadUsers();
       loadPlanningColumns();
       subscribeToUserChanges();
