@@ -1328,3 +1328,114 @@ a:hover {
   gap: 12px;
 }
 /* ===== End Compact v2 ===== */
+
+/* ===== Planning overrides v3 (cell=button, closed hatch on hover) ===== */
+:root {
+  --cell-size: 40px; /* Adjustable master size for square cells */
+}
+
+/* Square cells driven by variable */
+.planning-table thead th:not(.planning-day-col),
+.planning-table tbody td {
+  width: var(--cell-size);
+  height: var(--cell-size);
+  min-width: var(--cell-size);
+  min-height: var(--cell-size);
+  padding: 0;
+}
+
+/* Slightly larger headers while staying on one line */
+.planning-table thead th {
+  font-size: 0.62rem;
+  padding: 4px 4px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+
+/* Make entire cell the clickable surface (no bubble) */
+.planning-slot-toggle {
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  margin: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  cursor: pointer;
+  position: relative;
+}
+
+/* Text sizing rules to keep up to 6 chars on one line.
+   Max font-size is ~ S/3.6 assuming ~0.6em per char * 6 chars = 3.6em total. */
+.planning-slot-title,
+.planning-assignment-tag {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: 0.02em;
+  font-weight: 700;
+  font-size: clamp(9px, calc(var(--cell-size) / 3.6), 16px);
+  line-height: 1;
+}
+
+/* Hide secondary number row if present to avoid forced second line */
+.planning-slot-number {
+  display: none;
+}
+
+/* Center content perfectly */
+.planning-slot-heading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  width: 100%;
+  gap: 0;
+  padding: 0 2px;
+}
+
+/* OPEN (available) state: subtle border and hover */
+.planning-slot-toggle[data-state='available'] {
+  background: #ffffff;
+}
+.planning-table tbody td:hover .planning-slot-toggle[data-state='available'] {
+  outline: 1px solid rgba(37, 99, 235, 0.35);
+  outline-offset: -1px;
+}
+
+/* CLOSED state: grey background by default, text muted */
+.planning-slot-toggle[data-state='closed'] {
+  background: #e2e8f0;              /* gris clair */
+  color: #64748b;                    /* texte grisÃ© */
+  cursor: not-allowed;
+}
+
+/* CLOSED hover: diagonal hatch (barrage) */
+.planning-slot-toggle[data-state='closed']::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;                        /* invisible par dÃ©faut */
+  transition: opacity 0.15s ease-in-out;
+  background-image: repeating-linear-gradient(
+    135deg,
+    rgba(100, 116, 139, 0.0) 0,
+    rgba(100, 116, 139, 0.0) 6px,
+    rgba(100, 116, 139, 0.35) 6px,
+    rgba(100, 116, 139, 0.35) 10px
+  );
+}
+.planning-table tbody td:hover .planning-slot-toggle[data-state='closed']::after {
+  opacity: 1;                        /* affiche l'onglet barrÃ© au survol */
+}
+
+/* Focus keyboard */
+.planning-slot-toggle:focus-visible {
+  outline: 2px solid var(--focus-ring-color);
+  outline-offset: -2px;
+}
+/* ===== End v3 ===== */
