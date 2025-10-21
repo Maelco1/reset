@@ -6,11 +6,71 @@ const STORAGE_KEYS = {
   user: 'guardes:currentUser'
 };
 
+const ROLE_ALIASES = new Map([
+  ['administrateur', 'administrateur'],
+  ['administrateurs', 'administrateur'],
+  ['administratrice', 'administrateur'],
+  ['administratrices', 'administrateur'],
+  ['admin', 'administrateur'],
+  ['admins', 'administrateur'],
+  ['administration', 'administrateur'],
+  ['administrations', 'administrateur'],
+  ['medecin', 'medecin'],
+  ['medecins', 'medecin'],
+  ['medecine', 'medecin'],
+  ['medecines', 'medecin'],
+  ['docteur', 'medecin'],
+  ['docteurs', 'medecin'],
+  ['remplacant', 'remplacant'],
+  ['remplacants', 'remplacant'],
+  ['remplacante', 'remplacant'],
+  ['remplacantes', 'remplacant'],
+  ['remplacement', 'remplacant'],
+  ['remplacements', 'remplacant']
+]);
+
 let client = null;
 let resolveReady;
 const readyPromise = new Promise((resolve) => {
   resolveReady = resolve;
 });
+
+const DIACRITICS_REGEX = /[\u0300-\u036f]/g;
+
+export function normalizeRole(value) {
+  if (value == null) {
+    return '';
+  }
+
+  const normalizedInput = value
+    .toString()
+    .normalize('NFD')
+    .replace(DIACRITICS_REGEX, '')
+    .toLowerCase()
+    .trim();
+
+  if (!normalizedInput) {
+    return '';
+  }
+
+  const compact = normalizedInput.replace(/[^a-z]/g, '');
+  if (!compact) {
+    return '';
+  }
+
+  const candidates = [compact];
+  if (compact.endsWith('s')) {
+    candidates.push(compact.slice(0, -1));
+  }
+
+  for (const candidate of candidates) {
+    if (ROLE_ALIASES.has(candidate)) {
+      return ROLE_ALIASES.get(candidate);
+    }
+  }
+
+  return '';
+}
 
 function buildClient(url, key) {
   if (!url || !key) {
@@ -61,7 +121,22 @@ export function getCurrentUser() {
     return null;
   }
   try {
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') {
+      return null;
+    }
+
+    const normalizedRole = normalizeRole(parsed.role);
+    if (normalizedRole) {
+      if (parsed.role !== normalizedRole) {
+        const updated = { ...parsed, role: normalizedRole };
+        localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(updated));
+        return updated;
+      }
+      return { ...parsed, role: normalizedRole };
+    }
+
+    return parsed;
   } catch (error) {
     console.error('Failed to parse stored user', error);
     return null;
@@ -70,15 +145,21 @@ export function getCurrentUser() {
 
 export function setCurrentUser(user) {
   if (user) {
-    localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(user));
-  } else {
-    localStorage.removeItem(STORAGE_KEYS.user);
+    const normalizedRole = normalizeRole(user.role);
+    const payload = normalizedRole ? { ...user, role: normalizedRole } : { ...user };
+    localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(payload));
+    return payload;
   }
+
+  localStorage.removeItem(STORAGE_KEYS.user);
+  return null;
 }
 
 export function requireRole(role) {
+  const expectedRole = normalizeRole(role);
   const user = getCurrentUser();
-  if (!user || user.role !== role) {
+  const actualRole = normalizeRole(user?.role);
+  if (!user || !expectedRole || actualRole !== expectedRole) {
     window.location.assign('index.html');
   }
 }
