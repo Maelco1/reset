@@ -327,7 +327,8 @@
         getCurrentUser,
         setCurrentUser,
         getSupabaseClient,
-        onSupabaseReady
+        onSupabaseReady,
+        normalizeRole
       } from './js/supabaseClient.js';
 
       const DEFAULT_COLOR = '#1e293b';
@@ -958,8 +959,8 @@
         noneOption.textContent = 'Aucune affectation';
         assignmentSelect.appendChild(noneOption);
 
-        const medecins = allUsers.filter((user) => user.role === 'medecin');
-        const remplacants = allUsers.filter((user) => user.role === 'remplacant');
+        const medecins = allUsers.filter((user) => normalizeRole(user.role) === 'medecin');
+        const remplacants = allUsers.filter((user) => normalizeRole(user.role) === 'remplacant');
 
         const appendGroup = (label, users) => {
           if (!users.length) {
@@ -1453,16 +1454,25 @@
       const openUserModal = (user) => {
         editingUser = user;
         const trigram = (user.trigram ?? '').trim() || user.username.slice(0, 3).toUpperCase();
+        const canonicalRole = normalizeRole(user.role);
         const roleLabels = {
           administrateur: 'Administrateurs',
           medecin: 'Médecins',
           remplacant: 'Remplaçants'
         };
-        userModalSubtitle.textContent = `${roleLabels[user.role] ?? 'Utilisateur'} · ${user.username}`;
+        const rawRoleLabel = typeof user.originalRole === 'string' && user.originalRole.trim()
+          ? user.originalRole.trim()
+          : typeof user.role === 'string' && user.role.trim()
+            ? user.role.trim()
+            : 'Utilisateur';
+        const subtitleRole = roleLabels[canonicalRole] ?? rawRoleLabel;
+        userModalSubtitle.textContent = `${subtitleRole} · ${user.username}`;
         editForm.elements['id'].value = user.id;
         editForm.elements['username'].value = user.username;
         editForm.elements['trigram'].value = trigram;
-        editForm.elements['role'].value = user.role;
+        const roleSelect = editForm.elements['role'];
+        const nextRole = roleLabels[canonicalRole] ? canonicalRole : 'medecin';
+        roleSelect.value = nextRole;
         editForm.elements['password'].value = '';
         userModal.classList.remove('hidden');
         editForm.elements['trigram'].focus();
@@ -1478,7 +1488,7 @@
         ];
 
         roles.forEach(({ value, label }) => {
-          const groupUsers = users.filter((user) => user.role === value);
+          const groupUsers = users.filter((user) => normalizeRole(user.role) === value);
           const section = document.createElement('section');
           section.className = 'user-group';
           section.innerHTML = `
@@ -1514,6 +1524,45 @@
           section.appendChild(list);
           userGroups.appendChild(section);
         });
+
+        const unknownUsers = users.filter(
+          (user) => !roles.some(({ value }) => normalizeRole(user.role) === value)
+        );
+
+        if (unknownUsers.length > 0) {
+          const section = document.createElement('section');
+          section.className = 'user-group';
+          section.innerHTML = `
+            <header class="user-group-header">
+              <h3>Autres rôles</h3>
+              <span class="badge">${unknownUsers.length}</span>
+            </header>
+          `;
+
+          const list = document.createElement('div');
+          list.className = 'user-grid';
+
+          unknownUsers
+            .sort((a, b) => a.username.localeCompare(b.username))
+            .forEach((user) => {
+              const trigram = (user.trigram ?? '').trim() || user.username.slice(0, 3).toUpperCase();
+              const card = document.createElement('button');
+              card.type = 'button';
+              card.className = 'user-card';
+              card.dataset.id = user.id;
+              const label = typeof user.originalRole === 'string' && user.originalRole.trim()
+                ? user.originalRole.trim()
+                : typeof user.role === 'string' && user.role.trim()
+                  ? user.role.trim()
+                  : 'Rôle inconnu';
+              card.textContent = trigram;
+              card.title = `${trigram} · ${user.username} · ${label}`;
+              list.appendChild(card);
+            });
+
+          section.appendChild(list);
+          userGroups.appendChild(section);
+        }
       };
 
       const loadUsers = async () => {
@@ -1528,8 +1577,17 @@
           usersFeedback.textContent = "Impossible de récupérer les utilisateurs.";
           return;
         }
-        allUsers = data;
-        usersFeedback.textContent = `${data.length} utilisateur(s).`;
+        const users = data ?? [];
+        allUsers = users.map((user) => {
+          const normalizedRole = normalizeRole(user.role);
+          const fallbackRole = typeof user.role === 'string' ? user.role.trim() : user.role;
+          return {
+            ...user,
+            role: normalizedRole || fallbackRole,
+            originalRole: user.role
+          };
+        });
+        usersFeedback.textContent = `${allUsers.length} utilisateur(s).`;
         renderUsers(allUsers);
         cleanupAssignments();
         refreshAssignmentButtons();

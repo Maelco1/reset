@@ -51,7 +51,8 @@
         getSupabaseClient,
         onSupabaseReady,
         setCurrentUser,
-        getCurrentUser
+        getCurrentUser,
+        normalizeRole
       } from './js/supabaseClient.js';
 
       initializeConnectionModal();
@@ -60,16 +61,21 @@
       const form = document.querySelector('#login-form');
 
       const redirectAfterLogin = (user) => {
+        if (!user) {
+          return;
+        }
         const destinations = {
           administrateur: 'admin.html',
           medecin: 'medecin.html',
           remplacant: 'remplacant.html'
         };
-        const target = destinations[user.role];
+        const normalizedRole = normalizeRole(user.role);
+        const target = destinations[normalizedRole];
         if (target) {
           window.location.assign(target);
         } else {
-          feedback.textContent = `Rôle inconnu: ${user.role}`;
+          const label = typeof user.role === 'string' && user.role.trim() ? user.role.trim() : 'inconnu';
+          feedback.textContent = `Rôle inconnu: ${label}`;
         }
       };
 
@@ -115,8 +121,8 @@
           return;
         }
 
-        setCurrentUser(data);
-        redirectAfterLogin(data);
+        const normalizedUser = setCurrentUser(data) ?? data;
+        redirectAfterLogin(normalizedUser);
       });
     </script>
   </body>
