@@ -1189,14 +1189,17 @@
           button.setAttribute('aria-label', buttonTitle);
           const heading = document.createElement('span');
           heading.className = 'planning-slot-heading';
+          if (slotType) {
+            const typeLabel = document.createElement('span');
+            typeLabel.className = 'planning-slot-type';
+            typeLabel.textContent = slotType;
+            heading.appendChild(typeLabel);
+          }
           const titleLabel = document.createElement('span');
           titleLabel.className = 'planning-slot-title';
           titleLabel.textContent = slotLabel;
           heading.appendChild(titleLabel);
           const metaParts = [];
-          if (slotType) {
-            metaParts.push(slotType);
-          }
           if (slotTime) {
             metaParts.push(slotTime);
           }
