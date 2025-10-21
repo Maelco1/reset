@@ -1439,3 +1439,129 @@ a:hover {
   outline-offset: -2px;
 }
 /* ===== End v3 ===== */
+
+/* ===== Planning overrides v4 (2025-10-21) ===== */
+/* Master cell size variable; will be set by JS compute step */
+:root {
+  --cell-size: 40px;
+  --col-index-badge-bg: rgba(15, 23, 42, 0.10);
+  --col-index-badge-fg: #0f172a;
+}
+
+/* Enforce square cells with zero padding to let the label fill nicely */
+.planning-table thead th:not(.planning-day-col),
+.planning-table tbody td {
+  width: var(--cell-size);
+  height: var(--cell-size);
+  min-width: var(--cell-size);
+  min-height: var(--cell-size);
+  padding: 0;
+  position: relative;
+}
+
+/* Slightly larger headers with column index badge support */
+.planning-table thead th {
+  font-size: 0.64rem;
+  line-height: 1.1;
+  padding: 6px 6px 4px 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Column index badge (inserted by JS) */
+.planning-col-index {
+  position: absolute;
+  top: 2px;
+  left: 4px;
+  font-size: 0.62rem;
+  line-height: 1;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--col-index-badge-bg);
+  color: var(--col-index-badge-fg);
+  font-weight: 700;
+  pointer-events: none;
+}
+
+/* Entire cell is clickable */
+.planning-slot-toggle {
+  display: block;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  position: relative;
+  cursor: pointer;
+}
+
+/* Center the content and avoid line breaks */
+.planning-slot-heading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0 2px;
+}
+
+.planning-slot-number { display: none; }
+
+.planning-slot-title,
+.planning-assignment-tag {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: 0.02em;
+  font-weight: 700;
+  /* Scale to fit up to ~6 chars on one line. */
+  font-size: clamp(10px, calc(var(--cell-size) / 3.6), 18px);
+  line-height: 1;
+}
+
+/* OPEN state: background = column color variable; subtle hover outline */
+.planning-slot-toggle[data-state="available"] {
+  background: var(--slot-color, #ffffff);
+  color: var(--planning-text, #1f2937);
+}
+.planning-table tbody td:hover .planning-slot-toggle[data-state="available"] {
+  outline: 1px solid rgba(37, 99, 235, 0.35);
+  outline-offset: -1px;
+}
+
+/* CLOSED state: grey by default; hatch on hover */
+.planning-slot-toggle[data-state="closed"] {
+  background: #e2e8f0;
+  color: #64748b;
+  cursor: not-allowed;
+}
+.planning-slot-toggle[data-state="closed"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease-in-out;
+  background-image: repeating-linear-gradient(
+    135deg,
+    rgba(100, 116, 139, 0.00) 0,
+    rgba(100, 116, 139, 0.00) 6px,
+    rgba(100, 116, 139, 0.40) 6px,
+    rgba(100, 116, 139, 0.40) 10px
+  );
+}
+.planning-table tbody td:hover .planning-slot-toggle[data-state="closed"]::after {
+  opacity: 1;
+}
+
+/* Keyboard focus */
+.planning-slot-toggle:focus-visible {
+  outline: 2px solid var(--focus-ring-color, #2563eb);
+  outline-offset: -2px;
+}
+/* ===== End overrides v4 ===== */
