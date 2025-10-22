@@ -248,9 +248,6 @@ main {
   --planning-month-header-offset: 0px;
 }
 .planning-month-header {
-  position: sticky;
-  top: var(--planning-month-sticky-offset, 0px);
-  z-index: 5;
   display: flex;
   align-items: baseline;
   justify-content: space-between;
@@ -259,8 +256,6 @@ main {
   margin: 0;
   background: var(--planning-panel, #fff);
   border-bottom: 1px solid var(--planning-border, #d4dbe6);
-  box-shadow: 0 12px 24px -12px rgba(15, 23, 42, 0.22);
-  backdrop-filter: blur(14px);
 }
 .planning-month-header h3 { margin: 0; }
 
@@ -284,10 +279,6 @@ main {
   text-align: center;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   padding: 0;
-  position: sticky;
-  top: calc(var(--planning-month-sticky-offset, 0px) + var(--planning-month-header-offset, 0px));
-  z-index: 5;
-  box-shadow: 0 10px 18px -12px rgba(15, 23, 42, 0.25);
 }
 .planning-table thead th.planning-day-col { padding: 8px 12px; }
 .planning-table thead th:not(.planning-day-col),
