@@ -59,7 +59,7 @@
         <section>
           <h2>Mes gardes</h2>
           <div class="card">
-            <table class="table">
+            <table class="table guards-table">
               <thead>
                 <tr id="guards-header-row"></tr>
               </thead>
@@ -102,58 +102,36 @@
 
       const formatDate = (value) => new Intl.DateTimeFormat('fr-FR').format(new Date(value));
 
-      const DEFAULT_GUARD_TYPES = ['Jour', 'Nuit', 'Week-end'];
-
-      const sortGuardTypes = (types) =>
-        [...types].sort((a, b) => {
-          const indexA = DEFAULT_GUARD_TYPES.indexOf(a);
-          const indexB = DEFAULT_GUARD_TYPES.indexOf(b);
-          if (indexA === -1 && indexB === -1) {
-            return a.localeCompare(b);
-          }
-          if (indexA === -1) {
-            return 1;
-          }
-          if (indexB === -1) {
-            return -1;
-          }
-          return indexA - indexB;
-        });
-
-      const updateGuardHeader = (types) => {
+      const updateGuardHeader = () => {
         if (!tableHeaderRow) {
           return;
         }
         tableHeaderRow.innerHTML = '';
-        const dateHeader = document.createElement('th');
-        dateHeader.scope = 'col';
-        dateHeader.textContent = 'Date';
-        tableHeaderRow.appendChild(dateHeader);
-        types.forEach((type) => {
+        const headers = [
+          { key: 'date', label: 'Date' },
+          { key: 'type', label: 'Type' },
+          { key: 'notes', label: 'Notes' },
+          { key: 'actions', label: 'Actions' }
+        ];
+        headers.forEach((header) => {
           const th = document.createElement('th');
           th.scope = 'col';
-          th.textContent = type;
+          th.dataset.column = header.key;
+          th.textContent = header.label;
           tableHeaderRow.appendChild(th);
         });
       };
 
-      updateGuardHeader(DEFAULT_GUARD_TYPES);
+      updateGuardHeader();
 
       const renderGuards = (guards) => {
         tableBody.innerHTML = '';
-        const typeSet = new Set(DEFAULT_GUARD_TYPES);
-        guards.forEach((guard) => {
-          if (guard.type) {
-            typeSet.add(guard.type);
-          }
-        });
-        const orderedTypes = sortGuardTypes(typeSet);
-        updateGuardHeader(orderedTypes);
+        updateGuardHeader();
 
         if (!guards.length) {
           const row = document.createElement('tr');
           const cell = document.createElement('td');
-          cell.colSpan = orderedTypes.length + 1;
+          cell.colSpan = 4;
           cell.className = 'guards-empty-cell';
           cell.textContent = 'Aucune garde enregistrée.';
           row.appendChild(cell);
@@ -161,60 +139,44 @@
           return;
         }
 
-        const groupedByDate = new Map();
-        guards.forEach((guard) => {
-          const key = guard.date;
-          if (!groupedByDate.has(key)) {
-            groupedByDate.set(key, new Map());
+        const sortedGuards = [...guards].sort((a, b) => {
+          const dateDiff = new Date(a.date) - new Date(b.date);
+          if (dateDiff !== 0) {
+            return dateDiff;
           }
-          groupedByDate.get(key).set(guard.type, guard);
+          const typeA = a.type ?? '';
+          const typeB = b.type ?? '';
+          return typeA.localeCompare(typeB);
         });
 
-        const sortedDates = [...groupedByDate.keys()].sort((a, b) => new Date(a) - new Date(b));
-
-        sortedDates.forEach((dateKey) => {
+        sortedGuards.forEach((guard) => {
           const row = document.createElement('tr');
-          const dateHeader = document.createElement('th');
-          dateHeader.scope = 'row';
-          dateHeader.textContent = formatDate(dateKey);
-          row.appendChild(dateHeader);
 
-          const guardsByType = groupedByDate.get(dateKey);
-          orderedTypes.forEach((type) => {
-            const cell = document.createElement('td');
-            const entry = guardsByType.get(type);
-            if (entry) {
-              const wrapper = document.createElement('div');
-              wrapper.className = 'guard-cell';
+          const dateCell = document.createElement('th');
+          dateCell.scope = 'row';
+          dateCell.textContent = formatDate(guard.date);
+          row.appendChild(dateCell);
 
-              const badge = document.createElement('span');
-              badge.className = 'badge';
-              badge.textContent = entry.type;
-              wrapper.appendChild(badge);
+          const typeCell = document.createElement('td');
+          typeCell.className = 'guard-type-cell';
+          typeCell.textContent = guard.type || '—';
+          row.appendChild(typeCell);
 
-              const note = document.createElement('p');
-              note.className = 'guard-note';
-              note.textContent = entry.notes?.trim() || '—';
-              wrapper.appendChild(note);
+          const notesCell = document.createElement('td');
+          notesCell.className = 'guard-notes-cell';
+          notesCell.textContent = guard.notes?.trim() || '—';
+          row.appendChild(notesCell);
 
-              const actions = document.createElement('div');
-              actions.className = 'table-actions';
-              const deleteButton = document.createElement('button');
-              deleteButton.type = 'button';
-              deleteButton.className = 'danger';
-              deleteButton.dataset.action = 'delete';
-              deleteButton.dataset.id = entry.id;
-              deleteButton.textContent = 'Supprimer';
-              actions.appendChild(deleteButton);
-              wrapper.appendChild(actions);
-
-              cell.appendChild(wrapper);
-            } else {
-              cell.className = 'guard-empty-cell';
-              cell.textContent = '';
-            }
-            row.appendChild(cell);
-          });
+          const actionsCell = document.createElement('td');
+          actionsCell.className = 'guard-actions-cell';
+          const deleteButton = document.createElement('button');
+          deleteButton.type = 'button';
+          deleteButton.className = 'danger';
+          deleteButton.dataset.action = 'delete';
+          deleteButton.dataset.id = guard.id;
+          deleteButton.textContent = 'Supprimer';
+          actionsCell.appendChild(deleteButton);
+          row.appendChild(actionsCell);
 
           tableBody.appendChild(row);
         });
