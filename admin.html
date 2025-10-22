@@ -482,6 +482,7 @@
       const planningFeedback = document.querySelector('#planning-feedback');
 
       let planningCellSizingFrame = null;
+      let planningStickyHeaderFrame = null;
 
       const measurePlanningCellSize = () => {
         if (!planningTables) {
@@ -537,6 +538,44 @@
         planningCellSizingFrame = requestAnimationFrame(() => {
           planningCellSizingFrame = null;
           measurePlanningCellSize();
+        });
+      };
+
+      const updatePlanningStickyHeaders = () => {
+        if (!planningTables) {
+          return;
+        }
+        const sections = planningTables.querySelectorAll('.planning-month');
+        sections.forEach((section) => {
+          if (!section.isConnected) {
+            return;
+          }
+          const header = section.querySelector('.planning-month-header');
+          const table = section.querySelector('.planning-table');
+          if (!header || !table) {
+            section.style.removeProperty('--planning-month-header-offset');
+            return;
+          }
+          const headerHeight = header.getBoundingClientRect().height;
+          const styles = window.getComputedStyle(section);
+          const gapValue = styles.rowGap || styles.gap || '0';
+          const gap = Number.parseFloat(gapValue);
+          const totalOffset = Math.ceil(headerHeight + (Number.isNaN(gap) ? 0 : gap));
+          if (totalOffset > 0) {
+            section.style.setProperty('--planning-month-header-offset', `${totalOffset}px`);
+          } else {
+            section.style.removeProperty('--planning-month-header-offset');
+          }
+        });
+      };
+
+      const schedulePlanningStickyHeaders = () => {
+        if (planningStickyHeaderFrame) {
+          cancelAnimationFrame(planningStickyHeaderFrame);
+        }
+        planningStickyHeaderFrame = requestAnimationFrame(() => {
+          planningStickyHeaderFrame = null;
+          updatePlanningStickyHeaders();
         });
       };
 
@@ -1533,6 +1572,7 @@
           planningTables.innerHTML = '<p class="empty-planning">Chargement du planning…</p>';
           planningTables.style.removeProperty('--planning-cell-width');
           planningTables.style.removeProperty('--planning-cell-height');
+          schedulePlanningStickyHeaders();
           return;
         }
         const baseYear = Number(planningYearSelect?.value ?? new Date().getFullYear());
@@ -1569,6 +1609,7 @@
           planningTables.appendChild(monthSection);
         });
         schedulePlanningCellSize();
+        schedulePlanningStickyHeaders();
       };
 
       const closeUserModal = () => {
@@ -2182,12 +2223,16 @@
         });
       }
 
-      window.addEventListener('resize', schedulePlanningCellSize);
+      window.addEventListener('resize', () => {
+        schedulePlanningCellSize();
+        schedulePlanningStickyHeaders();
+      });
 
       if (document.fonts && document.fonts.ready && typeof document.fonts.ready.then === 'function') {
         document.fonts.ready
           .then(() => {
             schedulePlanningCellSize();
+            schedulePlanningStickyHeaders();
           })
           .catch(() => {
             /* ignore font loading errors for sizing */

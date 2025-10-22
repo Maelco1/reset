@@ -245,6 +245,7 @@ main {
   gap: 12px;
   min-width: max-content;
   position: relative;
+  --planning-month-header-offset: 0px;
 }
 .planning-month-header {
   position: sticky;
@@ -283,6 +284,10 @@ main {
   text-align: center;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   padding: 0;
+  position: sticky;
+  top: calc(var(--planning-month-sticky-offset, 0px) + var(--planning-month-header-offset, 0px));
+  z-index: 5;
+  box-shadow: 0 10px 18px -12px rgba(15, 23, 42, 0.25);
 }
 .planning-table thead th.planning-day-col { padding: 8px 12px; }
 .planning-table thead th:not(.planning-day-col),
