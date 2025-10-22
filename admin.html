@@ -445,6 +445,9 @@
         remplacant: 'Remplaçant'
       };
 
+      const MAX_PLANNING_CELL_WIDTH = 132;
+      const MAX_PLANNING_CELL_HEIGHT = 88;
+
       const currentUser = getCurrentUser();
       if (!currentUser) {
         window.location.replace('index.html');
@@ -518,10 +521,12 @@
           maxHeight = Math.max(maxHeight, rect.height);
         });
         if (maxWidth > 0) {
-          planningTables.style.setProperty('--planning-cell-width', `${Math.ceil(maxWidth)}px`);
+          const clampedWidth = Math.min(Math.ceil(maxWidth), MAX_PLANNING_CELL_WIDTH);
+          planningTables.style.setProperty('--planning-cell-width', `${clampedWidth}px`);
         }
         if (maxHeight > 0) {
-          planningTables.style.setProperty('--planning-cell-height', `${Math.ceil(maxHeight)}px`);
+          const clampedHeight = Math.min(Math.ceil(maxHeight), MAX_PLANNING_CELL_HEIGHT);
+          planningTables.style.setProperty('--planning-cell-height', `${clampedHeight}px`);
         }
       };
 

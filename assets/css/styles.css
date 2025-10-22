@@ -272,15 +272,16 @@ main {
   min-width: var(--planning-cell-width, auto);
 }
 .planning-day-col {
-  width: 220px; min-width: 220px;
+  width: 160px; min-width: 160px;
   --slot-header-background: rgba(52, 152, 219, .1);
   background: var(--slot-header-background);
   text-align: left;
 }
 .planning-day-header {
-  display: grid; gap: 4px; align-content: start;
+  display: grid; gap: 2px; align-content: start;
 }
-.planning-day-header .day-name { font-weight: 600; }
+.planning-day-header .day-name { font-weight: 600; font-size: .75rem; }
+.planning-day-header .day-number { font-size: .7rem; }
 .holiday-badge {
   display: inline-block; margin-top: 4px; padding: 4px 8px; border-radius: 999px;
   background: rgba(231, 76, 60, .1); color: #e74c3c; font-size: .75rem; font-weight: 600;
@@ -289,7 +290,7 @@ main {
 /* En-tête de colonne planning (boutons configurables) */
 .planning-slot-header {
   display: flex; flex-direction: column; align-items: stretch; justify-content: center;
-  gap: 6px; padding: 8px 4px 10px;
+  gap: 4px; padding: 6px 4px 8px;
   color: var(--slot-text-color, var(--planning-text));
   width: 100%;
   height: 100%;
@@ -299,11 +300,11 @@ main {
 /* Index + boutons de slot (utilisés pour mesurer les cellules) */
 .planning-slot-index {
   display: inline-flex; align-items: center; justify-content: center;
-  min-width: 1.75rem; height: 1.75rem; padding: 0 .25rem;
+  min-width: 1.5rem; height: 1.5rem; padding: 0 .25rem;
   border-radius: 999px;
   background: var(--slot-color, rgba(52, 152, 219, .65));
   color: var(--slot-text-color, #0f172a);
-  font-size: .75rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+  font-size: .65rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
   font-variant-numeric: tabular-nums;
   box-shadow: inset 0 0 0 1px rgba(15, 23, 42, .12);
 }
@@ -311,10 +312,10 @@ main {
 .planning-slot-button {
   position: relative;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 4px;
+  gap: 2px;
   width: var(--planning-cell-width, auto); min-width: var(--planning-cell-width, auto);
   height: var(--planning-cell-height, auto); min-height: var(--planning-cell-height, auto);
-  margin: 0 auto; padding: 6px 6px 8px;
+  margin: 0 auto; padding: 4px 4px 6px;
   border-radius: 10px; border: 1px solid rgba(15, 23, 42, .18);
   background: var(--slot-color, #3498db); color: var(--slot-text-color, #f8fafc);
   text-align: center;
@@ -325,12 +326,12 @@ main {
 .planning-slot-button .sr-only { position: absolute; }
 
 .planning-slot-heading {
-  display: grid; gap: 4px; text-transform: uppercase; line-height: 1.15;
+  display: grid; gap: 2px; text-transform: uppercase; line-height: 1.1;
   width: 100%; word-break: break-word; overflow-wrap: anywhere;
 }
-.planning-slot-type { font-size: .6rem; font-weight: 700; letter-spacing: .08em; opacity: .9; }
-.planning-slot-title { font-size: .65rem; font-weight: 600; white-space: normal; word-break: break-word; overflow-wrap: anywhere; }
-.planning-slot-meta { font-size: .6rem; letter-spacing: .08em; opacity: .85; }
+.planning-slot-type { font-size: .55rem; font-weight: 700; letter-spacing: .08em; opacity: .9; }
+.planning-slot-title { font-size: .6rem; font-weight: 600; white-space: normal; word-break: break-word; overflow-wrap: anywhere; }
+.planning-slot-meta { font-size: .55rem; letter-spacing: .08em; opacity: .85; }
 
 .planning-summary-cell { padding: 10px 8px; border: none; background: var(--slot-column-background, transparent); text-align: center; }
 
