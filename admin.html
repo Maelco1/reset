@@ -24,7 +24,6 @@
         </form>
       </section>
     </div>
-
     <main>
       <section class="card admin-shell">
         <header>
@@ -321,13 +320,11 @@
         { position: 6, typeCode: '6S', color: '#1e293b' }
       ];
 
-      /* === Correction ici === */
       const TYPE_CATEGORY_MAP = new Map([
-        ...['1N','2N','3N','4C','5S','6S','N','C','S','VIS'].map((code) => [code, 'Visite']),
-        ...['C1COU','C2COU','C1BOU','C2BOU','PFG','C1ANT','C2ANT','C1','C2','C3'].map((code) => [code, 'Consultation']),
-        ...['TC','TCN'].map((code) => [code, 'Téléconsultation'])
+        .['1N','2N','3N','4C','5S','6S','N','C','S','VIS'].map((code) => [code, 'Visite']),
+        .['C1COU','C2COU','C1BOU','C2BOU','PFG','C1ANT','C2ANT','C1','C2','C3'].map((code) => [code, 'Consultation']),
+        .['TC','TCN'].map((code) => [code, 'Téléconsultation'])
       ]);
-      /* === fin correction === */
 
       const PLANNING_TOURS = [
         { id: 1, label: 'Tour 1', table: 'planning_columns' },
@@ -339,7 +336,9 @@
       ];
 
       const currentUser = getCurrentUser();
-      if (!currentUser) window.location.replace('index.html');
+      if (!currentUser) {
+        window.location.replace('index.html');
+      }
       requireRole('administrateur');
       initializeConnectionModal();
 
