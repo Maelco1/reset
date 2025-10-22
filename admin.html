@@ -1152,7 +1152,6 @@
         orderedSlots.forEach((slot) => {
           const th = document.createElement('th');
           th.scope = 'col';
-          th.classList.add('planning-slot-header');
           const slotColor = normalizeColor(slot.color);
           const slotTextColor = getSlotTextColor(slotColor);
           const columnTint = getSlotColumnTint(slotColor);
@@ -1161,6 +1160,8 @@
           th.style.setProperty('--slot-header-background', columnTint);
           th.style.setProperty('--slot-color', slotColor);
           th.style.setProperty('--slot-text-color', slotTextColor);
+          const headerContent = document.createElement('div');
+          headerContent.className = 'planning-slot-header';
           const slotNumber = String(slot.position).padStart(2, '0');
           const rawLabel = (slot.label ?? '').trim();
           const slotLabel = rawLabel || `Colonne ${slot.position}`;
@@ -1178,7 +1179,7 @@
           indexBadge.className = 'planning-slot-index';
           indexBadge.textContent = slotNumber;
           indexBadge.setAttribute('aria-hidden', 'true');
-          th.appendChild(indexBadge);
+          headerContent.appendChild(indexBadge);
           const button = document.createElement('button');
           button.type = 'button';
           button.dataset.position = String(slot.position);
@@ -1214,7 +1215,8 @@
           srLabel.className = 'sr-only';
           srLabel.textContent = buttonTitle;
           button.appendChild(srLabel);
-          th.appendChild(button);
+          headerContent.appendChild(button);
+          th.appendChild(headerContent);
           headerRow.appendChild(th);
         });
 

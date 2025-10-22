@@ -263,7 +263,9 @@ main {
   font-size: .7rem; line-height: 1.1;
   text-align: center;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  padding: 0;
 }
+.planning-table thead th.planning-day-col { padding: 8px 12px; }
 .planning-table thead th:not(.planning-day-col),
 .planning-table tbody td {
   width: var(--planning-cell-width, auto);
@@ -289,6 +291,8 @@ main {
   display: flex; flex-direction: column; align-items: stretch; justify-content: center;
   gap: 6px; padding: 8px 4px 10px;
   color: var(--slot-text-color, var(--planning-text));
+  width: 100%;
+  height: 100%;
 }
 .planning-slot-header .planning-slot-button { width: 100%; }
 
