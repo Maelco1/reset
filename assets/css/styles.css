@@ -22,6 +22,7 @@
   --planning-success: #22c55e;
   --planning-danger: #dc2626;
   --planning-grey: #94a3b8;
+  --planning-month-sticky-offset: 0px;
 }
 
 /* Reset minimal & utilitaires */
@@ -239,10 +240,28 @@ main {
   overflow-x: auto; padding-bottom: 8px;
 }
 
-.planning-month { display: grid; gap: 12px; min-width: max-content; }
-.planning-month-header {
-  display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+.planning-month {
+  display: grid;
+  gap: 12px;
+  min-width: max-content;
+  position: relative;
 }
+.planning-month-header {
+  position: sticky;
+  top: var(--planning-month-sticky-offset, 0px);
+  z-index: 5;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  margin: 0;
+  background: var(--planning-panel, #fff);
+  border-bottom: 1px solid var(--planning-border, #d4dbe6);
+  box-shadow: 0 12px 24px -12px rgba(15, 23, 42, 0.22);
+  backdrop-filter: blur(14px);
+}
+.planning-month-header h3 { margin: 0; }
 
 /* Table du planning – ne pas confondre avec .table */
 .planning-table {
