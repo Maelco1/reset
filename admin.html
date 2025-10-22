@@ -1007,24 +1007,26 @@
         return sanitizeQuality(slot.quality_weekdays);
       };
 
-      const isSlotOpen = (slot, segment) => {
+      const getSlotOpeningsForSegment = (slot, segment) => {
+        const segmentKey = segment === 'saturday' ? 'saturday' : segment === 'sunday' ? 'sunday' : 'weekdays';
+        const bonusKey = `open_bonus_${segmentKey}`;
+        const mauvaiseKey = `open_mauvaise_${segmentKey}`;
+        return {
+          bonus: toBoolean(slot[bonusKey]),
+          mauvaise: toBoolean(slot[mauvaiseKey])
+        };
+      };
+
+      const isSlotOpen = (slot, segment, visionOverride = null) => {
+        const openings = getSlotOpeningsForSegment(slot, segment);
         const quality = getQualityForSegment(slot, segment);
-        if (quality === 'Bonus') {
-          if (segment === 'saturday') {
-            return toBoolean(slot.open_bonus_saturday);
-          }
-          if (segment === 'sunday') {
-            return toBoolean(slot.open_bonus_sunday);
-          }
-          return toBoolean(slot.open_bonus_weekdays);
-        }
-        if (segment === 'saturday') {
-          return toBoolean(slot.open_mauvaise_saturday);
-        }
-        if (segment === 'sunday') {
-          return toBoolean(slot.open_mauvaise_sunday);
-        }
-        return toBoolean(slot.open_mauvaise_weekdays);
+        const preferredVision =
+          visionOverride === 'bonus' || visionOverride === 'mauvaise'
+            ? visionOverride
+            : quality === 'Bonus'
+              ? 'bonus'
+              : 'mauvaise';
+        return openings[preferredVision];
       };
 
       const buildSlotTitle = (slot, dayLabel, isHoliday, holidayName, isOpen, quality) => {
@@ -1356,9 +1358,12 @@
             const segment = getDaySegment(day, isHoliday);
             const quality = getQualityForSegment(slot, segment);
             const cellVision = quality === 'Bonus' ? 'bonus' : 'mauvaise';
-            const matchesVision = !activePlanningVision || activePlanningVision === cellVision;
+            const openings = getSlotOpeningsForSegment(slot, segment);
+            const matchesVision =
+              !activePlanningVision ||
+              (activePlanningVision === 'bonus' ? openings.bonus : openings.mauvaise);
             cell.dataset.vision = cellVision;
-            const open = isSlotOpen(slot, segment);
+            const open = isSlotOpen(slot, segment, activePlanningVision);
 
             const summaryTitle = buildSlotTitle(slot, dayName, isHoliday, holidayName, open, quality);
             const slotKey = `${isoKey}:${slot.position}`;
