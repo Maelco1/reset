@@ -183,7 +183,9 @@ main {
 }
 
 /* Fix anti-empilement des en-têtes */
-.table thead, .table tbody, .table tfoot { display: table-header-group; }
+.table thead { display: table-header-group; }
+.table tbody { display: table-row-group; }
+.table tfoot { display: table-footer-group; }
 .table thead tr, .table tbody tr, .table tfoot tr { display: table-row; }
 .table th, .table td { display: table-cell; }
 .table thead th { white-space: nowrap; }
