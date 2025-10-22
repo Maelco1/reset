@@ -190,6 +190,27 @@ main {
 .table th, .table td { display: table-cell; }
 .table thead th { white-space: nowrap; }
 
+.guards-table thead th[data-column='date'],
+.guards-table thead th[data-column='type'],
+.guards-table thead th[data-column='notes'] { text-align: left; }
+.guards-table thead th[data-column='actions'] { text-align: center; }
+.guards-table tbody th { text-align: left; font-weight: 600; }
+.guards-table tbody td { vertical-align: top; }
+.guards-table .guard-type-cell { font-weight: 600; }
+.guards-table .guard-notes-cell {
+  color: rgba(44, 62, 80, .85);
+  font-size: .9rem;
+  white-space: pre-line;
+}
+.guards-table .guard-actions-cell {
+  text-align: center;
+  white-space: nowrap;
+}
+.guards-table .guard-actions-cell button {
+  min-width: 120px;
+}
+.guards-table .guards-empty-cell { text-align: center; padding: 20px; color: rgba(44,62,80,.6); font-style: italic; }
+
 /* Badges & helpers */
 .badge {
   display: inline-block;
