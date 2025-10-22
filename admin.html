@@ -1019,13 +1019,14 @@
 
       const isSlotOpen = (slot, segment, visionOverride = null) => {
         const openings = getSlotOpeningsForSegment(slot, segment);
+        if (visionOverride === 'bonus' || visionOverride === 'mauvaise') {
+          return openings[visionOverride];
+        }
+        if (visionOverride === null) {
+          return openings.bonus || openings.mauvaise;
+        }
         const quality = getQualityForSegment(slot, segment);
-        const preferredVision =
-          visionOverride === 'bonus' || visionOverride === 'mauvaise'
-            ? visionOverride
-            : quality === 'Bonus'
-              ? 'bonus'
-              : 'mauvaise';
+        const preferredVision = quality === 'Bonus' ? 'bonus' : 'mauvaise';
         return openings[preferredVision];
       };
 
