@@ -69,6 +69,28 @@
                 <label for="planning-month-2">Mois 2</label>
                 <select id="planning-month-2" name="month-2"></select>
               </div>
+
+              <div class="planning-control planning-vision-control">
+                <span class="planning-control-label">Vision</span>
+                <div class="planning-vision-group" role="group" aria-label="Vision du planning">
+                  <button
+                    type="button"
+                    id="planning-vision-mauvaise"
+                    class="planning-vision-toggle"
+                    aria-pressed="false"
+                  >
+                    Vision “Mauvaise garde”
+                  </button>
+                  <button
+                    type="button"
+                    id="planning-vision-bonus"
+                    class="planning-vision-toggle"
+                    aria-pressed="false"
+                  >
+                    Vision “Garde bonus”
+                  </button>
+                </div>
+              </div>
             </form>
 
             <div class="planning-layout">
@@ -480,9 +502,34 @@
       const planningConfigContainer = document.querySelector('#planning-config');
       const planningTables = document.querySelector('#planning-tables');
       const planningFeedback = document.querySelector('#planning-feedback');
+      const planningVisionMauvaise = document.querySelector('#planning-vision-mauvaise');
+      const planningVisionBonus = document.querySelector('#planning-vision-bonus');
+      const planningVisionButtons = {
+        mauvaise: planningVisionMauvaise,
+        bonus: planningVisionBonus
+      };
 
       let planningCellSizingFrame = null;
       let planningStickyHeaderFrame = null;
+      let activePlanningVision = null;
+
+      const updatePlanningVisionButtons = () => {
+        Object.entries(planningVisionButtons).forEach(([vision, button]) => {
+          if (!button) {
+            return;
+          }
+          const isActive = activePlanningVision === vision;
+          button.classList.toggle('is-active', isActive);
+          button.setAttribute('aria-pressed', String(isActive));
+        });
+      };
+
+      const togglePlanningVision = (vision) => {
+        const normalizedVision = vision === 'bonus' ? 'bonus' : vision === 'mauvaise' ? 'mauvaise' : null;
+        activePlanningVision = activePlanningVision === normalizedVision ? null : normalizedVision;
+        updatePlanningVisionButtons();
+        renderPlanningTables();
+      };
 
       const measurePlanningCellSize = () => {
         if (!planningTables) {
@@ -1308,6 +1355,9 @@
             const columnColor = columnColors.get(slot.position);
             const segment = getDaySegment(day, isHoliday);
             const quality = getQualityForSegment(slot, segment);
+            const cellVision = quality === 'Bonus' ? 'bonus' : 'mauvaise';
+            const matchesVision = !activePlanningVision || activePlanningVision === cellVision;
+            cell.dataset.vision = cellVision;
             const open = isSlotOpen(slot, segment);
 
             const summaryTitle = buildSlotTitle(slot, dayName, isHoliday, holidayName, open, quality);
@@ -1333,6 +1383,18 @@
               button.dataset.state = 'closed';
               button.setAttribute('aria-disabled', 'true');
               button.tabIndex = -1;
+            }
+
+            if (!matchesVision) {
+              cell.classList.add('is-filtered-out');
+              button.setAttribute('aria-hidden', 'true');
+              button.tabIndex = -1;
+            } else {
+              cell.classList.remove('is-filtered-out');
+              button.removeAttribute('aria-hidden');
+              if (open) {
+                button.removeAttribute('tabindex');
+              }
             }
 
             const tag = document.createElement('span');
@@ -1568,6 +1630,7 @@
         if (!planningTables) {
           return;
         }
+        planningTables.dataset.vision = activePlanningVision ?? 'all';
         if (!planningSlots.length) {
           planningTables.innerHTML = '<p class="empty-planning">Chargement du planning…</p>';
           planningTables.style.removeProperty('--planning-cell-width');
@@ -2373,6 +2436,16 @@
           })
           .subscribe();
       };
+
+      Object.entries(planningVisionButtons).forEach(([vision, button]) => {
+        if (!button) {
+          return;
+        }
+        button.addEventListener('click', () => {
+          togglePlanningVision(vision);
+        });
+      });
+      updatePlanningVisionButtons();
 
       if (planningYearSelect && planningMonthOneSelect && planningMonthTwoSelect) {
         populatePlanningControls();
