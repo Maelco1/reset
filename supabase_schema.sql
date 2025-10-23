@@ -63,12 +63,12 @@ create table if not exists public.planning_columns (
   quality_weekdays text default 'Normale',
   quality_saturday text default 'Normale',
   quality_sunday text default 'Normale',
-  open_mauvaise_weekdays boolean default true,
-  open_mauvaise_saturday boolean default true,
-  open_mauvaise_sunday boolean default true,
-  open_bonus_weekdays boolean default true,
-  open_bonus_saturday boolean default true,
-  open_bonus_sunday boolean default true,
+  open_normale_weekdays boolean default true,
+  open_normale_saturday boolean default true,
+  open_normale_sunday boolean default true,
+  open_bonne_weekdays boolean default true,
+  open_bonne_saturday boolean default true,
+  open_bonne_sunday boolean default true,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint planning_columns_quality_weekdays_chk check (quality_weekdays in ('Normale', 'Bonne')),
@@ -190,13 +190,13 @@ on conflict (position) do nothing;
 insert into public.planning_columns_tour2
 (position,label,type_code,type_category,start_time,end_time,color,
  quality_weekdays,quality_saturday,quality_sunday,
- open_mauvaise_weekdays,open_mauvaise_saturday,open_mauvaise_sunday,
- open_bonus_weekdays,open_bonus_saturday,open_bonus_sunday)
+ open_normale_weekdays,open_normale_saturday,open_normale_sunday,
+ open_bonne_weekdays,open_bonne_saturday,open_bonne_sunday)
 select
   position,label,type_code,type_category,start_time,end_time,color,
   quality_weekdays,quality_saturday,quality_sunday,
-  open_mauvaise_weekdays,open_mauvaise_saturday,open_mauvaise_sunday,
-  open_bonus_weekdays,open_bonus_saturday,open_bonus_sunday
+  open_normale_weekdays,open_normale_saturday,open_normale_sunday,
+  open_bonne_weekdays,open_bonne_saturday,open_bonne_sunday
 from public.planning_columns
 on conflict (position) do nothing;
 
@@ -204,52 +204,52 @@ on conflict (position) do nothing;
 insert into public.planning_columns_tour3
 (position,label,type_code,type_category,start_time,end_time,color,
  quality_weekdays,quality_saturday,quality_sunday,
- open_mauvaise_weekdays,open_mauvaise_saturday,open_mauvaise_sunday,
- open_bonus_weekdays,open_bonus_saturday,open_bonus_sunday)
+ open_normale_weekdays,open_normale_saturday,open_normale_sunday,
+ open_bonne_weekdays,open_bonne_saturday,open_bonne_sunday)
 select
   position,label,type_code,type_category,start_time,end_time,color,
   quality_weekdays,quality_saturday,quality_sunday,
-  open_mauvaise_weekdays,open_mauvaise_saturday,open_mauvaise_sunday,
-  open_bonus_weekdays,open_bonus_saturday,open_bonus_sunday
+  open_normale_weekdays,open_normale_saturday,open_normale_sunday,
+  open_bonne_weekdays,open_bonne_saturday,open_bonne_sunday
 from public.planning_columns
 on conflict (position) do nothing;
 
 insert into public.planning_columns_tour4
 (position,label,type_code,type_category,start_time,end_time,color,
  quality_weekdays,quality_saturday,quality_sunday,
- open_mauvaise_weekdays,open_mauvaise_saturday,open_mauvaise_sunday,
- open_bonus_weekdays,open_bonus_saturday,open_bonus_sunday)
+ open_normale_weekdays,open_normale_saturday,open_normale_sunday,
+ open_bonne_weekdays,open_bonne_saturday,open_bonne_sunday)
 select
   position,label,type_code,type_category,start_time,end_time,color,
   quality_weekdays,quality_saturday,quality_sunday,
-  open_mauvaise_weekdays,open_mauvaise_saturday,open_mauvaise_sunday,
-  open_bonus_weekdays,open_bonus_saturday,open_bonus_sunday
+  open_normale_weekdays,open_normale_saturday,open_normale_sunday,
+  open_bonne_weekdays,open_bonne_saturday,open_bonne_sunday
 from public.planning_columns
 on conflict (position) do nothing;
 
 insert into public.planning_columns_tour5
 (position,label,type_code,type_category,start_time,end_time,color,
  quality_weekdays,quality_saturday,quality_sunday,
- open_mauvaise_weekdays,open_mauvaise_saturday,open_mauvaise_sunday,
- open_bonus_weekdays,open_bonus_saturday,open_bonus_sunday)
+ open_normale_weekdays,open_normale_saturday,open_normale_sunday,
+ open_bonne_weekdays,open_bonne_saturday,open_bonne_sunday)
 select
   position,label,type_code,type_category,start_time,end_time,color,
   quality_weekdays,quality_saturday,quality_sunday,
-  open_mauvaise_weekdays,open_mauvaise_saturday,open_mauvaise_sunday,
-  open_bonus_weekdays,open_bonus_saturday,open_bonus_sunday
+  open_normale_weekdays,open_normale_saturday,open_normale_sunday,
+  open_bonne_weekdays,open_bonne_saturday,open_bonne_sunday
 from public.planning_columns
 on conflict (position) do nothing;
 
 insert into public.planning_columns_tour6
 (position,label,type_code,type_category,start_time,end_time,color,
  quality_weekdays,quality_saturday,quality_sunday,
- open_mauvaise_weekdays,open_mauvaise_saturday,open_mauvaise_sunday,
- open_bonus_weekdays,open_bonus_saturday,open_bonus_sunday)
+ open_normale_weekdays,open_normale_saturday,open_normale_sunday,
+ open_bonne_weekdays,open_bonne_saturday,open_bonne_sunday)
 select
   position,label,type_code,type_category,start_time,end_time,color,
   quality_weekdays,quality_saturday,quality_sunday,
-  open_mauvaise_weekdays,open_mauvaise_saturday,open_mauvaise_sunday,
-  open_bonus_weekdays,open_bonus_saturday,open_bonus_sunday
+  open_normale_weekdays,open_normale_saturday,open_normale_sunday,
+  open_bonne_weekdays,open_bonne_saturday,open_bonne_sunday
 from public.planning_columns
 on conflict (position) do nothing;
 

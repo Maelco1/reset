@@ -116,14 +116,14 @@ const ACTIVITY_TYPES = new Map([
 ]);
 
 const USER_TYPE_LABELS = new Set(['medecin', 'remplacant']);
-const CHOICE_SERIES = ['mauvaise', 'bonus'];
+const CHOICE_SERIES = ['normale', 'bonne'];
 const CHOICE_SERIES_LABELS = new Map([
-  ['mauvaise', 'Gardes normales'],
-  ['bonus', 'Bonnes gardes']
+  ['normale', 'Gardes normales'],
+  ['bonne', 'Bonnes gardes']
 ]);
 const CHOICE_SERIES_STEPS = new Map([
-  ['mauvaise', 1],
-  ['bonus', 2]
+  ['normale', 1],
+  ['bonne', 2]
 ]);
 const CHOICE_INDEX_MIN = 1;
 const CHOICE_INDEX_MAX = 20;
@@ -250,12 +250,12 @@ const getDefaultSlot = (position) => {
     quality_weekdays: 'Normale',
     quality_saturday: 'Normale',
     quality_sunday: 'Normale',
-    open_mauvaise_weekdays: true,
-    open_mauvaise_saturday: true,
-    open_mauvaise_sunday: true,
-    open_bonus_weekdays: true,
-    open_bonus_saturday: true,
-    open_bonus_sunday: true
+    open_normale_weekdays: true,
+    open_normale_saturday: true,
+    open_normale_sunday: true,
+    open_bonne_weekdays: true,
+    open_bonne_saturday: true,
+    open_bonne_sunday: true
   };
 };
 
@@ -347,24 +347,24 @@ const getQualityForSegment = (slot, segment) => {
 
 const getSlotOpeningsForSegment = (slot, segment) => {
   const segmentKey = segment === 'saturday' ? 'saturday' : segment === 'sunday' ? 'sunday' : 'weekdays';
-  const bonusKey = `open_bonus_${segmentKey}`;
-  const mauvaiseKey = `open_mauvaise_${segmentKey}`;
+  const bonneKey = `open_bonne_${segmentKey}`;
+  const normaleKey = `open_normale_${segmentKey}`;
   return {
-    bonus: toBoolean(slot[bonusKey]),
-    mauvaise: toBoolean(slot[mauvaiseKey])
+    bonne: toBoolean(slot[bonneKey]),
+    normale: toBoolean(slot[normaleKey])
   };
 };
 
 const isSlotOpen = (slot, segment, visionOverride = null) => {
   const openings = getSlotOpeningsForSegment(slot, segment);
-  if (visionOverride === 'bonus' || visionOverride === 'mauvaise') {
+  if (visionOverride === 'bonne' || visionOverride === 'normale') {
     return openings[visionOverride];
   }
   if (visionOverride === null) {
-    return openings.bonus || openings.mauvaise;
+    return openings.bonne || openings.normale;
   }
   const quality = getQualityForSegment(slot, segment);
-  const preferredVision = quality === 'Bonne' ? 'bonus' : 'mauvaise';
+  const preferredVision = quality === 'Bonne' ? 'bonne' : 'normale';
   return openings[preferredVision];
 };
 
@@ -438,12 +438,12 @@ const ensurePlanningColumns = async (supabase, slots, tableName) => {
         quality_weekdays,
         quality_saturday,
         quality_sunday,
-        open_mauvaise_weekdays,
-        open_mauvaise_saturday,
-        open_mauvaise_sunday,
-        open_bonus_weekdays,
-        open_bonus_saturday,
-        open_bonus_sunday`
+        open_normale_weekdays,
+        open_normale_saturday,
+        open_normale_sunday,
+        open_bonne_weekdays,
+        open_bonne_saturday,
+        open_bonne_sunday`
     )
     .order('position');
   if (reloadError) {
@@ -522,10 +522,10 @@ export function initializePlanningChoices({ userRole }) {
     slotButtons: new Map(),
     selectionMap: new Map(),
     selections: [],
-    selectionMode: 'mauvaise',
+    selectionMode: 'normale',
     choiceSeries: {
-      mauvaise: { activeIndex: CHOICE_INDEX_MIN, buttons: new Map(), container: null },
-      bonus: { activeIndex: CHOICE_INDEX_MIN, buttons: new Map(), container: null }
+      normale: { activeIndex: CHOICE_INDEX_MIN, buttons: new Map(), container: null },
+      bonne: { activeIndex: CHOICE_INDEX_MIN, buttons: new Map(), container: null }
     },
     currentStep: 1,
     selectedTourId: PLANNING_TOURS[0].id,
@@ -567,7 +567,7 @@ export function initializePlanningChoices({ userRole }) {
     host.appendChild(planningSection);
   };
 
-  const sanitizeChoiceNature = (nature) => (nature === 'bonus' ? 'bonus' : 'mauvaise');
+  const sanitizeChoiceNature = (nature) => (nature === 'bonne' ? 'bonne' : 'normale');
 
   const initializeSummaryLists = () => {
     summaryLists.clear();
@@ -872,7 +872,7 @@ export function initializePlanningChoices({ userRole }) {
       }
       if (roleLabel) {
         const bullet = selection.isPrimary ? '●' : '○';
-        const natureLabel = selection.nature === 'bonus' ? 'Bonne' : 'Normale';
+        const natureLabel = selection.nature === 'bonne' ? 'Bonne' : 'Normale';
         roleLabel.textContent = `${bullet} ${natureLabel}`;
         roleLabel.classList.remove('is-empty');
       }
@@ -963,8 +963,8 @@ export function initializePlanningChoices({ userRole }) {
           }</span>
                 <span class="summary-item-tags">
                   <span class="badge ${
-                    selection.nature === 'bonus' ? 'badge-success' : 'badge-warning'
-                  }">${(selection.isPrimary ? '●' : '○') + ' ' + (selection.nature === 'bonus' ? 'Bonne' : 'Normale')}</span>
+                    selection.nature === 'bonne' ? 'badge-success' : 'badge-warning'
+                  }">${(selection.isPrimary ? '●' : '○') + ' ' + (selection.nature === 'bonne' ? 'Bonne' : 'Normale')}</span>
                   <span class="badge">${selection.activityType}</span>
                 </span>
               </div>
@@ -1188,10 +1188,10 @@ export function initializePlanningChoices({ userRole }) {
   const updateButtonAvailability = () => {
     state.slotButtons.forEach((button) => {
       const isSelected = button.classList.contains('is-selected');
-      const canSelect = state.selectionMode === 'mauvaise'
-        ? button.dataset.openMauvaise === 'true'
-        : state.selectionMode === 'bonus'
-          ? button.dataset.openBonus === 'true'
+      const canSelect = state.selectionMode === 'normale'
+        ? button.dataset.openNormale === 'true'
+        : state.selectionMode === 'bonne'
+          ? button.dataset.openBonne === 'true'
           : false;
       if (!state.selectionMode) {
         button.dataset.state = canSelect ? 'available' : 'closed';
@@ -1218,11 +1218,11 @@ export function initializePlanningChoices({ userRole }) {
       return;
     }
     state.currentStep = step;
-    state.selectionMode = step === 1 ? 'mauvaise' : step === 2 ? 'bonus' : null;
+    state.selectionMode = step === 1 ? 'normale' : step === 2 ? 'bonne' : null;
     updateStepperButtons();
     updateStepPanes();
-    updateChoiceIndexActiveState('mauvaise');
-    updateChoiceIndexActiveState('bonus');
+    updateChoiceIndexActiveState('normale');
+    updateChoiceIndexActiveState('bonne');
     if (step <= 2) {
       movePlanningSectionToStep(step);
       planningSection.classList.remove('hidden');
@@ -1408,8 +1408,8 @@ export function initializePlanningChoices({ userRole }) {
           quality
         );
         const openings = getSlotOpeningsForSegment(slot, segment);
-        button.dataset.openMauvaise = String(openings.mauvaise);
-        button.dataset.openBonus = String(openings.bonus);
+        button.dataset.openNormale = String(openings.normale);
+        button.dataset.openBonne = String(openings.bonne);
         button.dataset.month = String(day.getMonth() + 1);
         button.dataset.year = String(day.getFullYear());
         button.dataset.dayLabel = `${dayName} ${dayNumber} ${MONTH_NAMES[month]} ${year}`;
@@ -1498,12 +1498,12 @@ export function initializePlanningChoices({ userRole }) {
           quality_weekdays,
           quality_saturday,
           quality_sunday,
-          open_mauvaise_weekdays,
-          open_mauvaise_saturday,
-          open_mauvaise_sunday,
-          open_bonus_weekdays,
-          open_bonus_saturday,
-          open_bonus_sunday`
+          open_normale_weekdays,
+          open_normale_saturday,
+          open_normale_sunday,
+          open_bonne_weekdays,
+          open_bonne_saturday,
+          open_bonne_sunday`
       )
       .order('position');
     if (error) {
