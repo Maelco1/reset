@@ -1120,10 +1120,19 @@ export function initializePlanningChoices({ userRole }) {
 
       const groups = [];
       let currentGroup = null;
+      let currentGroupHasPrincipal = false;
       domItems.forEach(({ selection, role }) => {
-        if (!currentGroup || role === 'principal') {
+        const isPrincipal = role === 'principal';
+        if (!currentGroup) {
           currentGroup = [];
+          currentGroupHasPrincipal = isPrincipal;
           groups.push(currentGroup);
+        } else if (isPrincipal && currentGroupHasPrincipal) {
+          currentGroup = [];
+          currentGroupHasPrincipal = true;
+          groups.push(currentGroup);
+        } else if (isPrincipal) {
+          currentGroupHasPrincipal = true;
         }
         currentGroup.push(selection);
       });
