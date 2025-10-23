@@ -118,8 +118,8 @@ const ACTIVITY_TYPES = new Map([
 const USER_TYPE_LABELS = new Set(['medecin', 'remplacant']);
 const CHOICE_SERIES = ['mauvaise', 'bonus'];
 const CHOICE_SERIES_LABELS = new Map([
-  ['mauvaise', 'Mauvaises gardes'],
-  ['bonus', 'Gardes bonus']
+  ['mauvaise', 'Gardes normales'],
+  ['bonus', 'Bonnes gardes']
 ]);
 const CHOICE_SERIES_STEPS = new Map([
   ['mauvaise', 1],
@@ -204,7 +204,7 @@ const inferTypeCategory = (typeCode) => {
   return TYPE_CATEGORY_MAP.get(normalized) ?? 'Visite';
 };
 
-const sanitizeQuality = (value) => (value === 'Bonus' ? 'Bonus' : 'Mauvaise');
+const sanitizeQuality = (value) => (value === 'Bonne' ? 'Bonne' : 'Normale');
 
 const toBoolean = (value, fallback = true) => {
   if (value === null || value === undefined) {
@@ -247,9 +247,9 @@ const getDefaultSlot = (position) => {
     start_time: null,
     end_time: null,
     color: defaults?.color ?? DEFAULT_COLOR,
-    quality_weekdays: 'Mauvaise',
-    quality_saturday: 'Mauvaise',
-    quality_sunday: 'Mauvaise',
+    quality_weekdays: 'Normale',
+    quality_saturday: 'Normale',
+    quality_sunday: 'Normale',
     open_mauvaise_weekdays: true,
     open_mauvaise_saturday: true,
     open_mauvaise_sunday: true,
@@ -364,7 +364,7 @@ const isSlotOpen = (slot, segment, visionOverride = null) => {
     return openings.bonus || openings.mauvaise;
   }
   const quality = getQualityForSegment(slot, segment);
-  const preferredVision = quality === 'Bonus' ? 'bonus' : 'mauvaise';
+  const preferredVision = quality === 'Bonne' ? 'bonus' : 'mauvaise';
   return openings[preferredVision];
 };
 
@@ -855,7 +855,7 @@ export function initializePlanningChoices({ userRole }) {
       }
       if (roleLabel) {
         const bullet = selection.isPrimary ? '●' : '○';
-        const natureLabel = selection.nature === 'bonus' ? 'Bonus' : 'Mauvaise';
+        const natureLabel = selection.nature === 'bonus' ? 'Bonne' : 'Normale';
         roleLabel.textContent = `${bullet} ${natureLabel}`;
         roleLabel.classList.remove('is-empty');
       }
@@ -900,7 +900,7 @@ export function initializePlanningChoices({ userRole }) {
       }</span>
           <span class="summary-item-tags">
             <span class="badge ${selection.nature === 'bonus' ? 'badge-success' : 'badge-warning'}">${
-        (selection.isPrimary ? '●' : '○') + ' ' + (selection.nature === 'bonus' ? 'Bonus' : 'Mauvaise')
+        (selection.isPrimary ? '●' : '○') + ' ' + (selection.nature === 'bonus' ? 'Bonne' : 'Normale')
       }</span>
             <span class="badge">${selection.activityType}</span>
           </span>
