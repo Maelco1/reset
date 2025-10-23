@@ -80,7 +80,7 @@
                     class="planning-vision-toggle"
                     aria-pressed="false"
                   >
-                    Vision “Mauvaise garde”
+                    Vision “Garde normale”
                   </button>
                   <button
                     type="button"
@@ -88,7 +88,7 @@
                     class="planning-vision-toggle"
                     aria-pressed="false"
                   >
-                    Vision “Garde bonus”
+                    Vision “Bonne garde”
                   </button>
                 </div>
               </div>
@@ -311,20 +311,20 @@
             <div class="slot-qualities-grid">
               <label for="slot-quality-weekdays">Lun - Ven</label>
               <select id="slot-quality-weekdays" name="qualityWeekdays" required>
-                <option value="Mauvaise">Mauvaise</option>
-                <option value="Bonus">Bonus</option>
+                <option value="Normale">Normale</option>
+                <option value="Bonne">Bonne</option>
               </select>
 
               <label for="slot-quality-saturday">Samedi</label>
               <select id="slot-quality-saturday" name="qualitySaturday" required>
-                <option value="Mauvaise">Mauvaise</option>
-                <option value="Bonus">Bonus</option>
+                <option value="Normale">Normale</option>
+                <option value="Bonne">Bonne</option>
               </select>
 
               <label for="slot-quality-sunday">Dimanche / Férié</label>
               <select id="slot-quality-sunday" name="qualitySunday" required>
-                <option value="Mauvaise">Mauvaise</option>
-                <option value="Bonus">Bonus</option>
+                <option value="Normale">Normale</option>
+                <option value="Bonne">Bonne</option>
               </select>
             </div>
           </fieldset>
@@ -333,7 +333,7 @@
             <legend>Ouverture des cases</legend>
             <div class="slot-openings-grid">
               <div>
-                <h3>Mauvaise</h3>
+                <h3>Normale</h3>
                 <label for="slot-open-mauvaise-weekdays">Lun - Ven</label>
                 <select id="slot-open-mauvaise-weekdays" name="openMauvaiseWeekdays" required>
                   <option value="true">Oui</option>
@@ -353,7 +353,7 @@
                 </select>
               </div>
               <div>
-                <h3>Bonus</h3>
+                <h3>Bonne</h3>
                 <label for="slot-open-bonus-weekdays">Lun - Ven</label>
                 <select id="slot-open-bonus-weekdays" name="openBonusWeekdays" required>
                   <option value="true">Oui</option>
@@ -942,7 +942,7 @@
         return TYPE_CATEGORY_MAP.get(normalized) ?? 'Visite';
       };
 
-      const sanitizeQuality = (value) => (value === 'Bonus' ? 'Bonus' : 'Mauvaise');
+      const sanitizeQuality = (value) => (value === 'Bonne' ? 'Bonne' : 'Normale');
 
       const toBoolean = (value, fallback = true) => {
         if (value === null || value === undefined) {
@@ -997,9 +997,9 @@
           start_time: null,
           end_time: null,
           color: defaults?.color ?? DEFAULT_COLOR,
-          quality_weekdays: 'Mauvaise',
-          quality_saturday: 'Mauvaise',
-          quality_sunday: 'Mauvaise',
+          quality_weekdays: 'Normale',
+          quality_saturday: 'Normale',
+          quality_sunday: 'Normale',
           open_mauvaise_weekdays: true,
           open_mauvaise_saturday: true,
           open_mauvaise_sunday: true,
@@ -1114,7 +1114,7 @@
           return openings.bonus || openings.mauvaise;
         }
         const quality = getQualityForSegment(slot, segment);
-        const preferredVision = quality === 'Bonus' ? 'bonus' : 'mauvaise';
+        const preferredVision = quality === 'Bonne' ? 'bonus' : 'mauvaise';
         return openings[preferredVision];
       };
 
@@ -1446,7 +1446,7 @@
             const columnColor = columnColors.get(slot.position);
             const segment = getDaySegment(day, isHoliday);
             const quality = getQualityForSegment(slot, segment);
-            const cellVision = quality === 'Bonus' ? 'bonus' : 'mauvaise';
+            const cellVision = quality === 'Bonne' ? 'bonus' : 'mauvaise';
             const openings = getSlotOpeningsForSegment(slot, segment);
             const matchesVision =
               !activePlanningVision ||
@@ -1698,8 +1698,8 @@
             <th scope="col">Horaires</th>
             <th scope="col">Couleur</th>
             <th scope="col">Qualités</th>
-            <th scope="col">Ouverture Mauvaise</th>
-            <th scope="col">Ouverture Bonus</th>
+            <th scope="col">Ouverture Normale</th>
+            <th scope="col">Ouverture Bonne</th>
             <th scope="col">Actions</th>
           </tr>
         `;
