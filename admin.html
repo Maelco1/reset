@@ -76,7 +76,7 @@
                 <div class="planning-vision-group" role="group" aria-label="Vision du planning">
                   <button
                     type="button"
-                    id="planning-vision-mauvaise"
+                    id="planning-vision-normale"
                     class="planning-vision-toggle"
                     aria-pressed="false"
                   >
@@ -84,7 +84,7 @@
                   </button>
                   <button
                     type="button"
-                    id="planning-vision-bonus"
+                    id="planning-vision-bonne"
                     class="planning-vision-toggle"
                     aria-pressed="false"
                   >
@@ -334,40 +334,40 @@
             <div class="slot-openings-grid">
               <div>
                 <h3>Normale</h3>
-                <label for="slot-open-mauvaise-weekdays">Lun - Ven</label>
-                <select id="slot-open-mauvaise-weekdays" name="openMauvaiseWeekdays" required>
+                <label for="slot-open-normale-weekdays">Lun - Ven</label>
+                <select id="slot-open-normale-weekdays" name="openNormaleWeekdays" required>
                   <option value="true">Oui</option>
                   <option value="false">Non</option>
                 </select>
 
-                <label for="slot-open-mauvaise-saturday">Samedi</label>
-                <select id="slot-open-mauvaise-saturday" name="openMauvaiseSaturday" required>
+                <label for="slot-open-normale-saturday">Samedi</label>
+                <select id="slot-open-normale-saturday" name="openNormaleSaturday" required>
                   <option value="true">Oui</option>
                   <option value="false">Non</option>
                 </select>
 
-                <label for="slot-open-mauvaise-sunday">Dimanche / Férié</label>
-                <select id="slot-open-mauvaise-sunday" name="openMauvaiseSunday" required>
+                <label for="slot-open-normale-sunday">Dimanche / Férié</label>
+                <select id="slot-open-normale-sunday" name="openNormaleSunday" required>
                   <option value="true">Oui</option>
                   <option value="false">Non</option>
                 </select>
               </div>
               <div>
                 <h3>Bonne</h3>
-                <label for="slot-open-bonus-weekdays">Lun - Ven</label>
-                <select id="slot-open-bonus-weekdays" name="openBonusWeekdays" required>
+                <label for="slot-open-bonne-weekdays">Lun - Ven</label>
+                <select id="slot-open-bonne-weekdays" name="openBonneWeekdays" required>
                   <option value="true">Oui</option>
                   <option value="false">Non</option>
                 </select>
 
-                <label for="slot-open-bonus-saturday">Samedi</label>
-                <select id="slot-open-bonus-saturday" name="openBonusSaturday" required>
+                <label for="slot-open-bonne-saturday">Samedi</label>
+                <select id="slot-open-bonne-saturday" name="openBonneSaturday" required>
                   <option value="true">Oui</option>
                   <option value="false">Non</option>
                 </select>
 
-                <label for="slot-open-bonus-sunday">Dimanche / Férié</label>
-                <select id="slot-open-bonus-sunday" name="openBonusSunday" required>
+                <label for="slot-open-bonne-sunday">Dimanche / Férié</label>
+                <select id="slot-open-bonne-sunday" name="openBonneSunday" required>
                   <option value="true">Oui</option>
                   <option value="false">Non</option>
                 </select>
@@ -588,11 +588,11 @@
       const planningConfigContainer = document.querySelector('#planning-config');
       const planningTables = document.querySelector('#planning-tables');
       const planningFeedback = document.querySelector('#planning-feedback');
-      const planningVisionMauvaise = document.querySelector('#planning-vision-mauvaise');
-      const planningVisionBonus = document.querySelector('#planning-vision-bonus');
+      const planningVisionNormale = document.querySelector('#planning-vision-normale');
+      const planningVisionBonne = document.querySelector('#planning-vision-bonne');
       const planningVisionButtons = {
-        mauvaise: planningVisionMauvaise,
-        bonus: planningVisionBonus
+        normale: planningVisionNormale,
+        bonne: planningVisionBonne
       };
 
       let adminSettingsRecordId = null;
@@ -613,7 +613,7 @@
       };
 
       const togglePlanningVision = (vision) => {
-        const normalizedVision = vision === 'bonus' ? 'bonus' : vision === 'mauvaise' ? 'mauvaise' : null;
+        const normalizedVision = vision === 'bonne' ? 'bonne' : vision === 'normale' ? 'normale' : null;
         activePlanningVision = activePlanningVision === normalizedVision ? null : normalizedVision;
         updatePlanningVisionButtons();
         renderPlanningTables();
@@ -1000,12 +1000,12 @@
           quality_weekdays: 'Normale',
           quality_saturday: 'Normale',
           quality_sunday: 'Normale',
-          open_mauvaise_weekdays: true,
-          open_mauvaise_saturday: true,
-          open_mauvaise_sunday: true,
-          open_bonus_weekdays: true,
-          open_bonus_saturday: true,
-          open_bonus_sunday: true
+          open_normale_weekdays: true,
+          open_normale_saturday: true,
+          open_normale_sunday: true,
+          open_bonne_weekdays: true,
+          open_bonne_saturday: true,
+          open_bonne_sunday: true
         };
       };
 
@@ -1097,24 +1097,24 @@
 
       const getSlotOpeningsForSegment = (slot, segment) => {
         const segmentKey = segment === 'saturday' ? 'saturday' : segment === 'sunday' ? 'sunday' : 'weekdays';
-        const bonusKey = `open_bonus_${segmentKey}`;
-        const mauvaiseKey = `open_mauvaise_${segmentKey}`;
+        const bonneKey = `open_bonne_${segmentKey}`;
+        const normaleKey = `open_normale_${segmentKey}`;
         return {
-          bonus: toBoolean(slot[bonusKey]),
-          mauvaise: toBoolean(slot[mauvaiseKey])
+          bonne: toBoolean(slot[bonneKey]),
+          normale: toBoolean(slot[normaleKey])
         };
       };
 
       const isSlotOpen = (slot, segment, visionOverride = null) => {
         const openings = getSlotOpeningsForSegment(slot, segment);
-        if (visionOverride === 'bonus' || visionOverride === 'mauvaise') {
+        if (visionOverride === 'bonne' || visionOverride === 'normale') {
           return openings[visionOverride];
         }
         if (visionOverride === null) {
-          return openings.bonus || openings.mauvaise;
+          return openings.bonne || openings.normale;
         }
         const quality = getQualityForSegment(slot, segment);
-        const preferredVision = quality === 'Bonne' ? 'bonus' : 'mauvaise';
+        const preferredVision = quality === 'Bonne' ? 'bonne' : 'normale';
         return openings[preferredVision];
       };
 
@@ -1446,11 +1446,11 @@
             const columnColor = columnColors.get(slot.position);
             const segment = getDaySegment(day, isHoliday);
             const quality = getQualityForSegment(slot, segment);
-            const cellVision = quality === 'Bonne' ? 'bonus' : 'mauvaise';
+            const cellVision = quality === 'Bonne' ? 'bonne' : 'normale';
             const openings = getSlotOpeningsForSegment(slot, segment);
             const matchesVision =
               !activePlanningVision ||
-              (activePlanningVision === 'bonus' ? openings.bonus : openings.mauvaise);
+              (activePlanningVision === 'bonne' ? openings.bonne : openings.normale);
             cell.dataset.vision = cellVision;
             const open = isSlotOpen(slot, segment, activePlanningVision);
 
@@ -1777,13 +1777,13 @@
           });
           row.appendChild(qualityCell);
 
-          const mauvaiseCell = document.createElement('td');
-          const mauvaiseStatuses = [
-            { label: 'Lun - Ven', value: formatBoolean(slot.open_mauvaise_weekdays) },
-            { label: 'Samedi', value: formatBoolean(slot.open_mauvaise_saturday) },
-            { label: 'Dim / Férié', value: formatBoolean(slot.open_mauvaise_sunday) }
+          const normaleCell = document.createElement('td');
+          const normaleStatuses = [
+            { label: 'Lun - Ven', value: formatBoolean(slot.open_normale_weekdays) },
+            { label: 'Samedi', value: formatBoolean(slot.open_normale_saturday) },
+            { label: 'Dim / Férié', value: formatBoolean(slot.open_normale_sunday) }
           ];
-          mauvaiseStatuses.forEach(({ label, value }) => {
+          normaleStatuses.forEach(({ label, value }) => {
             const line = document.createElement('div');
             line.className = 'planning-config-line';
             const strong = document.createElement('strong');
@@ -1792,17 +1792,17 @@
             const text = document.createElement('span');
             text.textContent = value;
             line.appendChild(text);
-            mauvaiseCell.appendChild(line);
+            normaleCell.appendChild(line);
           });
-          row.appendChild(mauvaiseCell);
+          row.appendChild(normaleCell);
 
-          const bonusCell = document.createElement('td');
-          const bonusStatuses = [
-            { label: 'Lun - Ven', value: formatBoolean(slot.open_bonus_weekdays) },
-            { label: 'Samedi', value: formatBoolean(slot.open_bonus_saturday) },
-            { label: 'Dim / Férié', value: formatBoolean(slot.open_bonus_sunday) }
+          const bonneCell = document.createElement('td');
+          const bonneStatuses = [
+            { label: 'Lun - Ven', value: formatBoolean(slot.open_bonne_weekdays) },
+            { label: 'Samedi', value: formatBoolean(slot.open_bonne_saturday) },
+            { label: 'Dim / Férié', value: formatBoolean(slot.open_bonne_sunday) }
           ];
-          bonusStatuses.forEach(({ label, value }) => {
+          bonneStatuses.forEach(({ label, value }) => {
             const line = document.createElement('div');
             line.className = 'planning-config-line';
             const strong = document.createElement('strong');
@@ -1811,9 +1811,9 @@
             const text = document.createElement('span');
             text.textContent = value;
             line.appendChild(text);
-            bonusCell.appendChild(line);
+            bonneCell.appendChild(line);
           });
-          row.appendChild(bonusCell);
+          row.appendChild(bonneCell);
 
           const actionCell = document.createElement('td');
           actionCell.className = 'planning-config-actions';
@@ -2088,12 +2088,12 @@
             quality_weekdays,
             quality_saturday,
             quality_sunday,
-            open_mauvaise_weekdays,
-            open_mauvaise_saturday,
-            open_mauvaise_sunday,
-            open_bonus_weekdays,
-            open_bonus_saturday,
-            open_bonus_sunday`
+            open_normale_weekdays,
+            open_normale_saturday,
+            open_normale_sunday,
+            open_bonne_weekdays,
+            open_bonne_saturday,
+            open_bonne_sunday`
           )
           .order('position');
         if (reloadError) {
@@ -2135,12 +2135,12 @@
             quality_weekdays,
             quality_saturday,
             quality_sunday,
-            open_mauvaise_weekdays,
-            open_mauvaise_saturday,
-            open_mauvaise_sunday,
-            open_bonus_weekdays,
-            open_bonus_saturday,
-            open_bonus_sunday`
+            open_normale_weekdays,
+            open_normale_saturday,
+            open_normale_sunday,
+            open_bonne_weekdays,
+            open_bonne_saturday,
+            open_bonne_sunday`
           )
           .order('position');
         if (error) {
@@ -2187,12 +2187,12 @@
           quality_weekdays: sanitizeQuality(slot.quality_weekdays),
           quality_saturday: sanitizeQuality(slot.quality_saturday),
           quality_sunday: sanitizeQuality(slot.quality_sunday),
-          open_mauvaise_weekdays: toBoolean(slot.open_mauvaise_weekdays),
-          open_mauvaise_saturday: toBoolean(slot.open_mauvaise_saturday),
-          open_mauvaise_sunday: toBoolean(slot.open_mauvaise_sunday),
-          open_bonus_weekdays: toBoolean(slot.open_bonus_weekdays),
-          open_bonus_saturday: toBoolean(slot.open_bonus_saturday),
-          open_bonus_sunday: toBoolean(slot.open_bonus_sunday)
+          open_normale_weekdays: toBoolean(slot.open_normale_weekdays),
+          open_normale_saturday: toBoolean(slot.open_normale_saturday),
+          open_normale_sunday: toBoolean(slot.open_normale_sunday),
+          open_bonne_weekdays: toBoolean(slot.open_bonne_weekdays),
+          open_bonne_saturday: toBoolean(slot.open_bonne_saturday),
+          open_bonne_sunday: toBoolean(slot.open_bonne_sunday)
         }));
         const total = planningSlots.length;
         if (planningFeedback) {
@@ -2439,29 +2439,29 @@
         if (qualitySunday) {
           qualitySunday.value = sanitizeQuality(slot.quality_sunday);
         }
-        const openMauvaiseWeekdays = slotForm.elements['openMauvaiseWeekdays'];
-        if (openMauvaiseWeekdays) {
-          openMauvaiseWeekdays.value = slot.open_mauvaise_weekdays ? 'true' : 'false';
+        const openNormaleWeekdays = slotForm.elements['openNormaleWeekdays'];
+        if (openNormaleWeekdays) {
+          openNormaleWeekdays.value = slot.open_normale_weekdays ? 'true' : 'false';
         }
-        const openMauvaiseSaturday = slotForm.elements['openMauvaiseSaturday'];
-        if (openMauvaiseSaturday) {
-          openMauvaiseSaturday.value = slot.open_mauvaise_saturday ? 'true' : 'false';
+        const openNormaleSaturday = slotForm.elements['openNormaleSaturday'];
+        if (openNormaleSaturday) {
+          openNormaleSaturday.value = slot.open_normale_saturday ? 'true' : 'false';
         }
-        const openMauvaiseSunday = slotForm.elements['openMauvaiseSunday'];
-        if (openMauvaiseSunday) {
-          openMauvaiseSunday.value = slot.open_mauvaise_sunday ? 'true' : 'false';
+        const openNormaleSunday = slotForm.elements['openNormaleSunday'];
+        if (openNormaleSunday) {
+          openNormaleSunday.value = slot.open_normale_sunday ? 'true' : 'false';
         }
-        const openBonusWeekdays = slotForm.elements['openBonusWeekdays'];
-        if (openBonusWeekdays) {
-          openBonusWeekdays.value = slot.open_bonus_weekdays ? 'true' : 'false';
+        const openBonneWeekdays = slotForm.elements['openBonneWeekdays'];
+        if (openBonneWeekdays) {
+          openBonneWeekdays.value = slot.open_bonne_weekdays ? 'true' : 'false';
         }
-        const openBonusSaturday = slotForm.elements['openBonusSaturday'];
-        if (openBonusSaturday) {
-          openBonusSaturday.value = slot.open_bonus_saturday ? 'true' : 'false';
+        const openBonneSaturday = slotForm.elements['openBonneSaturday'];
+        if (openBonneSaturday) {
+          openBonneSaturday.value = slot.open_bonne_saturday ? 'true' : 'false';
         }
-        const openBonusSunday = slotForm.elements['openBonusSunday'];
-        if (openBonusSunday) {
-          openBonusSunday.value = slot.open_bonus_sunday ? 'true' : 'false';
+        const openBonneSunday = slotForm.elements['openBonneSunday'];
+        if (openBonneSunday) {
+          openBonneSunday.value = slot.open_bonne_sunday ? 'true' : 'false';
         }
         slotForm.elements['position'].value = position;
         slotModal?.classList.remove('hidden');
@@ -2486,12 +2486,12 @@
         const qualityWeekdays = sanitizeQuality(formData.get('qualityWeekdays'));
         const qualitySaturday = sanitizeQuality(formData.get('qualitySaturday'));
         const qualitySunday = sanitizeQuality(formData.get('qualitySunday'));
-        const openMauvaiseWeekdays = selectToBoolean(formData.get('openMauvaiseWeekdays'), true);
-        const openMauvaiseSaturday = selectToBoolean(formData.get('openMauvaiseSaturday'), true);
-        const openMauvaiseSunday = selectToBoolean(formData.get('openMauvaiseSunday'), true);
-        const openBonusWeekdays = selectToBoolean(formData.get('openBonusWeekdays'), true);
-        const openBonusSaturday = selectToBoolean(formData.get('openBonusSaturday'), true);
-        const openBonusSunday = selectToBoolean(formData.get('openBonusSunday'), true);
+        const openNormaleWeekdays = selectToBoolean(formData.get('openNormaleWeekdays'), true);
+        const openNormaleSaturday = selectToBoolean(formData.get('openNormaleSaturday'), true);
+        const openNormaleSunday = selectToBoolean(formData.get('openNormaleSunday'), true);
+        const openBonneWeekdays = selectToBoolean(formData.get('openBonneWeekdays'), true);
+        const openBonneSaturday = selectToBoolean(formData.get('openBonneSaturday'), true);
+        const openBonneSunday = selectToBoolean(formData.get('openBonneSunday'), true);
         const startTime = formData.get('startTime') || null;
         const endTime = formData.get('endTime') || null;
         if (slotFeedback) {
@@ -2510,12 +2510,12 @@
           quality_weekdays: qualityWeekdays,
           quality_saturday: qualitySaturday,
           quality_sunday: qualitySunday,
-          open_mauvaise_weekdays: openMauvaiseWeekdays,
-          open_mauvaise_saturday: openMauvaiseSaturday,
-          open_mauvaise_sunday: openMauvaiseSunday,
-          open_bonus_weekdays: openBonusWeekdays,
-          open_bonus_saturday: openBonusSaturday,
-          open_bonus_sunday: openBonusSunday
+          open_normale_weekdays: openNormaleWeekdays,
+          open_normale_saturday: openNormaleSaturday,
+          open_normale_sunday: openNormaleSunday,
+          open_bonne_weekdays: openBonneWeekdays,
+          open_bonne_saturday: openBonneSaturday,
+          open_bonne_sunday: openBonneSunday
         };
         const tableName = getPlanningTableName();
         const { error } = await supabase.from(tableName).upsert(payload, { onConflict: 'position' });

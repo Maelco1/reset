@@ -740,10 +740,10 @@ main {
   box-shadow: 0 0 0 3px var(--planning-accent);
   transform: translateY(-1px);
 }
-.planning-slot-toggle.is-selected[data-choice-type='bonus'] {
+.planning-slot-toggle.is-selected[data-choice-type='bonne'] {
   box-shadow: 0 0 0 3px var(--planning-success);
 }
-.planning-slot-toggle.is-selected[data-choice-type='mauvaise'] {
+.planning-slot-toggle.is-selected[data-choice-type='normale'] {
   box-shadow: 0 0 0 3px var(--planning-danger);
 }
 
