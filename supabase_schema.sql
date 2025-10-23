@@ -358,10 +358,38 @@ create table if not exists public.planning_choices (
   is_active boolean not null default true,
   slot_type_code text,
   column_label text,
-  planning_day_label text
+  planning_day_label text,
+  etat text not null default 'en attente' check (etat in ('en attente', 'validé', 'refusé'))
 );
 
 create index if not exists planning_choices_user_idx
   on public.planning_choices (user_id, choice_order);
 create index if not exists planning_choices_reference_idx
   on public.planning_choices (planning_reference, tour_number, choice_order);
+
+alter table if exists public.planning_choices
+  add column if not exists etat text;
+
+update public.planning_choices
+set etat = coalesce(nullif(etat, ''), 'en attente')
+where etat is null or etat not in ('en attente', 'validé', 'refusé');
+
+alter table if exists public.planning_choices
+  alter column etat set default 'en attente';
+
+alter table if exists public.planning_choices
+  alter column etat set not null;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where connamespace = 'public'::regnamespace
+      and conrelid = 'public.planning_choices'::regclass
+      and conname = 'planning_choices_etat_check'
+  ) then
+    alter table public.planning_choices
+      add constraint planning_choices_etat_check check (etat in ('en attente', 'validé', 'refusé'));
+  end if;
+end $$;

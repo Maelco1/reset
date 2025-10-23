@@ -559,6 +559,10 @@ export function initializePlanningChoices({ userRole }) {
     }
   };
 
+  const invalidateGroupedSelections = () => {
+    state.groupedSelections = null;
+  };
+
   const movePlanningSectionToStep = (step) => {
     const host = stepHosts.get(step);
     if (!host || planningSection.parentElement === host) {
@@ -640,7 +644,7 @@ export function initializePlanningChoices({ userRole }) {
     }, {});
 
   const computeGroupedSelections = () => {
-    const groupedSelections = createEmptyChoiceGroups();
+    const provisionalGroups = createEmptyChoiceGroups();
 
     state.selections.forEach((selection, index) => {
       selection.order = index + 1;
@@ -650,23 +654,54 @@ export function initializePlanningChoices({ userRole }) {
         ? sanitizeChoiceIndex(selection.choiceIndex)
         : getActiveChoiceIndex(nature);
       selection.choiceIndex = choiceIndex;
-      if (!groupedSelections[nature].has(choiceIndex)) {
-        groupedSelections[nature].set(choiceIndex, []);
+      if (!provisionalGroups[nature].has(choiceIndex)) {
+        provisionalGroups[nature].set(choiceIndex, []);
       }
-      groupedSelections[nature].get(choiceIndex).push(selection);
+      provisionalGroups[nature].get(choiceIndex).push(selection);
     });
 
+    const groupedSelections = createEmptyChoiceGroups();
+
     CHOICE_SERIES.forEach((nature) => {
-      groupedSelections[nature].forEach((list) => {
-        list.forEach((selection, position) => {
+      const orderedGroups = Array.from(provisionalGroups[nature].entries())
+        .map(([choiceIndex, selections]) => ({
+          choiceIndex,
+          selections,
+          order: Math.min(
+            ...selections.map((selection) => selection.order ?? Number.MAX_SAFE_INTEGER)
+          )
+        }))
+        .sort((a, b) => a.order - b.order || a.choiceIndex - b.choiceIndex);
+
+      orderedGroups.forEach((group, groupPosition) => {
+        const normalizedIndex = CHOICE_INDEX_MIN + groupPosition;
+        group.selections.forEach((selection, position) => {
+          selection.choiceIndex = normalizedIndex;
           selection.choiceRank = position + 1;
           selection.isPrimary = position === 0;
-          selection.choiceLabel = `${selection.choiceIndex}.${selection.choiceRank}`;
+          selection.choiceLabel = selection.isPrimary
+            ? String(selection.choiceIndex)
+            : `${selection.choiceIndex}.${selection.choiceRank}`;
         });
+        groupedSelections[nature].set(normalizedIndex, group.selections);
       });
     });
 
     state.groupedSelections = groupedSelections;
+
+    CHOICE_SERIES.forEach((nature) => {
+      const series = getChoiceSeries(nature);
+      if (!series) {
+        return;
+      }
+      const nextIndex = clamp(
+        CHOICE_INDEX_MIN + groupedSelections[nature].size,
+        CHOICE_INDEX_MIN,
+        CHOICE_INDEX_MAX
+      );
+      series.activeIndex = nextIndex;
+    });
+
     return groupedSelections;
   };
 
@@ -947,6 +982,7 @@ export function initializePlanningChoices({ userRole }) {
           const item = document.createElement('li');
           item.className = 'summary-item';
           item.classList.add(selection.isPrimary ? 'summary-item--primary' : 'summary-item--alternative');
+          item.classList.add(`summary-item--${selection.nature}`);
           item.draggable = true;
           item.dataset.slotKey = selection.slotKey;
           item.dataset.choiceIndex = String(selection.choiceIndex ?? CHOICE_INDEX_MIN);
@@ -957,6 +993,14 @@ export function initializePlanningChoices({ userRole }) {
             <div class="summary-item-order">${selection.choiceLabel ?? selection.order}</div>
             <div class="summary-item-body">
               <div class="summary-item-main">
+                <span class="summary-item-choice">${
+                  selection.isPrimary
+                    ? `Choix ${selection.choiceIndex} — Principal`
+                    : `Choix ${selection.choiceIndex} — Alternative ${Math.max(
+                        1,
+                        selection.choiceRank - 1
+                      )}`
+                }</span>
                 <span class="summary-item-date">${formatSummaryLabel(selection)}</span>
                 <span class="summary-item-details">Col. ${selection.columnPosition} · ${
             selection.columnLabel || selection.slotTypeCode || 'Créneau'
@@ -1017,6 +1061,7 @@ export function initializePlanningChoices({ userRole }) {
     });
     if (inserted && newSelections.length === state.selections.length) {
       state.selections = newSelections;
+      invalidateGroupedSelections();
       refreshSelections();
     }
   };
@@ -1061,6 +1106,42 @@ export function initializePlanningChoices({ userRole }) {
     });
     if (newSelections.length === state.selections.length) {
       state.selections = newSelections;
+
+      const domItems = Array.from(list.querySelectorAll('.summary-item[data-slot-key]'))
+        .map((element) => ({
+          element,
+          selection: state.selectionMap.get(element.dataset.slotKey),
+          role: element.dataset.choiceRole === 'alternative' ? 'alternative' : 'principal'
+        }))
+        .filter(
+          (entry) =>
+            entry.selection && sanitizeChoiceNature(entry.selection.nature) === sanitizedNature
+        );
+
+      const groups = [];
+      let currentGroup = null;
+      domItems.forEach(({ selection, role }) => {
+        if (!currentGroup || role === 'principal') {
+          currentGroup = [];
+          groups.push(currentGroup);
+        }
+        currentGroup.push(selection);
+      });
+
+      let nextIndex = CHOICE_INDEX_MIN;
+      groups.forEach((group) => {
+        group.forEach((selection, position) => {
+          selection.choiceIndex = nextIndex;
+          selection.choiceRank = position + 1;
+          selection.isPrimary = position === 0;
+          selection.choiceLabel = selection.isPrimary
+            ? String(selection.choiceIndex)
+            : `${selection.choiceIndex}.${selection.choiceRank}`;
+        });
+        nextIndex += 1;
+      });
+
+      invalidateGroupedSelections();
       refreshSelections();
     }
   };
@@ -1111,6 +1192,7 @@ export function initializePlanningChoices({ userRole }) {
     if (selection?.button) {
       selection.button.classList.remove('is-selected');
     }
+    invalidateGroupedSelections();
     refreshSelections();
   };
 
@@ -1120,6 +1202,7 @@ export function initializePlanningChoices({ userRole }) {
     }
     state.selectionMap.set(selection.slotKey, selection);
     state.selections.push(selection);
+    invalidateGroupedSelections();
     refreshSelections();
   };
 
@@ -1602,6 +1685,117 @@ export function initializePlanningChoices({ userRole }) {
     };
   };
 
+  const loadPersistedSelections = async () => {
+    if (state.selections.length) {
+      return;
+    }
+    await onSupabaseReady();
+    const supabase = getSupabaseClient();
+    state.supabase = supabase;
+    if (!supabase || !state.userProfile) {
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from('planning_choices')
+      .select(
+        `id,
+          day,
+          column_number,
+          guard_nature,
+          activity_type,
+          choice_order,
+          choice_index,
+          choice_rank,
+          slot_type_code,
+          column_label,
+          planning_day_label,
+          etat,
+          created_at,
+          is_active`
+      )
+      .eq('trigram', state.userProfile.trigram)
+      .eq('user_type', normalizedUserRole)
+      .eq('planning_reference', state.planningReference)
+      .eq('tour_number', state.selectedTourId)
+      .eq('etat', 'en attente')
+      .eq('is_active', true)
+      .order('choice_order', { ascending: true });
+
+    if (error) {
+      console.error(error);
+      return;
+    }
+    if (!data || !data.length) {
+      return;
+    }
+
+    const persistedSelections = data
+      .map((record) => {
+        if (!record?.column_number || !record?.day) {
+          return null;
+        }
+        const parsedDay = new Date(record.day);
+        if (Number.isNaN(parsedDay.getTime())) {
+          return null;
+        }
+        const dayIso = formatDateKey(parsedDay);
+        const slotKey = `${dayIso}:${record.column_number}`;
+        const button = state.slotButtons.get(slotKey) ?? null;
+        const activityType = typeof record.activity_type === 'string'
+          ? record.activity_type
+          : 'visite';
+        const activityEntry = Array.from(ACTIVITY_TYPES.entries()).find(
+          ([, value]) => value === activityType
+        );
+        const activityCategory = activityEntry ? activityEntry[0] : 'Visite';
+        const selection = {
+          slotKey,
+          nature: sanitizeChoiceNature(record.guard_nature),
+          dayIso,
+          dayDate: parsedDay,
+          dayLabel: record.planning_day_label ?? button?.dataset.dayLabel ?? dayIso,
+          monthNumber: parsedDay.getMonth() + 1,
+          yearNumber: parsedDay.getFullYear(),
+          columnPosition: record.column_number,
+          columnLabel: record.column_label ?? button?.dataset.columnLabel ?? '',
+          slotTypeCode: record.slot_type_code ?? button?.dataset.typeCode ?? '',
+          activityCategory,
+          activityType,
+          summary: button?.dataset.summary ?? record.planning_day_label ?? '',
+          button,
+          choiceIndex: sanitizeChoiceIndex(record.choice_index),
+          choiceRank: sanitizeChoiceRank(record.choice_rank),
+          order: Number.parseInt(record.choice_order, 10) || 0,
+          isPrimary: sanitizeChoiceRank(record.choice_rank) === 1,
+          isPersisted: true,
+          etat: record.etat ?? 'en attente',
+          createdAt: record.created_at ?? null
+        };
+        selection.choiceLabel = selection.isPrimary
+          ? String(selection.choiceIndex)
+          : `${selection.choiceIndex}.${selection.choiceRank}`;
+        return selection;
+      })
+      .filter(Boolean)
+      .sort((a, b) => {
+        const orderA = Number.isFinite(a.order) ? a.order : Number.MAX_SAFE_INTEGER;
+        const orderB = Number.isFinite(b.order) ? b.order : Number.MAX_SAFE_INTEGER;
+        return orderA - orderB;
+      });
+
+    persistedSelections.forEach((selection) => {
+      if (state.selectionMap.has(selection.slotKey)) {
+        return;
+      }
+      state.selectionMap.set(selection.slotKey, selection);
+      state.selections.push(selection);
+    });
+
+    invalidateGroupedSelections();
+    refreshSelections();
+  };
+
   const saveSelections = async () => {
     if (state.isSaving) {
       return;
@@ -1645,13 +1839,34 @@ export function initializePlanningChoices({ userRole }) {
       is_active: true,
       slot_type_code: selection.slotTypeCode,
       column_label: selection.columnLabel,
-      planning_day_label: selection.dayLabel
+      planning_day_label: selection.dayLabel,
+      etat: selection.etat ?? 'en attente'
     }));
 
     state.isSaving = true;
     saveButton?.setAttribute('disabled', 'true');
     if (saveFeedback) {
       saveFeedback.textContent = 'Enregistrement en cours…';
+    }
+
+    const { error: deleteError } = await supabase
+      .from('planning_choices')
+      .delete()
+      .eq('trigram', trigram)
+      .eq('user_type', normalizedUserRole)
+      .eq('planning_reference', state.planningReference)
+      .eq('tour_number', state.selectedTourId)
+      .eq('etat', 'en attente')
+      .eq('is_active', true);
+
+    if (deleteError) {
+      console.error(deleteError);
+      state.isSaving = false;
+      saveButton?.removeAttribute('disabled');
+      if (saveFeedback) {
+        saveFeedback.textContent = "Impossible de mettre à jour vos choix existants.";
+      }
+      return;
     }
 
     const { error } = await supabase.from('planning_choices').insert(payload);
@@ -1669,6 +1884,11 @@ export function initializePlanningChoices({ userRole }) {
     if (saveFeedback) {
       saveFeedback.textContent = 'Choix enregistrés avec succès !';
     }
+
+    state.selections.forEach((selection) => {
+      selection.isPersisted = true;
+      selection.etat = 'en attente';
+    });
   };
   if (stepper) {
     stepper.addEventListener('click', (event) => {
@@ -1815,6 +2035,7 @@ export function initializePlanningChoices({ userRole }) {
     await loadAdministrativeSettings();
     await loadPlanningColumns();
     state.userProfile = await fetchUserProfile();
+    await loadPersistedSelections();
     setStep(1);
   };
 
