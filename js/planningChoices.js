@@ -506,8 +506,8 @@ export function initializePlanningChoices({ userRole }) {
       element
     ])
   );
-  const summaryList = document.querySelector('#summary-list');
   const summaryFeedback = document.querySelector('#summary-feedback');
+  const summaryLists = new Map();
   const saveButton = document.querySelector('#save-choices');
   const saveFeedback = document.querySelector('#save-feedback');
 
@@ -542,7 +542,8 @@ export function initializePlanningChoices({ userRole }) {
     planningCellSizingFrame: null,
     stickyHeaderFrame: null,
     userProfile: null,
-    isSaving: false
+    isSaving: false,
+    groupedSelections: null
   };
 
   const getHolidaysForYear = (year) => {
@@ -567,6 +568,13 @@ export function initializePlanningChoices({ userRole }) {
   };
 
   const sanitizeChoiceNature = (nature) => (nature === 'bonus' ? 'bonus' : 'mauvaise');
+
+  const initializeSummaryLists = () => {
+    summaryLists.clear();
+    document.querySelectorAll('[data-summary-nature]').forEach((element) => {
+      summaryLists.set(sanitizeChoiceNature(element.dataset.summaryNature), element);
+    });
+  };
 
   const sanitizeChoiceIndex = (value) => {
     if (value == null || value === '') {
@@ -630,6 +638,39 @@ export function initializePlanningChoices({ userRole }) {
       acc[nature] = new Map();
       return acc;
     }, {});
+
+  const computeGroupedSelections = () => {
+    const groupedSelections = createEmptyChoiceGroups();
+
+    state.selections.forEach((selection, index) => {
+      selection.order = index + 1;
+      const nature = sanitizeChoiceNature(selection.nature);
+      selection.nature = nature;
+      const choiceIndex = selection.choiceIndex
+        ? sanitizeChoiceIndex(selection.choiceIndex)
+        : getActiveChoiceIndex(nature);
+      selection.choiceIndex = choiceIndex;
+      if (!groupedSelections[nature].has(choiceIndex)) {
+        groupedSelections[nature].set(choiceIndex, []);
+      }
+      groupedSelections[nature].get(choiceIndex).push(selection);
+    });
+
+    CHOICE_SERIES.forEach((nature) => {
+      groupedSelections[nature].forEach((list) => {
+        list.forEach((selection, position) => {
+          selection.choiceRank = position + 1;
+          selection.isPrimary = position === 0;
+          selection.choiceLabel = `${selection.choiceIndex}.${selection.choiceRank}`;
+        });
+      });
+    });
+
+    state.groupedSelections = groupedSelections;
+    return groupedSelections;
+  };
+
+  const getGroupedSelections = () => state.groupedSelections ?? computeGroupedSelections();
 
   const updateChoiceIndexButtons = (groupedSelections = null) => {
     const groups = groupedSelections ?? createEmptyChoiceGroups();
@@ -790,7 +831,7 @@ export function initializePlanningChoices({ userRole }) {
   };
 
   const updateSelectionVisuals = () => {
-    const groupedSelections = createEmptyChoiceGroups();
+    const groupedSelections = computeGroupedSelections();
 
     state.slotButtons.forEach((button) => {
       const tag = button.querySelector('.planning-assignment-tag');
@@ -814,30 +855,6 @@ export function initializePlanningChoices({ userRole }) {
       button.removeAttribute('data-choice-role');
       button.removeAttribute('data-choice-label');
       button.classList.remove('is-selected');
-    });
-
-    state.selections.forEach((selection, index) => {
-      selection.order = index + 1;
-      const nature = sanitizeChoiceNature(selection.nature);
-      selection.nature = nature;
-      const choiceIndex = selection.choiceIndex
-        ? sanitizeChoiceIndex(selection.choiceIndex)
-        : getActiveChoiceIndex(nature);
-      selection.choiceIndex = choiceIndex;
-      if (!groupedSelections[nature].has(choiceIndex)) {
-        groupedSelections[nature].set(choiceIndex, []);
-      }
-      groupedSelections[nature].get(choiceIndex).push(selection);
-    });
-
-    CHOICE_SERIES.forEach((nature) => {
-      groupedSelections[nature].forEach((list) => {
-        list.forEach((selection, position) => {
-          selection.choiceRank = position + 1;
-          selection.isPrimary = position === 0;
-          selection.choiceLabel = `${selection.choiceIndex}.${selection.choiceRank}`;
-        });
-      });
     });
 
     state.selections.forEach((selection) => {
@@ -880,36 +897,203 @@ export function initializePlanningChoices({ userRole }) {
   };
 
   const renderSummaryList = () => {
-    if (!summaryList) {
+    if (!summaryLists.size) {
+      updateSummaryFeedback();
       return;
     }
-    summaryList.innerHTML = '';
-    state.selections.forEach((selection) => {
-      const item = document.createElement('li');
-      item.className = 'summary-item';
-      item.draggable = true;
-      item.dataset.slotKey = selection.slotKey;
-      item.dataset.choiceIndex = String(selection.choiceIndex ?? CHOICE_INDEX_MIN);
-      item.dataset.choiceRank = String(selection.choiceRank ?? 1);
-      item.innerHTML = `
-        <div class="summary-item-order">${selection.choiceLabel ?? selection.order}</div>
-        <div class="summary-item-body">
-          <span class="summary-item-date">${formatSummaryLabel(selection)}</span>
-          <span class="summary-item-details">Col. ${selection.columnPosition} · ${
-        selection.columnLabel || selection.slotTypeCode || 'Créneau'
-      }</span>
-          <span class="summary-item-tags">
-            <span class="badge ${selection.nature === 'bonus' ? 'badge-success' : 'badge-warning'}">${
-        (selection.isPrimary ? '●' : '○') + ' ' + (selection.nature === 'bonus' ? 'Bonne' : 'Normale')
-      }</span>
-            <span class="badge">${selection.activityType}</span>
-          </span>
-        </div>
-        <button type="button" class="summary-item-remove" aria-label="Retirer ce choix">&times;</button>
-      `;
-      summaryList.appendChild(item);
+
+    const groupedSelections = getGroupedSelections();
+
+    summaryLists.forEach((list) => {
+      list.innerHTML = '';
     });
+
+    const buildActions = (selection, groupSize) => {
+      const actions = [];
+      if (!selection.isPrimary) {
+        actions.push(
+          '<button type="button" class="summary-item-action summary-item-make-primary">Définir comme principal</button>'
+        );
+      } else if (groupSize > 1) {
+        actions.push(
+          '<button type="button" class="summary-item-action summary-item-make-alternative">Définir comme alternative</button>'
+        );
+      }
+      actions.push(
+        '<button type="button" class="summary-item-remove" aria-label="Retirer ce choix"><span aria-hidden="true">&times;</span></button>'
+      );
+      return `<div class="summary-item-actions">${actions.join('')}</div>`;
+    };
+
+    CHOICE_SERIES.forEach((nature) => {
+      const list = summaryLists.get(nature);
+      if (!list) {
+        return;
+      }
+
+      const natureGroups = groupedSelections[nature] ?? new Map();
+      const sortedGroups = Array.from(natureGroups.entries())
+        .map(([choiceIndex, selections]) => ({
+          choiceIndex,
+          selections: selections.slice().sort((a, b) => (a.choiceRank ?? 0) - (b.choiceRank ?? 0)),
+          position: Math.min(
+            ...selections.map((selection) => selection.order ?? Number.MAX_SAFE_INTEGER)
+          )
+        }))
+        .sort((a, b) => a.position - b.position || a.choiceIndex - b.choiceIndex);
+
+      sortedGroups.forEach((group) => {
+        group.selections.forEach((selection) => {
+          const item = document.createElement('li');
+          item.className = 'summary-item';
+          item.classList.add(selection.isPrimary ? 'summary-item--primary' : 'summary-item--alternative');
+          item.draggable = true;
+          item.dataset.slotKey = selection.slotKey;
+          item.dataset.choiceIndex = String(selection.choiceIndex ?? CHOICE_INDEX_MIN);
+          item.dataset.choiceRank = String(selection.choiceRank ?? 1);
+          item.dataset.choiceRole = selection.isPrimary ? 'principal' : 'alternative';
+          item.dataset.summaryNature = selection.nature;
+          item.innerHTML = `
+            <div class="summary-item-order">${selection.choiceLabel ?? selection.order}</div>
+            <div class="summary-item-body">
+              <div class="summary-item-main">
+                <span class="summary-item-date">${formatSummaryLabel(selection)}</span>
+                <span class="summary-item-details">Col. ${selection.columnPosition} · ${
+            selection.columnLabel || selection.slotTypeCode || 'Créneau'
+          }</span>
+                <span class="summary-item-tags">
+                  <span class="badge ${
+                    selection.nature === 'bonus' ? 'badge-success' : 'badge-warning'
+                  }">${(selection.isPrimary ? '●' : '○') + ' ' + (selection.nature === 'bonus' ? 'Bonne' : 'Normale')}</span>
+                  <span class="badge">${selection.activityType}</span>
+                </span>
+              </div>
+              ${buildActions(selection, group.selections.length)}
+            </div>
+          `;
+          list.appendChild(item);
+        });
+      });
+
+      if (!list.children.length) {
+        const empty = document.createElement('li');
+        empty.className = 'summary-empty';
+        empty.textContent = 'Aucun créneau sélectionné.';
+        list.appendChild(empty);
+      }
+    });
+
     updateSummaryFeedback();
+  };
+
+  const reorderGroupWithinState = (nature, choiceIndex, orderedGroup) => {
+    const sanitizedNature = sanitizeChoiceNature(nature);
+    const sanitizedIndex = sanitizeChoiceIndex(choiceIndex);
+    const groupKey = `${sanitizedNature}:${sanitizedIndex}`;
+    const currentGroup = state.selections.filter(
+      (selection) =>
+        sanitizeChoiceNature(selection.nature) === sanitizedNature &&
+        sanitizeChoiceIndex(selection.choiceIndex) === sanitizedIndex
+    );
+    if (!currentGroup.length || currentGroup.length !== orderedGroup.length) {
+      return;
+    }
+    const orderedSet = new Set(orderedGroup);
+    if (currentGroup.some((selection) => !orderedSet.has(selection))) {
+      return;
+    }
+    const newSelections = [];
+    let inserted = false;
+    state.selections.forEach((selection) => {
+      const key = `${sanitizeChoiceNature(selection.nature)}:${sanitizeChoiceIndex(selection.choiceIndex)}`;
+      if (key === groupKey) {
+        if (!inserted) {
+          newSelections.push(...orderedGroup);
+          inserted = true;
+        }
+      } else {
+        newSelections.push(selection);
+      }
+    });
+    if (inserted && newSelections.length === state.selections.length) {
+      state.selections = newSelections;
+      refreshSelections();
+    }
+  };
+
+  const applySummaryListOrder = (nature) => {
+    const sanitizedNature = sanitizeChoiceNature(nature);
+    const list = summaryLists.get(sanitizedNature);
+    if (!list) {
+      return;
+    }
+    const orderedKeys = Array.from(list.querySelectorAll('.summary-item[data-slot-key]'))
+      .filter((item) => item.draggable)
+      .map((item) => item.dataset.slotKey)
+      .filter(Boolean);
+    const selectionsForNature = state.selections.filter(
+      (selection) => sanitizeChoiceNature(selection.nature) === sanitizedNature
+    );
+    if (!orderedKeys.length && selectionsForNature.length) {
+      return;
+    }
+    const orderedSelections = orderedKeys
+      .map((key) => state.selectionMap.get(key))
+      .filter(
+        (selection) => selection && sanitizeChoiceNature(selection.nature) === sanitizedNature
+      );
+    selectionsForNature.forEach((selection) => {
+      if (!orderedSelections.includes(selection)) {
+        orderedSelections.push(selection);
+      }
+    });
+    const newSelections = [];
+    CHOICE_SERIES.forEach((natureKey) => {
+      if (natureKey === sanitizedNature) {
+        newSelections.push(...orderedSelections);
+      } else {
+        state.selections.forEach((selection) => {
+          if (sanitizeChoiceNature(selection.nature) === natureKey) {
+            newSelections.push(selection);
+          }
+        });
+      }
+    });
+    if (newSelections.length === state.selections.length) {
+      state.selections = newSelections;
+      refreshSelections();
+    }
+  };
+
+  const setSelectionRole = (slotKey, role) => {
+    const selection = state.selectionMap.get(slotKey);
+    if (!selection) {
+      return;
+    }
+    const groupedSelections = getGroupedSelections();
+    const nature = sanitizeChoiceNature(selection.nature);
+    const choiceIndex = sanitizeChoiceIndex(selection.choiceIndex);
+    const group = groupedSelections[nature]?.get(choiceIndex);
+    if (!group || !group.length) {
+      return;
+    }
+    if (role === 'principal') {
+      if (selection.isPrimary) {
+        return;
+      }
+      const reordered = [selection, ...group.filter((item) => item.slotKey !== slotKey)];
+      reorderGroupWithinState(nature, choiceIndex, reordered);
+    } else if (role === 'alternative') {
+      if (!selection.isPrimary) {
+        return;
+      }
+      const alternatives = group.filter((item) => item.slotKey !== slotKey);
+      if (!alternatives.length) {
+        return;
+      }
+      const reordered = [...alternatives, selection];
+      reorderGroupWithinState(nature, choiceIndex, reordered);
+    }
   };
 
   const refreshSelections = () => {
@@ -1520,22 +1704,61 @@ export function initializePlanningChoices({ userRole }) {
     });
   }
 
-  if (summaryList) {
-    summaryList.addEventListener('click', (event) => {
-      const removeBtn = event.target.closest('.summary-item-remove');
-      if (!removeBtn) {
-        return;
-      }
+  initializeSummaryLists();
+
+  const handleSummaryClick = (event) => {
+    const removeBtn = event.target.closest('.summary-item-remove');
+    if (removeBtn) {
       const item = removeBtn.closest('.summary-item');
-      if (!item) {
+      if (!item || !item.dataset.slotKey) {
         return;
       }
-      const slotKey = item.dataset.slotKey;
-      removeSelection(slotKey);
+      removeSelection(item.dataset.slotKey);
+      return;
+    }
+    const makePrimaryBtn = event.target.closest('.summary-item-make-primary');
+    if (makePrimaryBtn) {
+      const item = makePrimaryBtn.closest('.summary-item');
+      if (!item || !item.dataset.slotKey) {
+        return;
+      }
+      setSelectionRole(item.dataset.slotKey, 'principal');
+      return;
+    }
+    const makeAlternativeBtn = event.target.closest('.summary-item-make-alternative');
+    if (makeAlternativeBtn) {
+      const item = makeAlternativeBtn.closest('.summary-item');
+      if (!item || !item.dataset.slotKey) {
+        return;
+      }
+      setSelectionRole(item.dataset.slotKey, 'alternative');
+    }
+  };
+
+  const getDragAfterElement = (container, y) => {
+    const draggableElements = Array.from(
+      container.querySelectorAll('.summary-item[data-slot-key]:not(.is-dragging)')
+    );
+    return draggableElements.reduce(
+      (closest, child) => {
+        const box = child.getBoundingClientRect();
+        const offset = y - box.top - box.height / 2;
+        if (offset < 0 && offset > closest.offset) {
+          return { offset, element: child };
+        }
+        return closest;
+      },
+      { offset: Number.NEGATIVE_INFINITY, element: null }
+    ).element;
+  };
+
+  summaryLists.forEach((list, nature) => {
+    list.addEventListener('click', (event) => {
+      handleSummaryClick(event);
     });
 
-    summaryList.addEventListener('dragstart', (event) => {
-      const item = event.target.closest('.summary-item');
+    list.addEventListener('dragstart', (event) => {
+      const item = event.target.closest('.summary-item[data-slot-key]');
       if (!item) {
         return;
       }
@@ -1544,58 +1767,32 @@ export function initializePlanningChoices({ userRole }) {
       item.classList.add('is-dragging');
     });
 
-    const getDragAfterElement = (container, y) => {
-      const draggableElements = [...container.querySelectorAll('.summary-item:not(.is-dragging)')];
-      return draggableElements.reduce(
-        (closest, child) => {
-          const box = child.getBoundingClientRect();
-          const offset = y - box.top - box.height / 2;
-          if (offset < 0 && offset > closest.offset) {
-            return { offset, element: child };
-          }
-          return closest;
-        },
-        { offset: Number.NEGATIVE_INFINITY, element: null }
-      ).element;
-    };
-
-    summaryList.addEventListener('dragover', (event) => {
+    list.addEventListener('dragover', (event) => {
       event.preventDefault();
-      const afterElement = getDragAfterElement(summaryList, event.clientY);
-      const dragging = summaryList.querySelector('.summary-item.is-dragging');
+      const afterElement = getDragAfterElement(list, event.clientY);
+      const dragging = list.querySelector('.summary-item.is-dragging');
       if (!dragging) {
         return;
       }
-      if (afterElement == null) {
-        summaryList.appendChild(dragging);
+      if (!afterElement) {
+        list.appendChild(dragging);
       } else {
-        summaryList.insertBefore(dragging, afterElement);
+        list.insertBefore(dragging, afterElement);
       }
     });
 
-    summaryList.addEventListener('drop', (event) => {
+    list.addEventListener('drop', (event) => {
       event.preventDefault();
     });
 
-    summaryList.addEventListener('dragend', () => {
-      const dragging = summaryList.querySelector('.summary-item.is-dragging');
+    list.addEventListener('dragend', () => {
+      const dragging = list.querySelector('.summary-item.is-dragging');
       if (dragging) {
         dragging.classList.remove('is-dragging');
       }
-      const orderedKeys = [...summaryList.querySelectorAll('.summary-item')].map((item) => item.dataset.slotKey);
-      const newSelections = [];
-      orderedKeys.forEach((key) => {
-        const selection = state.selectionMap.get(key);
-        if (selection) {
-          newSelections.push(selection);
-        }
-      });
-      if (newSelections.length === state.selections.length) {
-        state.selections = newSelections;
-        refreshSelections();
-      }
+      applySummaryListOrder(nature);
     });
-  }
+  });
 
   if (saveButton) {
     saveButton.addEventListener('click', () => {
