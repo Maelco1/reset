@@ -238,6 +238,11 @@ main {
   font-size: 0.9rem;
   font-weight: 600;
 }
+.planning-control-value {
+  font-size: 1rem;
+  font-weight: 500;
+  color: rgba(44, 62, 80, 0.85);
+}
 .planning-vision-control {
   grid-column: 1 / -1;
 }

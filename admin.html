@@ -32,6 +32,7 @@
             <p>Gérez les comptes grâce aux trigrammes de vos collaborateurs.</p>
           </div>
           <nav>
+            <button id="open-admin-settings" type="button">Paramètres administrateur</button>
             <button id="disconnect" class="secondary" type="button">Changer d'instance</button>
             <button id="logout" class="secondary" type="button">Se déconnecter</button>
           </nav>
@@ -54,20 +55,20 @@
 
             <nav class="planning-tabs" id="planning-tour-tabs" role="tablist" aria-label="Tours du planning"></nav>
 
-            <form id="planning-controls" class="planning-controls" aria-label="Filtres du planning">
+            <section id="planning-controls" class="planning-controls" aria-label="Paramètres du planning">
               <div class="planning-control">
-                <label for="planning-year">Année</label>
-                <select id="planning-year" name="year"></select>
+                <span class="planning-control-label">Année</span>
+                <span id="planning-year-display" class="planning-control-value">—</span>
               </div>
 
               <div class="planning-control">
-                <label for="planning-month-1">Mois 1</label>
-                <select id="planning-month-1" name="month-1"></select>
+                <span class="planning-control-label">Mois 1</span>
+                <span id="planning-month-1-display" class="planning-control-value">—</span>
               </div>
 
               <div class="planning-control">
-                <label for="planning-month-2">Mois 2</label>
-                <select id="planning-month-2" name="month-2"></select>
+                <span class="planning-control-label">Mois 2</span>
+                <span id="planning-month-2-display" class="planning-control-value">—</span>
               </div>
 
               <div class="planning-control planning-vision-control">
@@ -91,7 +92,7 @@
                   </button>
                 </div>
               </div>
-            </form>
+            </section>
 
             <div class="planning-layout">
               <div class="planning-board" id="planning-board" role="region" aria-labelledby="planning-title">
@@ -138,6 +139,65 @@
         </footer>
       </section>
     </main>
+
+    <div
+      id="admin-settings-modal"
+      class="modal-backdrop hidden"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="admin-settings-title"
+    >
+      <section class="modal admin-settings-modal">
+        <header class="modal-header">
+          <div>
+            <h2 id="admin-settings-title">Paramètres administrateur</h2>
+            <p>Configurez les paramètres généraux de l'administration.</p>
+          </div>
+          <button type="button" class="icon-button" id="close-admin-settings-modal" aria-label="Fermer">
+            &times;
+          </button>
+        </header>
+
+        <form id="admin-settings-form" class="compact-form">
+          <div class="form-grid">
+            <label for="active-tour-select">Tour actif</label>
+            <select id="active-tour-select" name="activeTour">
+              <option value="">Aucun tour actif</option>
+              <option value="1">Tour 1</option>
+              <option value="2">Tour 2</option>
+              <option value="3">Tour 3</option>
+              <option value="4">Tour 4</option>
+              <option value="5">Tour 5</option>
+              <option value="6">Tour 6</option>
+            </select>
+
+            <label for="planning-year">Année</label>
+            <select id="planning-year" name="planningYear"></select>
+
+            <label for="planning-month-1">Mois 1</label>
+            <select id="planning-month-1" name="planningMonthOne"></select>
+
+            <label for="planning-month-2">Mois 2</label>
+            <select id="planning-month-2" name="planningMonthTwo"></select>
+          </div>
+
+          <label for="admin-instructions">Consignes / commentaires</label>
+          <textarea
+            id="admin-instructions"
+            name="instructions"
+            rows="5"
+            placeholder="Ajouter des consignes pour le tour en cours"
+          ></textarea>
+
+          <p id="admin-settings-feedback" role="status"></p>
+
+          <div class="modal-actions">
+            <button type="submit">Enregistrer</button>
+            <button type="button" class="secondary" id="cancel-admin-settings">Fermer</button>
+          </div>
+        </form>
+      </section>
+    </div>
 
     <div id="user-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="user-modal-title">
       <section class="modal user-modal">
@@ -439,6 +499,7 @@
         { id: 5, label: 'Tour 5', table: 'planning_columns_tour5' },
         { id: 6, label: 'Tour 6', table: 'planning_columns_tour6' }
       ];
+      const ADMIN_SETTINGS_TABLE = 'parametres_administratifs';
 
       let selectedTourId = PLANNING_TOURS[0].id;
 
@@ -499,6 +560,17 @@
       const planningYearSelect = document.querySelector('#planning-year');
       const planningMonthOneSelect = document.querySelector('#planning-month-1');
       const planningMonthTwoSelect = document.querySelector('#planning-month-2');
+      const planningYearDisplay = document.querySelector('#planning-year-display');
+      const planningMonthOneDisplay = document.querySelector('#planning-month-1-display');
+      const planningMonthTwoDisplay = document.querySelector('#planning-month-2-display');
+      const adminSettingsBtn = document.querySelector('#open-admin-settings');
+      const adminSettingsModal = document.querySelector('#admin-settings-modal');
+      const closeAdminSettingsBtn = document.querySelector('#close-admin-settings-modal');
+      const cancelAdminSettingsBtn = document.querySelector('#cancel-admin-settings');
+      const adminSettingsForm = document.querySelector('#admin-settings-form');
+      const adminSettingsFeedback = document.querySelector('#admin-settings-feedback');
+      const activeTourSelect = document.querySelector('#active-tour-select');
+      const adminInstructionsField = document.querySelector('#admin-instructions');
       const planningConfigContainer = document.querySelector('#planning-config');
       const planningTables = document.querySelector('#planning-tables');
       const planningFeedback = document.querySelector('#planning-feedback');
@@ -509,6 +581,8 @@
         bonus: planningVisionBonus
       };
 
+      let adminSettingsRecordId = null;
+      let administrativeSettings = null;
       let planningCellSizingFrame = null;
       let planningStickyHeaderFrame = null;
       let activePlanningVision = null;
@@ -1428,21 +1502,162 @@
         return table;
       };
 
-      const populatePlanningControls = () => {
+      const sanitizeActiveTour = (value) => {
+        if (value == null || value === '') {
+          return null;
+        }
+        const numeric = Number(value);
+        if (!Number.isInteger(numeric)) {
+          return null;
+        }
+        if (numeric < 1 || numeric > PLANNING_TOURS.length) {
+          return null;
+        }
+        return numeric;
+      };
+
+      const populatePlanningControls = (defaults = {}) => {
         if (!planningYearSelect || !planningMonthOneSelect || !planningMonthTwoSelect) {
           return;
         }
+        const { year, monthOne, monthTwo } = defaults;
         const now = new Date();
         const currentYear = now.getFullYear();
-        const years = [currentYear - 1, currentYear, currentYear + 1];
-        planningYearSelect.innerHTML = years.map((year) => `<option value="${year}">${year}</option>`).join('');
-        planningYearSelect.value = String(currentYear);
+        const years = new Set();
+        for (let delta = -2; delta <= 2; delta += 1) {
+          years.add(currentYear + delta);
+        }
+        if (Number.isInteger(year)) {
+          years.add(year);
+          years.add(year - 1);
+          years.add(year + 1);
+        }
+        const sortedYears = [...years].sort((a, b) => a - b);
+        planningYearSelect.innerHTML = sortedYears
+          .map((candidate) => `<option value="${candidate}">${candidate}</option>`)
+          .join('');
+        if (Number.isInteger(year)) {
+          planningYearSelect.value = String(year);
+        } else {
+          planningYearSelect.value = String(currentYear);
+        }
 
         const options = MONTH_NAMES.map((name, index) => `<option value="${index}">${name}</option>`).join('');
         planningMonthOneSelect.innerHTML = options;
         planningMonthTwoSelect.innerHTML = options;
-        planningMonthOneSelect.value = String(now.getMonth());
-        planningMonthTwoSelect.value = String((now.getMonth() + 1) % 12);
+
+        if (Number.isInteger(monthOne) && monthOne >= 0 && monthOne < MONTH_NAMES.length) {
+          planningMonthOneSelect.value = String(monthOne);
+        } else {
+          planningMonthOneSelect.value = String(now.getMonth());
+        }
+
+        if (Number.isInteger(monthTwo) && monthTwo >= 0 && monthTwo < MONTH_NAMES.length) {
+          planningMonthTwoSelect.value = String(monthTwo);
+        } else {
+          planningMonthTwoSelect.value = String((now.getMonth() + 1) % 12);
+        }
+      };
+
+      const updatePlanningSummary = () => {
+        if (planningYearDisplay) {
+          const selectedYearOption = planningYearSelect?.selectedOptions?.[0];
+          if (selectedYearOption) {
+            planningYearDisplay.textContent = selectedYearOption.textContent ?? '—';
+          } else {
+            planningYearDisplay.textContent = planningYearSelect?.value ?? '—';
+          }
+        }
+
+        const getMonthLabel = (select) => {
+          if (!select) {
+            return '—';
+          }
+          const numeric = Number.parseInt(select.value, 10);
+          if (Number.isInteger(numeric) && numeric >= 0 && numeric < MONTH_NAMES.length) {
+            return MONTH_NAMES[numeric];
+          }
+          return '—';
+        };
+
+        if (planningMonthOneDisplay) {
+          planningMonthOneDisplay.textContent = getMonthLabel(planningMonthOneSelect);
+        }
+        if (planningMonthTwoDisplay) {
+          planningMonthTwoDisplay.textContent = getMonthLabel(planningMonthTwoSelect);
+        }
+      };
+
+      const applyAdministrativeSettings = (settings, { updateTour = true } = {}) => {
+        administrativeSettings = settings ? { ...settings } : null;
+        const defaults = {
+          year: administrativeSettings?.planning_year ?? null,
+          monthOne: administrativeSettings?.planning_month_one ?? null,
+          monthTwo: administrativeSettings?.planning_month_two ?? null
+        };
+        populatePlanningControls(defaults);
+
+        const sanitizedActiveTour = sanitizeActiveTour(administrativeSettings?.active_tour);
+        if (activeTourSelect) {
+          activeTourSelect.value = sanitizedActiveTour ? String(sanitizedActiveTour) : '';
+        }
+        if (adminInstructionsField) {
+          adminInstructionsField.value = administrativeSettings?.instructions ?? '';
+        }
+
+        if (updateTour) {
+          if (sanitizedActiveTour) {
+            selectedTourId = sanitizedActiveTour;
+          } else if (!PLANNING_TOURS.some((tour) => tour.id === selectedTourId)) {
+            selectedTourId = PLANNING_TOURS[0].id;
+          }
+        }
+
+        updatePlanningSummary();
+        return { sanitizedActiveTour };
+      };
+
+      const fetchAdministrativeSettings = async () => {
+        await onSupabaseReady();
+        const supabase = getSupabaseClient();
+        if (!supabase) {
+          return null;
+        }
+        const { data, error } = await supabase
+          .from(ADMIN_SETTINGS_TABLE)
+          .select('id, active_tour, instructions, planning_year, planning_month_one, planning_month_two')
+          .order('id', { ascending: true })
+          .limit(1);
+        if (error) {
+          console.error(error);
+          return null;
+        }
+        if (!data || data.length === 0) {
+          return null;
+        }
+        return data[0];
+      };
+
+      const openAdminSettingsModal = () => {
+        if (!adminSettingsModal) {
+          return;
+        }
+        if (adminSettingsFeedback) {
+          adminSettingsFeedback.textContent = '';
+        }
+        applyAdministrativeSettings(administrativeSettings, { updateTour: false });
+        adminSettingsModal.classList.remove('hidden');
+      };
+
+      const closeAdminSettingsModal = () => {
+        if (!adminSettingsModal) {
+          return;
+        }
+        adminSettingsModal.classList.add('hidden');
+        if (adminSettingsFeedback) {
+          adminSettingsFeedback.textContent = '';
+        }
+        applyAdministrativeSettings(administrativeSettings, { updateTour: false });
       };
 
       const renderPlanningConfig = () => {
@@ -2033,6 +2248,116 @@
         }
       });
 
+      if (adminSettingsBtn) {
+        adminSettingsBtn.addEventListener('click', openAdminSettingsModal);
+      }
+
+      if (closeAdminSettingsBtn) {
+        closeAdminSettingsBtn.addEventListener('click', closeAdminSettingsModal);
+      }
+
+      if (cancelAdminSettingsBtn) {
+        cancelAdminSettingsBtn.addEventListener('click', closeAdminSettingsModal);
+      }
+
+      if (adminSettingsModal) {
+        adminSettingsModal.addEventListener('click', (event) => {
+          if (event.target === adminSettingsModal) {
+            closeAdminSettingsModal();
+          }
+        });
+      }
+
+      if (adminSettingsForm) {
+        adminSettingsForm.addEventListener('submit', async (event) => {
+          event.preventDefault();
+          if (adminSettingsFeedback) {
+            adminSettingsFeedback.textContent = '';
+          }
+
+          await onSupabaseReady();
+          const supabase = getSupabaseClient();
+          if (!supabase) {
+            if (adminSettingsFeedback) {
+              adminSettingsFeedback.textContent = 'Connexion à Supabase requise.';
+            }
+            return;
+          }
+
+          const formData = new FormData(adminSettingsForm);
+          const activeTourValue = formData.get('activeTour');
+          const sanitizedActive = sanitizeActiveTour(activeTourValue);
+          const instructionsRaw = formData.get('instructions');
+          const trimmedInstructions =
+            typeof instructionsRaw === 'string' ? instructionsRaw.trim() : '';
+          const parsedYear = Number.parseInt(formData.get('planningYear'), 10);
+          const parsedMonthOne = Number.parseInt(formData.get('planningMonthOne'), 10);
+          const parsedMonthTwo = Number.parseInt(formData.get('planningMonthTwo'), 10);
+
+          const payload = {
+            active_tour: sanitizedActive,
+            instructions: trimmedInstructions ? trimmedInstructions : null,
+            planning_year: Number.isInteger(parsedYear) ? parsedYear : null,
+            planning_month_one:
+              Number.isInteger(parsedMonthOne) && parsedMonthOne >= 0 && parsedMonthOne < MONTH_NAMES.length
+                ? parsedMonthOne
+                : null,
+            planning_month_two:
+              Number.isInteger(parsedMonthTwo) && parsedMonthTwo >= 0 && parsedMonthTwo < MONTH_NAMES.length
+                ? parsedMonthTwo
+                : null
+          };
+
+          if (adminSettingsRecordId) {
+            payload.id = adminSettingsRecordId;
+          }
+
+          const { data, error } = await supabase
+            .from(ADMIN_SETTINGS_TABLE)
+            .upsert(payload, { onConflict: 'id' })
+            .select(
+              'id, active_tour, instructions, planning_year, planning_month_one, planning_month_two'
+            )
+            .single();
+
+          if (error) {
+            console.error(error);
+            if (adminSettingsFeedback) {
+              adminSettingsFeedback.textContent = "Impossible d'enregistrer les paramètres.";
+            }
+            return;
+          }
+
+          if (!data) {
+            if (adminSettingsFeedback) {
+              adminSettingsFeedback.textContent = "Impossible d'enregistrer les paramètres.";
+            }
+            return;
+          }
+
+          adminSettingsRecordId = data.id ?? null;
+          const previousTourId = selectedTourId;
+          const sanitizedActiveTour = sanitizeActiveTour(data.active_tour);
+          if (sanitizedActiveTour && sanitizedActiveTour !== previousTourId) {
+            await selectPlanningTour(sanitizedActiveTour);
+          }
+
+          applyAdministrativeSettings(data);
+          renderPlanningTourTabs();
+          renderPlanningTables();
+
+          if (adminSettingsFeedback) {
+            adminSettingsFeedback.textContent = 'Paramètres enregistrés.';
+          }
+        });
+
+        adminSettingsForm.addEventListener('input', () => {
+          if (adminSettingsFeedback) {
+            adminSettingsFeedback.textContent = '';
+          }
+        });
+      }
+
       const closeSlotModal = () => {
         editingSlot = null;
         if (slotForm) {
@@ -2350,6 +2675,9 @@
           if (!userModal.classList.contains('hidden')) {
             closeUserModal();
           }
+          if (adminSettingsModal && !adminSettingsModal.classList.contains('hidden')) {
+            closeAdminSettingsModal();
+          }
           if (slotModal && !slotModal.classList.contains('hidden')) {
             closeSlotModal();
           }
@@ -2453,18 +2781,31 @@
       });
       updatePlanningVisionButtons();
 
-      if (planningYearSelect && planningMonthOneSelect && planningMonthTwoSelect) {
-        populatePlanningControls();
-        [planningYearSelect, planningMonthOneSelect, planningMonthTwoSelect].forEach((select) => {
-          select.addEventListener('change', renderPlanningTables);
-        });
-      }
+      const initializeAdminPage = async () => {
+        applyAdministrativeSettings(null);
 
-      renderPlanningTourTabs();
-      loadUsers();
-      loadPlanningColumns();
-      subscribeToUserChanges();
-      subscribeToPlanningChanges();
+        let settings = null;
+        try {
+          settings = await fetchAdministrativeSettings();
+        } catch (error) {
+          console.error(error);
+        }
+
+        if (settings) {
+          adminSettingsRecordId = settings.id ?? null;
+          applyAdministrativeSettings(settings);
+        }
+
+        renderPlanningTourTabs();
+        renderPlanningTables();
+
+        loadUsers();
+        loadPlanningColumns();
+        subscribeToUserChanges();
+        subscribeToPlanningChanges();
+      };
+
+      initializeAdminPage();
 
       window.addEventListener('beforeunload', () => {
         usersChannel?.unsubscribe();
