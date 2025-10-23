@@ -410,20 +410,24 @@ const sanitizeActiveTour = (value) => {
 };
 
 const ensurePlanningColumns = async (supabase, slots, tableName) => {
-  const missing = [];
+  const missingPositions = [];
   for (let position = 1; position <= 46; position += 1) {
     if (!slots.some((slot) => slot.position === position)) {
-      missing.push(getDefaultSlot(position));
+      missingPositions.push(position);
     }
   }
-  if (missing.length === 0) {
+  if (missingPositions.length === 0) {
     return slots;
   }
-  const { error } = await supabase.from(tableName).upsert(missing, { onConflict: 'position' });
+
+  const missingDefaults = missingPositions.map((position) => getDefaultSlot(position));
+
+  const { error } = await supabase.from(tableName).upsert(missingDefaults, { onConflict: 'position' });
   if (error) {
     console.error(error);
-    return slots;
+    return [...slots, ...missingDefaults];
   }
+
   const { data, error: reloadError } = await supabase
     .from(tableName)
     .select(
@@ -448,9 +452,9 @@ const ensurePlanningColumns = async (supabase, slots, tableName) => {
     .order('position');
   if (reloadError) {
     console.error(reloadError);
-    return slots;
+    return [...slots, ...missingDefaults];
   }
-  return data ?? slots;
+  return data ?? [...slots, ...missingDefaults];
 };
 
 const getActivityType = (category) => ACTIVITY_TYPES.get(category) ?? 'visite';
