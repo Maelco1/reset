@@ -507,12 +507,98 @@ export function initializePlanningChoices({ userRole }) {
     ])
   );
   const summaryLists = new Map();
-  CHOICE_SERIES.forEach((nature) => {
-    const list = document.querySelector(`[data-summary-list="${nature}"]`);
-    if (list) {
-      summaryLists.set(nature, list);
+  const summaryCard = document.querySelector('.summary-card');
+  let summaryColumnsContainer = summaryCard?.querySelector('.summary-columns') ?? null;
+
+  const normalizeSummaryListNature = (value) => {
+    if (!value) {
+      return null;
     }
-  });
+    const normalized = value.toString().trim().toLowerCase();
+    if (!normalized) {
+      return null;
+    }
+    if (['bonus', 'bonne', 'bonnes', 'good', 'goodes'].includes(normalized)) {
+      return 'bonus';
+    }
+    if (
+      [
+        'mauvaise',
+        'mauvaises',
+        'normale',
+        'normales',
+        'normal',
+        'normaux',
+        'standard'
+      ].includes(normalized)
+    ) {
+      return 'mauvaise';
+    }
+    return CHOICE_SERIES.includes(normalized) ? normalized : null;
+  };
+
+  const registerSummaryList = (element, natureHint = null) => {
+    if (!element) {
+      return null;
+    }
+    const nature = normalizeSummaryListNature(natureHint ?? element.dataset.summaryList);
+    if (!nature) {
+      return null;
+    }
+    element.dataset.summaryList = nature;
+    if (!summaryLists.has(nature)) {
+      summaryLists.set(nature, element);
+    }
+    return nature;
+  };
+
+  document
+    .querySelectorAll('[data-summary-list]')
+    .forEach((element) => registerSummaryList(element));
+
+  const ensureSummaryColumns = () => {
+    if (!summaryCard) {
+      return;
+    }
+    if (!summaryColumnsContainer) {
+      summaryColumnsContainer = document.createElement('div');
+      summaryColumnsContainer.className = 'summary-columns';
+      summaryCard.appendChild(summaryColumnsContainer);
+    }
+    CHOICE_SERIES.forEach((nature) => {
+      if (summaryLists.has(nature)) {
+        return;
+      }
+      const column = document.createElement('section');
+      column.className = 'summary-column';
+      column.dataset.summaryNature = nature;
+      const header = document.createElement('header');
+      header.className = 'summary-column-header';
+      const heading = document.createElement('h4');
+      heading.textContent = CHOICE_SERIES_LABELS.get(nature) ?? nature;
+      header.appendChild(heading);
+      column.appendChild(header);
+      const list = document.createElement('ul');
+      list.className = 'summary-list';
+      list.dataset.summaryList = nature;
+      column.appendChild(list);
+      summaryColumnsContainer.appendChild(column);
+      summaryLists.set(nature, list);
+    });
+
+    const orderedColumns = Array.from(summaryColumnsContainer.querySelectorAll('.summary-column'));
+    orderedColumns
+      .sort((a, b) => {
+        const aIndex = CHOICE_SERIES.indexOf(sanitizeChoiceNature(a.dataset.summaryNature));
+        const bIndex = CHOICE_SERIES.indexOf(sanitizeChoiceNature(b.dataset.summaryNature));
+        return aIndex - bIndex;
+      })
+      .forEach((column) => {
+        summaryColumnsContainer.appendChild(column);
+      });
+  };
+
+  ensureSummaryColumns();
   const summaryFeedback = document.querySelector('#summary-feedback');
   const saveButton = document.querySelector('#save-choices');
   const saveFeedback = document.querySelector('#save-feedback');
