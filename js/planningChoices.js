@@ -116,6 +116,17 @@ const ACTIVITY_TYPES = new Map([
 ]);
 
 const USER_TYPE_LABELS = new Set(['medecin', 'remplacant']);
+const CHOICE_SERIES = ['mauvaise', 'bonus'];
+const CHOICE_SERIES_LABELS = new Map([
+  ['mauvaise', 'Mauvaises gardes'],
+  ['bonus', 'Gardes bonus']
+]);
+const CHOICE_SERIES_STEPS = new Map([
+  ['mauvaise', 1],
+  ['bonus', 2]
+]);
+const CHOICE_INDEX_MIN = 1;
+const CHOICE_INDEX_MAX = 20;
 
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
 
@@ -512,6 +523,10 @@ export function initializePlanningChoices({ userRole }) {
     selectionMap: new Map(),
     selections: [],
     selectionMode: 'mauvaise',
+    choiceSeries: {
+      mauvaise: { activeIndex: CHOICE_INDEX_MIN, buttons: new Map(), container: null },
+      bonus: { activeIndex: CHOICE_INDEX_MIN, buttons: new Map(), container: null }
+    },
     currentStep: 1,
     selectedTourId: PLANNING_TOURS[0].id,
     planningYear: new Date().getFullYear(),
@@ -551,6 +566,202 @@ export function initializePlanningChoices({ userRole }) {
     host.appendChild(planningSection);
   };
 
+  const sanitizeChoiceNature = (nature) => (nature === 'bonus' ? 'bonus' : 'mauvaise');
+
+  const sanitizeChoiceIndex = (value) => {
+    if (value == null || value === '') {
+      return CHOICE_INDEX_MIN;
+    }
+    const numeric = Number.parseInt(value, 10);
+    if (Number.isNaN(numeric)) {
+      return CHOICE_INDEX_MIN;
+    }
+    return clamp(numeric, CHOICE_INDEX_MIN, CHOICE_INDEX_MAX);
+  };
+
+  const sanitizeChoiceRank = (value) => {
+    if (value == null || value === '') {
+      return 1;
+    }
+    const numeric = Number.parseInt(value, 10);
+    if (!Number.isFinite(numeric) || numeric < 1) {
+      return 1;
+    }
+    return numeric;
+  };
+
+  const getChoiceSeries = (nature) => state.choiceSeries[sanitizeChoiceNature(nature)];
+
+  const getActiveChoiceIndex = (nature) => {
+    const series = getChoiceSeries(nature);
+    return sanitizeChoiceIndex(series?.activeIndex);
+  };
+
+  const updateChoiceIndexActiveState = (nature) => {
+    const series = getChoiceSeries(nature);
+    if (!series) {
+      return;
+    }
+    const activeIndex = sanitizeChoiceIndex(series.activeIndex);
+    series.buttons.forEach((button, key) => {
+      const indexNumber = sanitizeChoiceIndex(key);
+      const isActive = indexNumber === activeIndex;
+      button.classList.toggle('is-active', isActive);
+      button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+    });
+  };
+
+  const setActiveChoiceIndex = (nature, index) => {
+    const series = getChoiceSeries(nature);
+    if (!series) {
+      return;
+    }
+    const sanitizedIndex = sanitizeChoiceIndex(index);
+    if (series.activeIndex === sanitizedIndex) {
+      updateChoiceIndexActiveState(nature);
+      return;
+    }
+    series.activeIndex = sanitizedIndex;
+    updateChoiceIndexActiveState(nature);
+  };
+
+  const createEmptyChoiceGroups = () =>
+    CHOICE_SERIES.reduce((acc, nature) => {
+      acc[nature] = new Map();
+      return acc;
+    }, {});
+
+  const updateChoiceIndexButtons = (groupedSelections = null) => {
+    const groups = groupedSelections ?? createEmptyChoiceGroups();
+    CHOICE_SERIES.forEach((nature) => {
+      const series = getChoiceSeries(nature);
+      if (!series) {
+        return;
+      }
+      const natureGroups = groups[nature] ?? new Map();
+      if (!groups[nature]) {
+        groups[nature] = natureGroups;
+      }
+      for (let index = CHOICE_INDEX_MIN; index <= CHOICE_INDEX_MAX; index += 1) {
+        const button = series.buttons.get(index);
+        if (!button) {
+          continue;
+        }
+        const entries = natureGroups.get(index) ?? [];
+        const hasPrimary = entries.length > 0;
+        const alternativeCount = Math.max(0, entries.length - 1);
+        button.classList.toggle('has-selection', hasPrimary || alternativeCount > 0);
+        button.dataset.hasPrimary = hasPrimary ? 'true' : 'false';
+        button.dataset.alternativeCount = String(alternativeCount);
+        const indicator = button.querySelector('.choice-index-indicator');
+        if (indicator) {
+          if (!hasPrimary && alternativeCount === 0) {
+            indicator.textContent = '';
+          } else if (alternativeCount <= 3) {
+            const alternatives = alternativeCount > 0 ? '○'.repeat(alternativeCount) : '';
+            indicator.textContent = `${hasPrimary ? '●' : ''}${alternatives}`;
+          } else {
+            indicator.textContent = `${hasPrimary ? '● ' : ''}${alternativeCount}×○`;
+          }
+        }
+        const sr = button.querySelector('.sr-only');
+        if (sr) {
+          const parts = [`Choix ${index}`];
+          if (!hasPrimary && alternativeCount === 0) {
+            parts.push('aucun créneau sélectionné');
+          } else {
+            parts.push(hasPrimary ? 'principal sélectionné' : 'aucun principal');
+            parts.push(
+              alternativeCount > 0
+                ? `${alternativeCount} alternative${alternativeCount > 1 ? 's' : ''}`
+                : 'aucune alternative'
+            );
+          }
+          sr.textContent = parts.join(', ');
+        }
+      }
+      updateChoiceIndexActiveState(nature);
+    });
+  };
+
+  const createChoiceIndexControls = (nature) => {
+    const series = getChoiceSeries(nature);
+    if (!series) {
+      return null;
+    }
+    series.buttons = new Map();
+    const container = document.createElement('section');
+    container.className = 'choice-index-panel';
+    container.dataset.choiceNature = nature;
+
+    const title = document.createElement('h3');
+    title.className = 'choice-index-title';
+    title.textContent = `Numérotation des choix — ${CHOICE_SERIES_LABELS.get(nature) ?? nature}`;
+    container.appendChild(title);
+
+    const description = document.createElement('p');
+    description.className = 'choice-index-description';
+    description.textContent = "Choisissez le numéro de choix actif puis cliquez sur les créneaux pour l'associer.";
+    container.appendChild(description);
+
+    const grid = document.createElement('div');
+    grid.className = 'choice-index-grid';
+    grid.setAttribute(
+      'aria-label',
+      `Sélection du numéro de choix pour ${(
+        CHOICE_SERIES_LABELS.get(nature) ?? nature
+      ).toLowerCase()}`
+    );
+    grid.setAttribute('role', 'group');
+
+    for (let index = CHOICE_INDEX_MIN; index <= CHOICE_INDEX_MAX; index += 1) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'choice-index-button';
+      button.dataset.choiceIndex = String(index);
+      button.innerHTML = `
+        <span class="choice-index-number">${index}</span>
+        <span class="choice-index-indicator" aria-hidden="true"></span>
+        <span class="sr-only">Choix ${index}</span>
+      `;
+      grid.appendChild(button);
+      series.buttons.set(index, button);
+    }
+
+    grid.addEventListener('click', (event) => {
+      const button = event.target.closest('.choice-index-button');
+      if (!button || !grid.contains(button)) {
+        return;
+      }
+      const index = Number.parseInt(button.dataset.choiceIndex ?? '', 10);
+      if (Number.isNaN(index)) {
+        return;
+      }
+      setActiveChoiceIndex(nature, index);
+    });
+
+    container.appendChild(grid);
+    return container;
+  };
+
+  const initializeChoiceSelectors = () => {
+    CHOICE_SERIES.forEach((nature) => {
+      const step = CHOICE_SERIES_STEPS.get(nature);
+      const host = stepHosts.get(step);
+      if (!host) {
+        return;
+      }
+      const container = createChoiceIndexControls(nature);
+      if (!container) {
+        return;
+      }
+      state.choiceSeries[sanitizeChoiceNature(nature)].container = container;
+      host.prepend(container);
+      updateChoiceIndexActiveState(nature);
+    });
+    updateChoiceIndexButtons();
+  };
+
   const updateStepperButtons = () => {
     stepperButtons.forEach((button) => {
       const step = Number.parseInt(button.dataset.step, 10);
@@ -579,6 +790,8 @@ export function initializePlanningChoices({ userRole }) {
   };
 
   const updateSelectionVisuals = () => {
+    const groupedSelections = createEmptyChoiceGroups();
+
     state.slotButtons.forEach((button) => {
       const tag = button.querySelector('.planning-assignment-tag');
       const roleLabel = button.querySelector('.planning-assignment-role');
@@ -596,11 +809,38 @@ export function initializePlanningChoices({ userRole }) {
       }
       button.removeAttribute('data-choice-order');
       button.removeAttribute('data-choice-type');
+      button.removeAttribute('data-choice-rank');
+      button.removeAttribute('data-choice-index');
+      button.removeAttribute('data-choice-role');
+      button.removeAttribute('data-choice-label');
       button.classList.remove('is-selected');
     });
 
     state.selections.forEach((selection, index) => {
       selection.order = index + 1;
+      const nature = sanitizeChoiceNature(selection.nature);
+      selection.nature = nature;
+      const choiceIndex = selection.choiceIndex
+        ? sanitizeChoiceIndex(selection.choiceIndex)
+        : getActiveChoiceIndex(nature);
+      selection.choiceIndex = choiceIndex;
+      if (!groupedSelections[nature].has(choiceIndex)) {
+        groupedSelections[nature].set(choiceIndex, []);
+      }
+      groupedSelections[nature].get(choiceIndex).push(selection);
+    });
+
+    CHOICE_SERIES.forEach((nature) => {
+      groupedSelections[nature].forEach((list) => {
+        list.forEach((selection, position) => {
+          selection.choiceRank = position + 1;
+          selection.isPrimary = position === 0;
+          selection.choiceLabel = `${selection.choiceIndex}.${selection.choiceRank}`;
+        });
+      });
+    });
+
+    state.selections.forEach((selection) => {
       const button = selection.button;
       if (!button) {
         return;
@@ -608,23 +848,35 @@ export function initializePlanningChoices({ userRole }) {
       const tag = button.querySelector('.planning-assignment-tag');
       const roleLabel = button.querySelector('.planning-assignment-role');
       const srLabel = button.querySelector('.sr-only');
+      const choiceLabel = selection.choiceLabel ?? String(selection.order);
       if (tag) {
-        tag.textContent = String(selection.order);
+        tag.textContent = choiceLabel;
         tag.classList.remove('is-empty');
       }
       if (roleLabel) {
-        roleLabel.textContent = selection.nature === 'bonus' ? 'Bonus' : 'Mauvaise';
+        const bullet = selection.isPrimary ? '●' : '○';
+        const natureLabel = selection.nature === 'bonus' ? 'Bonus' : 'Mauvaise';
+        roleLabel.textContent = `${bullet} ${natureLabel}`;
         roleLabel.classList.remove('is-empty');
       }
       if (srLabel) {
+        const roleDescription = selection.isPrimary
+          ? 'principal'
+          : `alternative ${selection.choiceRank - 1}`;
         srLabel.textContent = selection.summary
-          ? `${selection.summary} · Choix ${selection.order}`
-          : `Choix ${selection.order}`;
+          ? `${selection.summary} · Choix ${choiceLabel} (${roleDescription})`
+          : `Choix ${choiceLabel} (${roleDescription})`;
       }
-      button.dataset.choiceOrder = String(selection.order);
+      button.dataset.choiceOrder = choiceLabel;
       button.dataset.choiceType = selection.nature;
+      button.dataset.choiceRank = String(selection.choiceRank ?? 1);
+      button.dataset.choiceIndex = String(selection.choiceIndex ?? CHOICE_INDEX_MIN);
+      button.dataset.choiceRole = selection.isPrimary ? 'principal' : 'alternative';
+      button.dataset.choiceLabel = choiceLabel;
       button.classList.add('is-selected');
     });
+
+    updateChoiceIndexButtons(groupedSelections);
   };
 
   const renderSummaryList = () => {
@@ -637,8 +889,10 @@ export function initializePlanningChoices({ userRole }) {
       item.className = 'summary-item';
       item.draggable = true;
       item.dataset.slotKey = selection.slotKey;
+      item.dataset.choiceIndex = String(selection.choiceIndex ?? CHOICE_INDEX_MIN);
+      item.dataset.choiceRank = String(selection.choiceRank ?? 1);
       item.innerHTML = `
-        <div class="summary-item-order">${selection.order}</div>
+        <div class="summary-item-order">${selection.choiceLabel ?? selection.order}</div>
         <div class="summary-item-body">
           <span class="summary-item-date">${formatSummaryLabel(selection)}</span>
           <span class="summary-item-details">Col. ${selection.columnPosition} · ${
@@ -646,7 +900,7 @@ export function initializePlanningChoices({ userRole }) {
       }</span>
           <span class="summary-item-tags">
             <span class="badge ${selection.nature === 'bonus' ? 'badge-success' : 'badge-warning'}">${
-        selection.nature === 'bonus' ? 'Bonus' : 'Mauvaise'
+        (selection.isPrimary ? '●' : '○') + ' ' + (selection.nature === 'bonus' ? 'Bonus' : 'Mauvaise')
       }</span>
             <span class="badge">${selection.activityType}</span>
           </span>
@@ -783,6 +1037,8 @@ export function initializePlanningChoices({ userRole }) {
     state.selectionMode = step === 1 ? 'mauvaise' : step === 2 ? 'bonus' : null;
     updateStepperButtons();
     updateStepPanes();
+    updateChoiceIndexActiveState('mauvaise');
+    updateChoiceIndexActiveState('bonus');
     if (step <= 2) {
       movePlanningSectionToStep(step);
       planningSection.classList.remove('hidden');
@@ -808,6 +1064,8 @@ export function initializePlanningChoices({ userRole }) {
       return;
     }
     const selection = createSelectionFromButton(button, state.selectionMode);
+    selection.nature = sanitizeChoiceNature(selection.nature);
+    selection.choiceIndex = getActiveChoiceIndex(selection.nature);
     addSelection(selection);
   };
   const buildPlanningTable = (year, month) => {
@@ -1196,6 +1454,8 @@ export function initializePlanningChoices({ userRole }) {
       guard_nature: selection.nature,
       activity_type: selection.activityType,
       choice_order: index + 1,
+      choice_index: sanitizeChoiceIndex(selection.choiceIndex),
+      choice_rank: sanitizeChoiceRank(selection.choiceRank),
       tour_number: state.selectedTourId,
       planning_reference: state.planningReference,
       is_active: true,
@@ -1361,5 +1621,6 @@ export function initializePlanningChoices({ userRole }) {
     setStep(1);
   };
 
+  initializeChoiceSelectors();
   initialize();
 }
