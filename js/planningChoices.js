@@ -410,24 +410,20 @@ const sanitizeActiveTour = (value) => {
 };
 
 const ensurePlanningColumns = async (supabase, slots, tableName) => {
-  const missingPositions = [];
+  const missing = [];
   for (let position = 1; position <= 46; position += 1) {
     if (!slots.some((slot) => slot.position === position)) {
-      missingPositions.push(position);
+      missing.push(getDefaultSlot(position));
     }
   }
-  if (missingPositions.length === 0) {
+  if (missing.length === 0) {
     return slots;
   }
-
-  const missingDefaults = missingPositions.map((position) => getDefaultSlot(position));
-
-  const { error } = await supabase.from(tableName).upsert(missingDefaults, { onConflict: 'position' });
+  const { error } = await supabase.from(tableName).upsert(missing, { onConflict: 'position' });
   if (error) {
     console.error(error);
-    return [...slots, ...missingDefaults];
+    return slots;
   }
-
   const { data, error: reloadError } = await supabase
     .from(tableName)
     .select(
@@ -452,9 +448,9 @@ const ensurePlanningColumns = async (supabase, slots, tableName) => {
     .order('position');
   if (reloadError) {
     console.error(reloadError);
-    return [...slots, ...missingDefaults];
+    return slots;
   }
-  return data ?? [...slots, ...missingDefaults];
+  return data ?? slots;
 };
 
 const getActivityType = (category) => ACTIVITY_TYPES.get(category) ?? 'visite';
@@ -510,99 +506,7 @@ export function initializePlanningChoices({ userRole }) {
       element
     ])
   );
-  const summaryLists = new Map();
-  const summaryCard = document.querySelector('.summary-card');
-  let summaryColumnsContainer = summaryCard?.querySelector('.summary-columns') ?? null;
-
-  const normalizeSummaryListNature = (value) => {
-    if (!value) {
-      return null;
-    }
-    const normalized = value.toString().trim().toLowerCase();
-    if (!normalized) {
-      return null;
-    }
-    if (['bonus', 'bonne', 'bonnes', 'good', 'goodes'].includes(normalized)) {
-      return 'bonus';
-    }
-    if (
-      [
-        'mauvaise',
-        'mauvaises',
-        'normale',
-        'normales',
-        'normal',
-        'normaux',
-        'standard'
-      ].includes(normalized)
-    ) {
-      return 'mauvaise';
-    }
-    return CHOICE_SERIES.includes(normalized) ? normalized : null;
-  };
-
-  const registerSummaryList = (element, natureHint = null) => {
-    if (!element) {
-      return null;
-    }
-    const nature = normalizeSummaryListNature(natureHint ?? element.dataset.summaryList);
-    if (!nature) {
-      return null;
-    }
-    element.dataset.summaryList = nature;
-    if (!summaryLists.has(nature)) {
-      summaryLists.set(nature, element);
-    }
-    return nature;
-  };
-
-  document
-    .querySelectorAll('[data-summary-list]')
-    .forEach((element) => registerSummaryList(element));
-
-  const ensureSummaryColumns = () => {
-    if (!summaryCard) {
-      return;
-    }
-    if (!summaryColumnsContainer) {
-      summaryColumnsContainer = document.createElement('div');
-      summaryColumnsContainer.className = 'summary-columns';
-      summaryCard.appendChild(summaryColumnsContainer);
-    }
-    CHOICE_SERIES.forEach((nature) => {
-      if (summaryLists.has(nature)) {
-        return;
-      }
-      const column = document.createElement('section');
-      column.className = 'summary-column';
-      column.dataset.summaryNature = nature;
-      const header = document.createElement('header');
-      header.className = 'summary-column-header';
-      const heading = document.createElement('h4');
-      heading.textContent = CHOICE_SERIES_LABELS.get(nature) ?? nature;
-      header.appendChild(heading);
-      column.appendChild(header);
-      const list = document.createElement('ul');
-      list.className = 'summary-list';
-      list.dataset.summaryList = nature;
-      column.appendChild(list);
-      summaryColumnsContainer.appendChild(column);
-      summaryLists.set(nature, list);
-    });
-
-    const orderedColumns = Array.from(summaryColumnsContainer.querySelectorAll('.summary-column'));
-    orderedColumns
-      .sort((a, b) => {
-        const aIndex = CHOICE_SERIES.indexOf(sanitizeChoiceNature(a.dataset.summaryNature));
-        const bIndex = CHOICE_SERIES.indexOf(sanitizeChoiceNature(b.dataset.summaryNature));
-        return aIndex - bIndex;
-      })
-      .forEach((column) => {
-        summaryColumnsContainer.appendChild(column);
-      });
-  };
-
-  ensureSummaryColumns();
+  const summaryList = document.querySelector('#summary-list');
   const summaryFeedback = document.querySelector('#summary-feedback');
   const saveButton = document.querySelector('#save-choices');
   const saveFeedback = document.querySelector('#save-feedback');
@@ -932,8 +836,6 @@ export function initializePlanningChoices({ userRole }) {
           selection.choiceRank = position + 1;
           selection.isPrimary = position === 0;
           selection.choiceLabel = `${selection.choiceIndex}.${selection.choiceRank}`;
-          selection.groupSize = list.length;
-          selection.alternativeCount = Math.max(0, list.length - 1);
         });
       });
     });
@@ -978,55 +880,17 @@ export function initializePlanningChoices({ userRole }) {
   };
 
   const renderSummaryList = () => {
-    if (!summaryLists.size) {
-      updateSummaryFeedback();
+    if (!summaryList) {
       return;
     }
-    summaryLists.forEach((list) => {
-      if (list) {
-        list.innerHTML = '';
-      }
-    });
+    summaryList.innerHTML = '';
     state.selections.forEach((selection) => {
-      const nature = sanitizeChoiceNature(selection.nature);
-      const list = summaryLists.get(nature);
-      if (!list) {
-        return;
-      }
       const item = document.createElement('li');
       item.className = 'summary-item';
-      if (!selection.isPrimary) {
-        item.classList.add('summary-item--alternative');
-      }
       item.draggable = true;
       item.dataset.slotKey = selection.slotKey;
-      item.dataset.choiceNature = nature;
       item.dataset.choiceIndex = String(selection.choiceIndex ?? CHOICE_INDEX_MIN);
       item.dataset.choiceRank = String(selection.choiceRank ?? 1);
-      item.dataset.choiceRole = selection.isPrimary ? 'principal' : 'alternative';
-
-      const badges = `
-        <span class="badge ${selection.nature === 'bonus' ? 'badge-success' : 'badge-warning'}">
-          ${(selection.isPrimary ? '●' : '○') + ' ' + (selection.nature === 'bonus' ? 'Bonne' : 'Normale')}
-        </span>
-        <span class="badge">${selection.activityType}</span>
-      `;
-
-      const actions = [];
-      if (!selection.isPrimary) {
-        actions.push(
-          '<button type="button" class="summary-item-action" data-action="promote">Définir comme principal</button>'
-        );
-      } else if ((selection.alternativeCount ?? 0) > 0) {
-        actions.push(
-          '<button type="button" class="summary-item-action" data-action="demote">Définir comme alternative</button>'
-        );
-      }
-
-      const actionsHtml = actions.length
-        ? `<div class="summary-item-actions">${actions.join('')}</div>`
-        : '';
-
       item.innerHTML = `
         <div class="summary-item-order">${selection.choiceLabel ?? selection.order}</div>
         <div class="summary-item-body">
@@ -1034,21 +898,16 @@ export function initializePlanningChoices({ userRole }) {
           <span class="summary-item-details">Col. ${selection.columnPosition} · ${
         selection.columnLabel || selection.slotTypeCode || 'Créneau'
       }</span>
-          <span class="summary-item-tags">${badges}</span>
-          ${actionsHtml}
+          <span class="summary-item-tags">
+            <span class="badge ${selection.nature === 'bonus' ? 'badge-success' : 'badge-warning'}">${
+        (selection.isPrimary ? '●' : '○') + ' ' + (selection.nature === 'bonus' ? 'Bonne' : 'Normale')
+      }</span>
+            <span class="badge">${selection.activityType}</span>
+          </span>
         </div>
         <button type="button" class="summary-item-remove" aria-label="Retirer ce choix">&times;</button>
       `;
-      list.appendChild(item);
-    });
-    summaryLists.forEach((list) => {
-      if (!list) {
-        return;
-      }
-      const column = list.closest('.summary-column');
-      if (column) {
-        column.dataset.hasItems = list.children.length ? 'true' : 'false';
-      }
+      summaryList.appendChild(item);
     });
     updateSummaryFeedback();
   };
@@ -1077,68 +936,6 @@ export function initializePlanningChoices({ userRole }) {
     }
     state.selectionMap.set(selection.slotKey, selection);
     state.selections.push(selection);
-    refreshSelections();
-  };
-
-  const promoteSelectionToPrimary = (slotKey) => {
-    const selection = state.selectionMap.get(slotKey);
-    if (!selection) {
-      return;
-    }
-    const nature = sanitizeChoiceNature(selection.nature);
-    const choiceIndex = sanitizeChoiceIndex(selection.choiceIndex);
-    const groupMembers = state.selections.filter(
-      (item) => sanitizeChoiceNature(item.nature) === nature && sanitizeChoiceIndex(item.choiceIndex) === choiceIndex
-    );
-    if (groupMembers.length <= 1) {
-      return;
-    }
-    const targetIndex = state.selections.findIndex((item) => item.slotKey === slotKey);
-    if (targetIndex < 0) {
-      return;
-    }
-    const [target] = state.selections.splice(targetIndex, 1);
-    const primaryIndex = state.selections.findIndex(
-      (item) => sanitizeChoiceNature(item.nature) === nature && sanitizeChoiceIndex(item.choiceIndex) === choiceIndex
-    );
-    if (primaryIndex < 0) {
-      state.selections.splice(targetIndex, 0, target);
-      return;
-    }
-    state.selections.splice(primaryIndex, 0, target);
-    refreshSelections();
-  };
-
-  const demoteSelectionToAlternative = (slotKey) => {
-    const selection = state.selectionMap.get(slotKey);
-    if (!selection) {
-      return;
-    }
-    const nature = sanitizeChoiceNature(selection.nature);
-    const choiceIndex = sanitizeChoiceIndex(selection.choiceIndex);
-    const groupMembers = state.selections.filter(
-      (item) => sanitizeChoiceNature(item.nature) === nature && sanitizeChoiceIndex(item.choiceIndex) === choiceIndex
-    );
-    if (groupMembers.length <= 1) {
-      return;
-    }
-    const targetIndex = state.selections.findIndex((item) => item.slotKey === slotKey);
-    if (targetIndex < 0) {
-      return;
-    }
-    const [target] = state.selections.splice(targetIndex, 1);
-    const groupIndices = [];
-    state.selections.forEach((item, index) => {
-      if (sanitizeChoiceNature(item.nature) === nature && sanitizeChoiceIndex(item.choiceIndex) === choiceIndex) {
-        groupIndices.push(index);
-      }
-    });
-    if (!groupIndices.length) {
-      state.selections.splice(targetIndex, 0, target);
-      return;
-    }
-    const insertIndex = groupIndices[groupIndices.length - 1] + 1;
-    state.selections.splice(insertIndex, 0, target);
     refreshSelections();
   };
 
@@ -1723,7 +1520,30 @@ export function initializePlanningChoices({ userRole }) {
     });
   }
 
-  if (summaryLists.size) {
+  if (summaryList) {
+    summaryList.addEventListener('click', (event) => {
+      const removeBtn = event.target.closest('.summary-item-remove');
+      if (!removeBtn) {
+        return;
+      }
+      const item = removeBtn.closest('.summary-item');
+      if (!item) {
+        return;
+      }
+      const slotKey = item.dataset.slotKey;
+      removeSelection(slotKey);
+    });
+
+    summaryList.addEventListener('dragstart', (event) => {
+      const item = event.target.closest('.summary-item');
+      if (!item) {
+        return;
+      }
+      event.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.setData(DRAG_DATA_TYPE, item.dataset.slotKey);
+      item.classList.add('is-dragging');
+    });
+
     const getDragAfterElement = (container, y) => {
       const draggableElements = [...container.querySelectorAll('.summary-item:not(.is-dragging)')];
       return draggableElements.reduce(
@@ -1739,103 +1559,41 @@ export function initializePlanningChoices({ userRole }) {
       ).element;
     };
 
-    const collectOrderedKeys = () => {
-      const orderedKeys = [];
-      CHOICE_SERIES.forEach((nature) => {
-        const list = summaryLists.get(nature);
-        if (!list) {
-          return;
-        }
-        list.querySelectorAll('.summary-item').forEach((item) => {
-          if (item.dataset.slotKey) {
-            orderedKeys.push(item.dataset.slotKey);
-          }
-        });
-      });
-      return orderedKeys;
-    };
-
-    summaryLists.forEach((list) => {
-      if (!list) {
+    summaryList.addEventListener('dragover', (event) => {
+      event.preventDefault();
+      const afterElement = getDragAfterElement(summaryList, event.clientY);
+      const dragging = summaryList.querySelector('.summary-item.is-dragging');
+      if (!dragging) {
         return;
       }
-      list.addEventListener('click', (event) => {
-        const removeBtn = event.target.closest('.summary-item-remove');
-        if (removeBtn) {
-          const item = removeBtn.closest('.summary-item');
-          if (!item) {
-            return;
-          }
-          removeSelection(item.dataset.slotKey);
-          return;
-        }
-        const actionBtn = event.target.closest('.summary-item-action');
-        if (!actionBtn) {
-          return;
-        }
-        const item = actionBtn.closest('.summary-item');
-        if (!item || !item.dataset.slotKey) {
-          return;
-        }
-        if (actionBtn.dataset.action === 'promote') {
-          promoteSelectionToPrimary(item.dataset.slotKey);
-        } else if (actionBtn.dataset.action === 'demote') {
-          demoteSelectionToAlternative(item.dataset.slotKey);
-        }
-      });
+      if (afterElement == null) {
+        summaryList.appendChild(dragging);
+      } else {
+        summaryList.insertBefore(dragging, afterElement);
+      }
+    });
 
-      list.addEventListener('dragstart', (event) => {
-        const item = event.target.closest('.summary-item');
-        if (!item) {
-          return;
-        }
-        if (event.dataTransfer) {
-          event.dataTransfer.effectAllowed = 'move';
-          event.dataTransfer.setData(DRAG_DATA_TYPE, item.dataset.slotKey ?? '');
-        }
-        item.classList.add('is-dragging');
-      });
+    summaryList.addEventListener('drop', (event) => {
+      event.preventDefault();
+    });
 
-      list.addEventListener('dragover', (event) => {
-        const dragging = document.querySelector('.summary-item.is-dragging');
-        if (!dragging || dragging.dataset.choiceNature !== list.dataset.summaryList) {
-          return;
-        }
-        event.preventDefault();
-        const afterElement = getDragAfterElement(list, event.clientY);
-        if (!afterElement) {
-          list.appendChild(dragging);
-        } else {
-          list.insertBefore(dragging, afterElement);
-        }
-      });
-
-      list.addEventListener('drop', (event) => {
-        const dragging = document.querySelector('.summary-item.is-dragging');
-        if (!dragging || dragging.dataset.choiceNature !== list.dataset.summaryList) {
-          return;
-        }
-        event.preventDefault();
-      });
-
-      list.addEventListener('dragend', () => {
-        const dragging = document.querySelector('.summary-item.is-dragging');
-        if (dragging) {
-          dragging.classList.remove('is-dragging');
-        }
-        const orderedKeys = collectOrderedKeys();
-        const newSelections = [];
-        orderedKeys.forEach((key) => {
-          const selection = state.selectionMap.get(key);
-          if (selection) {
-            newSelections.push(selection);
-          }
-        });
-        if (newSelections.length === state.selections.length) {
-          state.selections = newSelections;
-          refreshSelections();
+    summaryList.addEventListener('dragend', () => {
+      const dragging = summaryList.querySelector('.summary-item.is-dragging');
+      if (dragging) {
+        dragging.classList.remove('is-dragging');
+      }
+      const orderedKeys = [...summaryList.querySelectorAll('.summary-item')].map((item) => item.dataset.slotKey);
+      const newSelections = [];
+      orderedKeys.forEach((key) => {
+        const selection = state.selectionMap.get(key);
+        if (selection) {
+          newSelections.push(selection);
         }
       });
+      if (newSelections.length === state.selections.length) {
+        state.selections = newSelections;
+        refreshSelections();
+      }
     });
   }
 
