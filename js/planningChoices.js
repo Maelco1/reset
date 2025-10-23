@@ -506,7 +506,13 @@ export function initializePlanningChoices({ userRole }) {
       element
     ])
   );
-  const summaryList = document.querySelector('#summary-list');
+  const summaryLists = new Map();
+  CHOICE_SERIES.forEach((nature) => {
+    const list = document.querySelector(`[data-summary-list="${nature}"]`);
+    if (list) {
+      summaryLists.set(nature, list);
+    }
+  });
   const summaryFeedback = document.querySelector('#summary-feedback');
   const saveButton = document.querySelector('#save-choices');
   const saveFeedback = document.querySelector('#save-feedback');
@@ -836,6 +842,8 @@ export function initializePlanningChoices({ userRole }) {
           selection.choiceRank = position + 1;
           selection.isPrimary = position === 0;
           selection.choiceLabel = `${selection.choiceIndex}.${selection.choiceRank}`;
+          selection.groupSize = list.length;
+          selection.alternativeCount = Math.max(0, list.length - 1);
         });
       });
     });
@@ -880,17 +888,55 @@ export function initializePlanningChoices({ userRole }) {
   };
 
   const renderSummaryList = () => {
-    if (!summaryList) {
+    if (!summaryLists.size) {
+      updateSummaryFeedback();
       return;
     }
-    summaryList.innerHTML = '';
+    summaryLists.forEach((list) => {
+      if (list) {
+        list.innerHTML = '';
+      }
+    });
     state.selections.forEach((selection) => {
+      const nature = sanitizeChoiceNature(selection.nature);
+      const list = summaryLists.get(nature);
+      if (!list) {
+        return;
+      }
       const item = document.createElement('li');
       item.className = 'summary-item';
+      if (!selection.isPrimary) {
+        item.classList.add('summary-item--alternative');
+      }
       item.draggable = true;
       item.dataset.slotKey = selection.slotKey;
+      item.dataset.choiceNature = nature;
       item.dataset.choiceIndex = String(selection.choiceIndex ?? CHOICE_INDEX_MIN);
       item.dataset.choiceRank = String(selection.choiceRank ?? 1);
+      item.dataset.choiceRole = selection.isPrimary ? 'principal' : 'alternative';
+
+      const badges = `
+        <span class="badge ${selection.nature === 'bonus' ? 'badge-success' : 'badge-warning'}">
+          ${(selection.isPrimary ? '●' : '○') + ' ' + (selection.nature === 'bonus' ? 'Bonne' : 'Normale')}
+        </span>
+        <span class="badge">${selection.activityType}</span>
+      `;
+
+      const actions = [];
+      if (!selection.isPrimary) {
+        actions.push(
+          '<button type="button" class="summary-item-action" data-action="promote">Définir comme principal</button>'
+        );
+      } else if ((selection.alternativeCount ?? 0) > 0) {
+        actions.push(
+          '<button type="button" class="summary-item-action" data-action="demote">Définir comme alternative</button>'
+        );
+      }
+
+      const actionsHtml = actions.length
+        ? `<div class="summary-item-actions">${actions.join('')}</div>`
+        : '';
+
       item.innerHTML = `
         <div class="summary-item-order">${selection.choiceLabel ?? selection.order}</div>
         <div class="summary-item-body">
@@ -898,16 +944,21 @@ export function initializePlanningChoices({ userRole }) {
           <span class="summary-item-details">Col. ${selection.columnPosition} · ${
         selection.columnLabel || selection.slotTypeCode || 'Créneau'
       }</span>
-          <span class="summary-item-tags">
-            <span class="badge ${selection.nature === 'bonus' ? 'badge-success' : 'badge-warning'}">${
-        (selection.isPrimary ? '●' : '○') + ' ' + (selection.nature === 'bonus' ? 'Bonne' : 'Normale')
-      }</span>
-            <span class="badge">${selection.activityType}</span>
-          </span>
+          <span class="summary-item-tags">${badges}</span>
+          ${actionsHtml}
         </div>
         <button type="button" class="summary-item-remove" aria-label="Retirer ce choix">&times;</button>
       `;
-      summaryList.appendChild(item);
+      list.appendChild(item);
+    });
+    summaryLists.forEach((list) => {
+      if (!list) {
+        return;
+      }
+      const column = list.closest('.summary-column');
+      if (column) {
+        column.dataset.hasItems = list.children.length ? 'true' : 'false';
+      }
     });
     updateSummaryFeedback();
   };
@@ -936,6 +987,68 @@ export function initializePlanningChoices({ userRole }) {
     }
     state.selectionMap.set(selection.slotKey, selection);
     state.selections.push(selection);
+    refreshSelections();
+  };
+
+  const promoteSelectionToPrimary = (slotKey) => {
+    const selection = state.selectionMap.get(slotKey);
+    if (!selection) {
+      return;
+    }
+    const nature = sanitizeChoiceNature(selection.nature);
+    const choiceIndex = sanitizeChoiceIndex(selection.choiceIndex);
+    const groupMembers = state.selections.filter(
+      (item) => sanitizeChoiceNature(item.nature) === nature && sanitizeChoiceIndex(item.choiceIndex) === choiceIndex
+    );
+    if (groupMembers.length <= 1) {
+      return;
+    }
+    const targetIndex = state.selections.findIndex((item) => item.slotKey === slotKey);
+    if (targetIndex < 0) {
+      return;
+    }
+    const [target] = state.selections.splice(targetIndex, 1);
+    const primaryIndex = state.selections.findIndex(
+      (item) => sanitizeChoiceNature(item.nature) === nature && sanitizeChoiceIndex(item.choiceIndex) === choiceIndex
+    );
+    if (primaryIndex < 0) {
+      state.selections.splice(targetIndex, 0, target);
+      return;
+    }
+    state.selections.splice(primaryIndex, 0, target);
+    refreshSelections();
+  };
+
+  const demoteSelectionToAlternative = (slotKey) => {
+    const selection = state.selectionMap.get(slotKey);
+    if (!selection) {
+      return;
+    }
+    const nature = sanitizeChoiceNature(selection.nature);
+    const choiceIndex = sanitizeChoiceIndex(selection.choiceIndex);
+    const groupMembers = state.selections.filter(
+      (item) => sanitizeChoiceNature(item.nature) === nature && sanitizeChoiceIndex(item.choiceIndex) === choiceIndex
+    );
+    if (groupMembers.length <= 1) {
+      return;
+    }
+    const targetIndex = state.selections.findIndex((item) => item.slotKey === slotKey);
+    if (targetIndex < 0) {
+      return;
+    }
+    const [target] = state.selections.splice(targetIndex, 1);
+    const groupIndices = [];
+    state.selections.forEach((item, index) => {
+      if (sanitizeChoiceNature(item.nature) === nature && sanitizeChoiceIndex(item.choiceIndex) === choiceIndex) {
+        groupIndices.push(index);
+      }
+    });
+    if (!groupIndices.length) {
+      state.selections.splice(targetIndex, 0, target);
+      return;
+    }
+    const insertIndex = groupIndices[groupIndices.length - 1] + 1;
+    state.selections.splice(insertIndex, 0, target);
     refreshSelections();
   };
 
@@ -1520,30 +1633,7 @@ export function initializePlanningChoices({ userRole }) {
     });
   }
 
-  if (summaryList) {
-    summaryList.addEventListener('click', (event) => {
-      const removeBtn = event.target.closest('.summary-item-remove');
-      if (!removeBtn) {
-        return;
-      }
-      const item = removeBtn.closest('.summary-item');
-      if (!item) {
-        return;
-      }
-      const slotKey = item.dataset.slotKey;
-      removeSelection(slotKey);
-    });
-
-    summaryList.addEventListener('dragstart', (event) => {
-      const item = event.target.closest('.summary-item');
-      if (!item) {
-        return;
-      }
-      event.dataTransfer.effectAllowed = 'move';
-      event.dataTransfer.setData(DRAG_DATA_TYPE, item.dataset.slotKey);
-      item.classList.add('is-dragging');
-    });
-
+  if (summaryLists.size) {
     const getDragAfterElement = (container, y) => {
       const draggableElements = [...container.querySelectorAll('.summary-item:not(.is-dragging)')];
       return draggableElements.reduce(
@@ -1559,41 +1649,103 @@ export function initializePlanningChoices({ userRole }) {
       ).element;
     };
 
-    summaryList.addEventListener('dragover', (event) => {
-      event.preventDefault();
-      const afterElement = getDragAfterElement(summaryList, event.clientY);
-      const dragging = summaryList.querySelector('.summary-item.is-dragging');
-      if (!dragging) {
+    const collectOrderedKeys = () => {
+      const orderedKeys = [];
+      CHOICE_SERIES.forEach((nature) => {
+        const list = summaryLists.get(nature);
+        if (!list) {
+          return;
+        }
+        list.querySelectorAll('.summary-item').forEach((item) => {
+          if (item.dataset.slotKey) {
+            orderedKeys.push(item.dataset.slotKey);
+          }
+        });
+      });
+      return orderedKeys;
+    };
+
+    summaryLists.forEach((list) => {
+      if (!list) {
         return;
       }
-      if (afterElement == null) {
-        summaryList.appendChild(dragging);
-      } else {
-        summaryList.insertBefore(dragging, afterElement);
-      }
-    });
-
-    summaryList.addEventListener('drop', (event) => {
-      event.preventDefault();
-    });
-
-    summaryList.addEventListener('dragend', () => {
-      const dragging = summaryList.querySelector('.summary-item.is-dragging');
-      if (dragging) {
-        dragging.classList.remove('is-dragging');
-      }
-      const orderedKeys = [...summaryList.querySelectorAll('.summary-item')].map((item) => item.dataset.slotKey);
-      const newSelections = [];
-      orderedKeys.forEach((key) => {
-        const selection = state.selectionMap.get(key);
-        if (selection) {
-          newSelections.push(selection);
+      list.addEventListener('click', (event) => {
+        const removeBtn = event.target.closest('.summary-item-remove');
+        if (removeBtn) {
+          const item = removeBtn.closest('.summary-item');
+          if (!item) {
+            return;
+          }
+          removeSelection(item.dataset.slotKey);
+          return;
+        }
+        const actionBtn = event.target.closest('.summary-item-action');
+        if (!actionBtn) {
+          return;
+        }
+        const item = actionBtn.closest('.summary-item');
+        if (!item || !item.dataset.slotKey) {
+          return;
+        }
+        if (actionBtn.dataset.action === 'promote') {
+          promoteSelectionToPrimary(item.dataset.slotKey);
+        } else if (actionBtn.dataset.action === 'demote') {
+          demoteSelectionToAlternative(item.dataset.slotKey);
         }
       });
-      if (newSelections.length === state.selections.length) {
-        state.selections = newSelections;
-        refreshSelections();
-      }
+
+      list.addEventListener('dragstart', (event) => {
+        const item = event.target.closest('.summary-item');
+        if (!item) {
+          return;
+        }
+        if (event.dataTransfer) {
+          event.dataTransfer.effectAllowed = 'move';
+          event.dataTransfer.setData(DRAG_DATA_TYPE, item.dataset.slotKey ?? '');
+        }
+        item.classList.add('is-dragging');
+      });
+
+      list.addEventListener('dragover', (event) => {
+        const dragging = document.querySelector('.summary-item.is-dragging');
+        if (!dragging || dragging.dataset.choiceNature !== list.dataset.summaryList) {
+          return;
+        }
+        event.preventDefault();
+        const afterElement = getDragAfterElement(list, event.clientY);
+        if (!afterElement) {
+          list.appendChild(dragging);
+        } else {
+          list.insertBefore(dragging, afterElement);
+        }
+      });
+
+      list.addEventListener('drop', (event) => {
+        const dragging = document.querySelector('.summary-item.is-dragging');
+        if (!dragging || dragging.dataset.choiceNature !== list.dataset.summaryList) {
+          return;
+        }
+        event.preventDefault();
+      });
+
+      list.addEventListener('dragend', () => {
+        const dragging = document.querySelector('.summary-item.is-dragging');
+        if (dragging) {
+          dragging.classList.remove('is-dragging');
+        }
+        const orderedKeys = collectOrderedKeys();
+        const newSelections = [];
+        orderedKeys.forEach((key) => {
+          const selection = state.selectionMap.get(key);
+          if (selection) {
+            newSelections.push(selection);
+          }
+        });
+        if (newSelections.length === state.selections.length) {
+          state.selections = newSelections;
+          refreshSelections();
+        }
+      });
     });
   }
 

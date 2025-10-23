@@ -101,7 +101,20 @@
               <h3>Vos créneaux sélectionnés</h3>
               <p id="summary-feedback"></p>
             </div>
-            <ul id="summary-list" class="summary-list"></ul>
+            <div class="summary-columns">
+              <section class="summary-column" data-summary-nature="mauvaise">
+                <header class="summary-column-header">
+                  <h4>Gardes normales</h4>
+                </header>
+                <ul class="summary-list" data-summary-list="mauvaise"></ul>
+              </section>
+              <section class="summary-column" data-summary-nature="bonus">
+                <header class="summary-column-header">
+                  <h4>Bonnes gardes</h4>
+                </header>
+                <ul class="summary-list" data-summary-list="bonus"></ul>
+              </section>
+            </div>
           </div>
           <footer class="step-pane-footer">
             <div class="step-actions">
