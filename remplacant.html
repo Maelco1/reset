@@ -25,53 +25,91 @@
       </section>
     </div>
     <main>
-      <section class="card">
-        <header>
+      <section class="card planning-entry">
+        <header class="planning-entry-header">
           <div>
             <h1>Espace Remplaçant</h1>
-            <p>Signalez vos disponibilités pour les gardes.</p>
+            <p>Positionnez-vous sur les gardes disponibles en trois étapes.</p>
           </div>
           <nav>
             <button id="disconnect" class="secondary" type="button">Changer d'instance</button>
             <button id="logout" class="secondary" type="button">Se déconnecter</button>
           </nav>
         </header>
-        <section>
-          <h2>Nouvelle disponibilité</h2>
-          <form id="availability-form">
-            <label for="availability-date">Date</label>
-            <input id="availability-date" name="date" type="date" required />
 
-            <label for="availability-slot">Créneau proposé</label>
-            <select id="availability-slot" name="slot" required>
-              <option value="Matin">Matin</option>
-              <option value="Après-midi">Après-midi</option>
-              <option value="Nuit">Nuit</option>
-            </select>
+        <nav class="stepper" aria-label="Progression des étapes">
+          <button type="button" class="stepper-step is-active" data-step="1">
+            <span class="stepper-index">1</span>
+            <span class="stepper-label">Mauvaises gardes</span>
+          </button>
+          <button type="button" class="stepper-step" data-step="2">
+            <span class="stepper-index">2</span>
+            <span class="stepper-label">Gardes bonus</span>
+          </button>
+          <button type="button" class="stepper-step" data-step="3">
+            <span class="stepper-index">3</span>
+            <span class="stepper-label">Récapitulatif</span>
+          </button>
+        </nav>
 
-            <label for="availability-notes">Notes</label>
-            <textarea id="availability-notes" name="notes" rows="3" placeholder="Précisions"></textarea>
-
-            <button type="submit">Publier ma disponibilité</button>
-            <p id="availability-feedback" role="status"></p>
-          </form>
-        </section>
-        <section>
-          <h2>Mes disponibilités</h2>
-          <div class="card">
-            <table class="table">
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Créneau</th>
-                  <th>Notes</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody id="availability-body"></tbody>
-            </table>
-            <p id="availability-list-feedback" role="status"></p>
+        <section class="step-pane is-active" data-step-pane="1">
+          <header class="step-pane-header">
+            <h2>Étape 1 — Mauvaises gardes</h2>
+            <p>Indiquez vos priorités parmi les gardes dites « mauvaises ». Seules les cases ouvertes sont cliquables.</p>
+          </header>
+          <div class="planning-host" data-step-host="1">
+            <section class="planning-section planning-step-section" data-planning-section>
+              <div class="planning-surface">
+                <div class="section-header planning-section-header">
+                  <h3 id="planning-title">Planning des gardes</h3>
+                  <p id="planning-feedback" role="status"></p>
+                </div>
+                <div class="planning-layout">
+                  <div class="planning-board" id="planning-board" role="region" aria-labelledby="planning-title">
+                    <div class="planning-tables" id="planning-tables" aria-live="polite"></div>
+                  </div>
+                </div>
+              </div>
+            </section>
           </div>
+          <footer class="step-pane-footer">
+            <button type="button" class="step-nav" data-action="next">Étape suivante</button>
+          </footer>
+        </section>
+
+        <section class="step-pane" data-step-pane="2">
+          <header class="step-pane-header">
+            <h2>Étape 2 — Gardes bonus</h2>
+            <p>Ajoutez des gardes bonus pour compléter vos souhaits.</p>
+          </header>
+          <div class="planning-host" data-step-host="2"></div>
+          <footer class="step-pane-footer">
+            <div class="step-actions">
+              <button type="button" class="step-nav secondary" data-action="previous">Étape précédente</button>
+              <button type="button" class="step-nav" data-action="next">Étape suivante</button>
+            </div>
+          </footer>
+        </section>
+
+        <section class="step-pane" data-step-pane="3">
+          <header class="step-pane-header">
+            <h2>Étape 3 — Récapitulatif</h2>
+            <p>Réordonnez vos choix puis enregistrez-les dans la base de données.</p>
+          </header>
+          <div class="summary-card" aria-live="polite">
+            <div class="summary-header">
+              <h3>Vos créneaux sélectionnés</h3>
+              <p id="summary-feedback"></p>
+            </div>
+            <ul id="summary-list" class="summary-list"></ul>
+          </div>
+          <footer class="step-pane-footer">
+            <div class="step-actions">
+              <button type="button" class="step-nav secondary" data-action="previous">Étape précédente</button>
+              <button type="button" id="save-choices" class="step-nav">Enregistrer</button>
+            </div>
+            <p id="save-feedback" role="status"></p>
+          </footer>
         </section>
       </section>
     </main>
@@ -80,10 +118,9 @@
         initializeConnectionModal,
         requireRole,
         getCurrentUser,
-        setCurrentUser,
-        getSupabaseClient,
-        onSupabaseReady
+        setCurrentUser
       } from './js/supabaseClient.js';
+      import { initializePlanningChoices } from './js/planningChoices.js';
 
       const user = getCurrentUser();
       if (!user) {
@@ -98,108 +135,7 @@
         window.location.replace('index.html');
       });
 
-      const form = document.querySelector('#availability-form');
-      const feedback = document.querySelector('#availability-feedback');
-      const tableBody = document.querySelector('#availability-body');
-      const listFeedback = document.querySelector('#availability-list-feedback');
-      let channel;
-
-      const formatDate = (value) => new Intl.DateTimeFormat('fr-FR').format(new Date(value));
-
-      const renderAvailabilities = (entries) => {
-        tableBody.innerHTML = '';
-        entries.forEach((entry) => {
-          const row = document.createElement('tr');
-          row.innerHTML = `
-            <td>${formatDate(entry.date)}</td>
-            <td><span class="badge">${entry.slot}</span></td>
-            <td>${entry.notes ?? ''}</td>
-            <td>
-              <div class="table-actions">
-                <button data-action="delete" data-id="${entry.id}" class="danger">Supprimer</button>
-              </div>
-            </td>
-          `;
-          tableBody.appendChild(row);
-        });
-      };
-
-      const loadAvailabilities = async () => {
-        await onSupabaseReady();
-        const supabase = getSupabaseClient();
-        const { data, error } = await supabase
-          .from('replacement_entries')
-          .select('id, date, slot, notes')
-          .eq('user_id', user.id)
-          .order('date', { ascending: true });
-        if (error) {
-          console.error(error);
-          listFeedback.textContent = 'Impossible de récupérer vos disponibilités.';
-          return;
-        }
-        listFeedback.textContent = `${data.length} disponibilité(s).`;
-        renderAvailabilities(data);
-      };
-
-      form.addEventListener('submit', async (event) => {
-        event.preventDefault();
-        await onSupabaseReady();
-        const supabase = getSupabaseClient();
-        const formData = new FormData(form);
-        const payload = {
-          user_id: user.id,
-          date: formData.get('date'),
-          slot: formData.get('slot'),
-          notes: formData.get('notes')?.trim() || null
-        };
-
-        const { error } = await supabase.from('replacement_entries').insert(payload);
-        if (error) {
-          console.error(error);
-          feedback.textContent = "Impossible d'enregistrer la disponibilité.";
-          return;
-        }
-
-        feedback.textContent = 'Disponibilité enregistrée !';
-        form.reset();
-      });
-
-      tableBody.addEventListener('click', async (event) => {
-        const button = event.target.closest('button');
-        if (!button) {
-          return;
-        }
-        if (button.dataset.action === 'delete') {
-          if (!confirm('Supprimer cette disponibilité ?')) {
-            return;
-          }
-          await onSupabaseReady();
-          const supabase = getSupabaseClient();
-          const { error } = await supabase.from('replacement_entries').delete().eq('id', button.dataset.id);
-          if (error) {
-            console.error(error);
-            alert('Impossible de supprimer la disponibilité.');
-          }
-        }
-      });
-
-      const subscribe = async () => {
-        await onSupabaseReady();
-        const supabase = getSupabaseClient();
-        channel = supabase
-          .channel('replacement-entries')
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'replacement_entries', filter: `user_id=eq.${user.id}` }, () => {
-            loadAvailabilities();
-          })
-          .subscribe();
-      };
-
-      loadAvailabilities();
-      subscribe();
-
-      window.addEventListener('beforeunload', () => {
-        channel?.unsubscribe();
-      });
+      initializePlanningChoices({ userRole: 'remplacant' });
     </script>
   </body>
 </html>

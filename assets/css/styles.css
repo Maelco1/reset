@@ -497,3 +497,123 @@ main {
   .card { padding: 20px; }
   .planning-day-col { width: 180px; min-width: 180px; }
 }
+
+/* Interfaces de saisie à étapes */
+.planning-entry { display: grid; gap: 32px; }
+.planning-entry-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+.planning-entry-header p { margin: 4px 0 0; color: rgba(44, 62, 80, 0.7); }
+
+.stepper { display: flex; flex-wrap: wrap; gap: 12px; }
+.stepper-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 18px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  background: #fff;
+  color: var(--primary);
+  cursor: pointer;
+  transition: transform var(--transition), box-shadow var(--transition), border-color var(--transition);
+}
+.stepper-step:hover { transform: translateY(-1px); box-shadow: 0 10px 22px rgba(15, 23, 42, 0.12); border-color: var(--accent); }
+.stepper-step.is-active { background: var(--accent); color: #fff; border-color: var(--accent); box-shadow: var(--shadow); }
+.stepper-index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(37, 99, 235, 0.15);
+  color: inherit;
+  font-weight: 700;
+}
+.stepper-step.is-active .stepper-index { background: rgba(255, 255, 255, 0.25); }
+.stepper-label { font-weight: 600; letter-spacing: 0.03em; }
+
+.step-pane { display: none; gap: 24px; }
+.step-pane.is-active { display: grid; }
+.step-pane-header { display: grid; gap: 8px; }
+.step-pane-header p { margin: 0; color: rgba(44, 62, 80, 0.75); }
+.step-pane-footer { display: flex; justify-content: flex-end; }
+.step-actions { display: flex; gap: 12px; flex-wrap: wrap; justify-content: flex-end; }
+.step-nav { min-width: 160px; }
+
+.planning-host { display: grid; }
+
+.summary-card { display: grid; gap: 16px; background: rgba(255, 255, 255, 0.82); border-radius: var(--radius); padding: 24px; box-shadow: var(--shadow); }
+.summary-header { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; }
+.summary-header h3 { margin: 0; }
+.summary-header p { margin: 0; color: rgba(44, 62, 80, 0.65); }
+.summary-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.summary-item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 16px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
+  transition: transform var(--transition), box-shadow var(--transition);
+}
+.summary-item:hover { transform: translateY(-1px); box-shadow: 0 12px 24px rgba(15, 23, 42, 0.12); }
+.summary-item.is-dragging { opacity: 0.65; box-shadow: 0 8px 18px rgba(37, 99, 235, 0.25); }
+.summary-item-order {
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.1);
+  color: var(--accent);
+  font-weight: 700;
+}
+.summary-item-body { display: grid; gap: 4px; }
+.summary-item-date { font-weight: 600; color: var(--primary); }
+.summary-item-details { color: rgba(44, 62, 80, 0.7); font-size: 0.85rem; }
+.summary-item-tags { display: flex; flex-wrap: wrap; gap: 8px; }
+.summary-item-remove {
+  border: none;
+  background: rgba(220, 38, 38, 0.12);
+  color: var(--danger);
+  border-radius: 999px;
+  width: 32px;
+  height: 32px;
+  font-size: 1.1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background var(--transition), transform var(--transition);
+}
+.summary-item-remove:hover { background: rgba(220, 38, 38, 0.2); transform: scale(1.05); }
+
+.badge-success {
+  background: rgba(34, 197, 94, 0.12);
+  color: #15803d;
+}
+.badge-warning {
+  background: rgba(245, 158, 11, 0.12);
+  color: #b45309;
+}
+
+.planning-slot-toggle.is-selected {
+  box-shadow: 0 0 0 3px var(--planning-accent);
+  transform: translateY(-1px);
+}
+.planning-slot-toggle.is-selected[data-choice-type='bonus'] {
+  box-shadow: 0 0 0 3px var(--planning-success);
+}
+.planning-slot-toggle.is-selected[data-choice-type='mauvaise'] {
+  box-shadow: 0 0 0 3px var(--planning-danger);
+}
+
+@media (max-width: 720px) {
+  .stepper-step { width: 100%; justify-content: center; }
+  .summary-item { grid-template-columns: 1fr; text-align: center; }
+  .summary-item-remove { margin-left: auto; }
+}
