@@ -351,6 +351,8 @@ create table if not exists public.planning_choices (
   guard_nature text not null check (guard_nature in ('mauvaise', 'bonus')),
   activity_type text not null check (activity_type in ('consultation', 'téléconsultation', 'visite')),
   choice_order int not null,
+  choice_index int not null default 1,
+  choice_rank int not null default 1,
   tour_number int not null,
   planning_reference text not null,
   is_active boolean not null default true,
