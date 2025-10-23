@@ -125,6 +125,49 @@ main {
 }
 .form-grid label { font-size: .9rem; }
 .form-grid input, .form-grid select { width: 100%; }
+
+.admin-settings-form { display: grid; gap: 24px; }
+.admin-settings-fieldset {
+  border: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 16px;
+}
+.admin-settings-fieldset legend {
+  font-weight: 600;
+  font-size: 1rem;
+  color: var(--primary);
+}
+.admin-settings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 18px 24px;
+}
+.admin-settings-field { display: grid; gap: 6px; }
+.admin-settings-field label {
+  font-size: 0.9rem;
+  color: rgba(44, 62, 80, 0.85);
+}
+.admin-settings-notes { display: grid; gap: 8px; }
+.admin-settings-notes label {
+  font-size: 0.9rem;
+  color: rgba(44, 62, 80, 0.85);
+}
+.admin-settings-notes textarea { resize: vertical; }
+.admin-settings-footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.admin-settings-footer p {
+  margin: 0;
+  color: rgba(44, 62, 80, 0.7);
+  font-size: 0.9rem;
+}
+.admin-settings-actions { display: flex; gap: 12px; }
 .subtle-button { background: transparent; color: var(--primary); border: 1px dashed rgba(44,62,80,.45); }
 .subtle-button:hover { box-shadow: none; transform: translateY(-1px); border-color: var(--primary); }
 

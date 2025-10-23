@@ -158,42 +158,56 @@
           </button>
         </header>
 
-        <form id="admin-settings-form" class="compact-form">
-          <div class="form-grid">
-            <label for="active-tour-select">Tour actif</label>
-            <select id="active-tour-select" name="activeTour">
-              <option value="">Aucun tour actif</option>
-              <option value="1">Tour 1</option>
-              <option value="2">Tour 2</option>
-              <option value="3">Tour 3</option>
-              <option value="4">Tour 4</option>
-              <option value="5">Tour 5</option>
-              <option value="6">Tour 6</option>
-            </select>
+        <form id="admin-settings-form" class="admin-settings-form">
+          <fieldset class="admin-settings-fieldset">
+            <legend>Planning en cours</legend>
+            <div class="admin-settings-grid">
+              <div class="admin-settings-field">
+                <label for="active-tour-select">Tour actif</label>
+                <select id="active-tour-select" name="activeTour">
+                  <option value="">Aucun tour actif</option>
+                  <option value="1">Tour 1</option>
+                  <option value="2">Tour 2</option>
+                  <option value="3">Tour 3</option>
+                  <option value="4">Tour 4</option>
+                  <option value="5">Tour 5</option>
+                  <option value="6">Tour 6</option>
+                </select>
+              </div>
 
-            <label for="planning-year">Année</label>
-            <select id="planning-year" name="planningYear"></select>
+              <div class="admin-settings-field">
+                <label for="planning-year">Année</label>
+                <select id="planning-year" name="planningYear"></select>
+              </div>
 
-            <label for="planning-month-1">Mois 1</label>
-            <select id="planning-month-1" name="planningMonthOne"></select>
+              <div class="admin-settings-field">
+                <label for="planning-month-1">Mois 1</label>
+                <select id="planning-month-1" name="planningMonthOne"></select>
+              </div>
 
-            <label for="planning-month-2">Mois 2</label>
-            <select id="planning-month-2" name="planningMonthTwo"></select>
+              <div class="admin-settings-field">
+                <label for="planning-month-2">Mois 2</label>
+                <select id="planning-month-2" name="planningMonthTwo"></select>
+              </div>
+            </div>
+          </fieldset>
+
+          <div class="admin-settings-notes">
+            <label for="admin-instructions">Consignes / commentaires</label>
+            <textarea
+              id="admin-instructions"
+              name="instructions"
+              rows="5"
+              placeholder="Ajouter des consignes pour le tour en cours"
+            ></textarea>
           </div>
 
-          <label for="admin-instructions">Consignes / commentaires</label>
-          <textarea
-            id="admin-instructions"
-            name="instructions"
-            rows="5"
-            placeholder="Ajouter des consignes pour le tour en cours"
-          ></textarea>
-
-          <p id="admin-settings-feedback" role="status"></p>
-
-          <div class="modal-actions">
-            <button type="submit">Enregistrer</button>
-            <button type="button" class="secondary" id="cancel-admin-settings">Fermer</button>
+          <div class="admin-settings-footer">
+            <p id="admin-settings-feedback" role="status"></p>
+            <div class="admin-settings-actions">
+              <button type="submit">Enregistrer</button>
+              <button type="button" class="secondary" id="cancel-admin-settings">Fermer</button>
+            </div>
           </div>
         </form>
       </section>
