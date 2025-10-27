@@ -251,7 +251,7 @@ const formatDateTime = (value) => {
 const formatPriority = (request) => {
   const index = Number.parseInt(request.choiceIndex, 10);
   const rank = Number.parseInt(request.choiceRank, 10);
-  if (!Number.isFinite(index)) {
+  if (!Number.isFinite(index) || index <= 0) {
     return '—';
   }
   if (!Number.isFinite(rank) || rank <= 1) {
