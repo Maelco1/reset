@@ -103,18 +103,24 @@ const elements = {
   logoutBtn: document.querySelector('#logout'),
   disconnectBtn: document.querySelector('#disconnect'),
   backBtn: document.querySelector('#back-to-admin'),
+  userTypeTabsNav: document.querySelector('#request-user-tabs'),
   tabsNav: document.querySelector('#request-tabs'),
   filtersForm: document.querySelector('#request-filters'),
   feedback: document.querySelector('#request-feedback'),
   tableBody: document.querySelector('#requests-body'),
-  userTypeButtons: Array.from(document.querySelectorAll('[data-user-type-filter]'))
+  userTypeTabButtons: Array.from(document.querySelectorAll('[data-user-type-tab]'))
 };
 
 const normalizeUserTypeFilter = (value) => {
   if (typeof value !== 'string') {
     return '';
   }
-  const lowered = value.toLowerCase();
+  const lowered = value
+    .toString()
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '');
   return USER_TYPE_FILTERS.has(lowered) ? lowered : '';
 };
 
@@ -337,7 +343,11 @@ const getFilteredRequests = (statuses) => {
       }
     }
     if (filters.column) {
-      const columnLabel = `${request.planningDayLabel ?? ''} ${request.columnLabel ?? ''} ${request.slotTypeCode ?? ''}`.toLowerCase();
+      const columnLabel = `${request.planningDayLabel ?? ''} ${request.columnLabel ?? ''} ${request.slotTypeCode ?? ''} ${
+        request.columnNumber ?? ''
+      }`
+        .trim()
+        .toLowerCase();
       if (!columnLabel.includes(filters.column.toLowerCase())) {
         return false;
       }
@@ -348,10 +358,10 @@ const getFilteredRequests = (statuses) => {
 
 const sortRequests = (list) =>
   [...list].sort((a, b) => {
-    const indexA = Number.isFinite(a.choiceIndex) ? a.choiceIndex : Number.MAX_SAFE_INTEGER;
-    const indexB = Number.isFinite(b.choiceIndex) ? b.choiceIndex : Number.MAX_SAFE_INTEGER;
+    const indexA = Number.isFinite(a.choiceIndex) ? a.choiceIndex : Number.NEGATIVE_INFINITY;
+    const indexB = Number.isFinite(b.choiceIndex) ? b.choiceIndex : Number.NEGATIVE_INFINITY;
     if (indexA !== indexB) {
-      return indexA - indexB;
+      return indexB - indexA;
     }
     const rankA = Number.isFinite(a.choiceRank) ? a.choiceRank : Number.MAX_SAFE_INTEGER;
     const rankB = Number.isFinite(b.choiceRank) ? b.choiceRank : Number.MAX_SAFE_INTEGER;
@@ -373,7 +383,7 @@ const renderRequests = () => {
   if (!requests.length) {
     const row = document.createElement('tr');
     const cell = document.createElement('td');
-    cell.colSpan = 10;
+    cell.colSpan = 11;
     cell.className = 'requests-empty-cell';
     cell.textContent = 'Aucune demande à afficher.';
     row.appendChild(cell);
@@ -399,10 +409,18 @@ const renderRequests = () => {
     };
 
     addCell(formatDate(request.day), 'date');
-    addCell(request.planningDayLabel || request.columnLabel || `Colonne ${request.columnNumber}`, 'column');
-    addCell(TYPE_LABELS.get(request.activityType) ?? TYPE_LABELS.get((request.activityType ?? '').toLowerCase()) ?? 'Visite', 'type');
+    const columnLabel =
+      request.columnLabel ||
+      request.slotTypeCode ||
+      (request.columnNumber != null ? `Colonne ${request.columnNumber}` : '—');
+    addCell(columnLabel, 'columnLabel');
+    addCell(Number.isFinite(request.columnNumber) ? String(request.columnNumber) : '—', 'columnNumber');
+    addCell(
+      TYPE_LABELS.get(request.activityType) ?? TYPE_LABELS.get((request.activityType ?? '').toLowerCase()) ?? 'Visite',
+      'type'
+    );
     addCell(formatHours(request.columnNumber), 'hours');
-    addCell((request.trigram ?? '').toUpperCase(), 'doctor');
+    addCell((request.trigram ?? '').toUpperCase(), 'user');
     addCell(formatPriority(request), 'priority');
     addCell(QUALITY_LABELS.get(request.guardNature) ?? '—', 'quality');
 
@@ -529,19 +547,22 @@ const loadPlanningColumns = async () => {
 
 const mapRequestRecord = (record) => {
   const createdAt = record.created_at ? new Date(record.created_at) : null;
+  const columnNumberValue = Number.parseInt(record.column_number ?? record.columnNumber ?? '', 10);
+  const choiceIndexValue = Number.parseFloat(record.choice_index ?? record.choiceIndex ?? '');
+  const choiceRankValue = Number.parseFloat(record.choice_rank ?? record.choiceRank ?? '');
   return {
     id: record.id,
     trigram: (record.trigram ?? '').toUpperCase(),
     userType: normalizeUserTypeFilter(record.user_type ?? ''),
     day: record.day ?? null,
-    columnNumber: record.column_number ?? null,
+    columnNumber: Number.isNaN(columnNumberValue) ? null : columnNumberValue,
     columnLabel: record.column_label ?? null,
     planningDayLabel: record.planning_day_label ?? null,
     slotTypeCode: record.slot_type_code ?? null,
     guardNature: record.guard_nature ?? 'normale',
     activityType: (record.activity_type ?? 'visite').toLowerCase(),
-    choiceIndex: Number.parseFloat(record.choice_index ?? record.choiceIndex ?? 0) || 0,
-    choiceRank: Number.parseFloat(record.choice_rank ?? record.choiceRank ?? 1) || 1,
+    choiceIndex: Number.isNaN(choiceIndexValue) ? null : choiceIndexValue,
+    choiceRank: Number.isNaN(choiceRankValue) ? null : choiceRankValue,
     createdAt,
     status: (record.etat ?? 'en attente').toLowerCase(),
     isActive: record.is_active,
@@ -569,7 +590,10 @@ const loadRequests = async () => {
   if (state.activeTourId) {
     query.eq('tour_number', state.activeTourId);
   }
-  query.order('choice_index', { ascending: true }).order('choice_rank', { ascending: true }).order('created_at', { ascending: true });
+  query
+    .order('choice_index', { ascending: false })
+    .order('choice_rank', { ascending: true })
+    .order('created_at', { ascending: true });
   const { data, error } = await query;
   state.isLoading = false;
   if (error) {
@@ -896,19 +920,21 @@ const handleTabClick = (event) => {
   renderRequests();
 };
 
-const updateUserTypeFilterButtons = () => {
-  if (!Array.isArray(elements.userTypeButtons)) {
+const updateUserTypeTabs = () => {
+  if (!Array.isArray(elements.userTypeTabButtons)) {
     return;
   }
   const active = normalizeUserTypeFilter(state.filters.userType);
-  elements.userTypeButtons.forEach((button) => {
+  elements.userTypeTabButtons.forEach((button) => {
     if (!button) {
       return;
     }
-    const value = normalizeUserTypeFilter(button.dataset.userTypeFilter ?? '');
+    const value = normalizeUserTypeFilter(button.dataset.userTypeTab ?? '');
     const isActive = !!value && value === active;
     button.classList.toggle('is-active', isActive);
-    button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+    button.setAttribute('aria-selected', isActive ? 'true' : 'false');
+    const shouldBeTabbable = isActive || !active;
+    button.setAttribute('tabindex', shouldBeTabbable ? '0' : '-1');
   });
 };
 
@@ -920,16 +946,16 @@ const setUserTypeFilter = (value) => {
     ...state.filters,
     userType: next
   };
-  updateUserTypeFilterButtons();
+  updateUserTypeTabs();
   renderRequests();
 };
 
-const handleUserTypeFilterClick = (event) => {
-  const button = event.currentTarget ?? event.target;
+const handleUserTypeTabClick = (event) => {
+  const button = event.target.closest('[data-user-type-tab]');
   if (!button) {
     return;
   }
-  const value = button.dataset.userTypeFilter;
+  const value = button.dataset.userTypeTab;
   if (!value) {
     return;
   }
@@ -951,7 +977,7 @@ const handleFiltersChange = () => {
     status: formData.get('status') ? formData.get('status').toString() : '',
     userType: previousUserType
   };
-  updateUserTypeFilterButtons();
+  updateUserTypeTabs();
   renderRequests();
 };
 
@@ -970,6 +996,9 @@ const attachEventListeners = () => {
   if (elements.tabsNav) {
     elements.tabsNav.addEventListener('click', handleTabClick);
   }
+  if (elements.userTypeTabsNav) {
+    elements.userTypeTabsNav.addEventListener('click', handleUserTypeTabClick);
+  }
   if (elements.tableBody) {
     elements.tableBody.addEventListener('click', handleActionClick);
   }
@@ -986,16 +1015,9 @@ const attachEventListeners = () => {
           status: '',
           userType: ''
         };
-        updateUserTypeFilterButtons();
+        updateUserTypeTabs();
         renderRequests();
       }, 0);
-    });
-  }
-  if (Array.isArray(elements.userTypeButtons)) {
-    elements.userTypeButtons.forEach((button) => {
-      if (button) {
-        button.addEventListener('click', handleUserTypeFilterClick);
-      }
     });
   }
 };
@@ -1010,7 +1032,7 @@ const initialize = async () => {
 
   initializeConnectionModal();
   attachEventListeners();
-  updateUserTypeFilterButtons();
+  updateUserTypeTabs();
   buildTabs();
   updateTabState();
 
