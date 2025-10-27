@@ -75,6 +75,8 @@ const DATETIME_FORMAT = new Intl.DateTimeFormat('fr-FR', {
   minute: '2-digit'
 });
 
+const USER_TYPE_FILTERS = new Set(['medecin', 'remplacant']);
+
 const state = {
   supabase: null,
   actor: null,
@@ -92,7 +94,8 @@ const state = {
     type: '',
     doctor: '',
     column: '',
-    status: ''
+    status: '',
+    userType: ''
   }
 };
 
@@ -103,7 +106,16 @@ const elements = {
   tabsNav: document.querySelector('#request-tabs'),
   filtersForm: document.querySelector('#request-filters'),
   feedback: document.querySelector('#request-feedback'),
-  tableBody: document.querySelector('#requests-body')
+  tableBody: document.querySelector('#requests-body'),
+  userTypeButtons: Array.from(document.querySelectorAll('[data-user-type-filter]'))
+};
+
+const normalizeUserTypeFilter = (value) => {
+  if (typeof value !== 'string') {
+    return '';
+  }
+  const lowered = value.toLowerCase();
+  return USER_TYPE_FILTERS.has(lowered) ? lowered : '';
 };
 
 const sanitizeActiveTour = (value) => {
@@ -301,6 +313,11 @@ const getFilteredRequests = (statuses) => {
     }
     if (filters.status && filters.status !== request.status) {
       return false;
+    }
+    if (filters.userType) {
+      if (normalizeUserTypeFilter(request.userType) !== filters.userType) {
+        return false;
+      }
     }
     if (filters.date) {
       const key = getRequestDayKey(request);
@@ -515,7 +532,7 @@ const mapRequestRecord = (record) => {
   return {
     id: record.id,
     trigram: (record.trigram ?? '').toUpperCase(),
-    userType: record.user_type ?? '',
+    userType: normalizeUserTypeFilter(record.user_type ?? ''),
     day: record.day ?? null,
     columnNumber: record.column_number ?? null,
     columnLabel: record.column_label ?? null,
@@ -879,19 +896,62 @@ const handleTabClick = (event) => {
   renderRequests();
 };
 
-const handleFiltersChange = (event) => {
+const updateUserTypeFilterButtons = () => {
+  if (!Array.isArray(elements.userTypeButtons)) {
+    return;
+  }
+  const active = normalizeUserTypeFilter(state.filters.userType);
+  elements.userTypeButtons.forEach((button) => {
+    if (!button) {
+      return;
+    }
+    const value = normalizeUserTypeFilter(button.dataset.userTypeFilter ?? '');
+    const isActive = !!value && value === active;
+    button.classList.toggle('is-active', isActive);
+    button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+  });
+};
+
+const setUserTypeFilter = (value) => {
+  const normalized = normalizeUserTypeFilter(value);
+  const current = normalizeUserTypeFilter(state.filters.userType);
+  const next = current === normalized ? '' : normalized;
+  state.filters = {
+    ...state.filters,
+    userType: next
+  };
+  updateUserTypeFilterButtons();
+  renderRequests();
+};
+
+const handleUserTypeFilterClick = (event) => {
+  const button = event.currentTarget ?? event.target;
+  if (!button) {
+    return;
+  }
+  const value = button.dataset.userTypeFilter;
+  if (!value) {
+    return;
+  }
+  setUserTypeFilter(value);
+};
+
+const handleFiltersChange = () => {
   const form = elements.filtersForm;
   if (!form) {
     return;
   }
   const formData = new FormData(form);
+  const previousUserType = normalizeUserTypeFilter(state.filters.userType);
   state.filters = {
     date: formData.get('date') ? formData.get('date').toString() : '',
     type: formData.get('type') ? formData.get('type').toString() : '',
     doctor: formData.get('doctor') ? formData.get('doctor').toString().trim() : '',
     column: formData.get('column') ? formData.get('column').toString().trim() : '',
-    status: formData.get('status') ? formData.get('status').toString() : ''
+    status: formData.get('status') ? formData.get('status').toString() : '',
+    userType: previousUserType
   };
+  updateUserTypeFilterButtons();
   renderRequests();
 };
 
@@ -923,10 +983,19 @@ const attachEventListeners = () => {
           type: '',
           doctor: '',
           column: '',
-          status: ''
+          status: '',
+          userType: ''
         };
+        updateUserTypeFilterButtons();
         renderRequests();
       }, 0);
+    });
+  }
+  if (Array.isArray(elements.userTypeButtons)) {
+    elements.userTypeButtons.forEach((button) => {
+      if (button) {
+        button.addEventListener('click', handleUserTypeFilterClick);
+      }
     });
   }
 };
@@ -941,6 +1010,7 @@ const initialize = async () => {
 
   initializeConnectionModal();
   attachEventListeners();
+  updateUserTypeFilterButtons();
   buildTabs();
   updateTabState();
 

@@ -304,6 +304,36 @@ main {
   align-items: flex-end;
 }
 
+.request-filter-toggle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: rgba(248, 250, 252, 0.8);
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 12px;
+}
+
+.request-filter-toggle-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: rgba(15, 23, 42, 0.7);
+}
+
+.request-filter-toggle-button {
+  border-radius: 999px;
+  padding: 6px 14px;
+  transition: background var(--transition), color var(--transition), border-color var(--transition);
+}
+
+.request-filter-toggle-button.is-active,
+.request-filter-toggle-button[aria-pressed='true'] {
+  background: rgba(37, 99, 235, 0.12);
+  border-color: rgba(37, 99, 235, 0.45);
+  color: #1d4ed8;
+}
+
 .request-filter-field {
   display: flex;
   flex-direction: column;
