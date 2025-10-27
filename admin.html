@@ -506,6 +506,12 @@
         ...['TC', 'TCN'].map((code) => [code, 'Téléconsultation'])
       ]);
 
+      const ACTIVITY_TYPE_BY_CATEGORY = new Map([
+        ['Visite', 'visite'],
+        ['Consultation', 'consultation'],
+        ['Téléconsultation', 'téléconsultation']
+      ]);
+
       const PLANNING_TOURS = [
         { id: 1, label: 'Tour 1', table: 'planning_columns' },
         { id: 2, label: 'Tour 2', table: 'planning_columns_tour2' },
@@ -661,6 +667,21 @@
           return null;
         }
         return formatDateKey(parsed);
+      };
+
+      const parseSlotKey = (value) => {
+        if (typeof value !== 'string') {
+          return null;
+        }
+        const [dayPart, columnPart] = value.split(':');
+        if (!dayPart || !columnPart) {
+          return null;
+        }
+        const columnNumber = Number.parseInt(columnPart, 10);
+        if (!Number.isFinite(columnNumber)) {
+          return null;
+        }
+        return { day: dayPart, columnNumber };
       };
 
       if (requestProcessingBtn) {
@@ -842,6 +863,204 @@
           return user.username.slice(0, 3).toUpperCase();
         }
         return '';
+      };
+
+      const getSlotByPosition = (position) =>
+        planningSlots.find((candidate) => Number(candidate.position) === Number(position)) ?? null;
+
+      const mapCategoryToActivityType = (value) => {
+        if (typeof value !== 'string') {
+          return 'visite';
+        }
+        const trimmed = value.trim();
+        if (!trimmed) {
+          return 'visite';
+        }
+        const direct = ACTIVITY_TYPE_BY_CATEGORY.get(trimmed);
+        if (direct) {
+          return direct;
+        }
+        const normalized = trimmed
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/\p{Diacritic}/gu, '');
+        if (normalized.includes('tele')) {
+          return 'téléconsultation';
+        }
+        if (normalized.includes('consult')) {
+          return 'consultation';
+        }
+        return 'visite';
+      };
+
+      const buildManualAssignmentPayload = (slotKey, user) => {
+        const parsed = parseSlotKey(slotKey);
+        if (!parsed) {
+          return { error: 'Créneau invalide.' };
+        }
+        const slot = getSlotByPosition(parsed.columnNumber);
+        if (!slot) {
+          return { error: 'Colonne introuvable pour ce créneau.' };
+        }
+        const reference = getActivePlanningReference();
+        if (!reference) {
+          return { error: 'Impossible de déterminer le planning actif.' };
+        }
+        const userType = normalizeRole(user.role);
+        if (!['medecin', 'remplacant'].includes(userType)) {
+          return { error: 'Seuls un médecin ou un remplaçant peuvent être affectés.' };
+        }
+        const trigram = getUserTrigram(user);
+        if (!trigram) {
+          return { error: "Le trigramme de l'utilisateur est requis." };
+        }
+        const dayDate = new Date(`${parsed.day}T00:00:00`);
+        if (Number.isNaN(dayDate.getTime())) {
+          return { error: 'Date de garde invalide.' };
+        }
+        const holidays = getFrenchHolidays(dayDate.getFullYear());
+        const isHoliday = holidays.has(parsed.day);
+        const segment = getDaySegment(dayDate, isHoliday);
+        const quality = getQualityForSegment(slot, segment);
+        const guardNature = quality === 'Bonne' ? 'bonne' : 'normale';
+        const category = slot.type_category ?? inferTypeCategory(slot.type_code);
+        const activityType = mapCategoryToActivityType(category);
+        const month = dayDate.getMonth() + 1;
+        const year = dayDate.getFullYear();
+        const dayNumber = String(dayDate.getDate()).padStart(2, '0');
+        const planningDayLabel = `${WEEKDAY_LABELS[dayDate.getDay()]} ${dayNumber} ${MONTH_NAMES[dayDate.getMonth()]}`;
+
+        return {
+          payload: {
+            user_id: user.id ?? null,
+            trigram,
+            user_type: userType,
+            created_at: new Date().toISOString(),
+            day: parsed.day,
+            month,
+            year,
+            column_number: parsed.columnNumber,
+            guard_nature: guardNature,
+            activity_type: activityType,
+            choice_order: 0,
+            choice_index: 0,
+            choice_rank: 0,
+            tour_number: selectedTourId,
+            planning_reference: reference,
+            is_active: true,
+            slot_type_code: slot.type_code ?? null,
+            column_label: slot.label ?? slot.type_code ?? `Colonne ${slot.position}`,
+            planning_day_label: planningDayLabel,
+            etat: 'validé'
+          }
+        };
+      };
+
+      const persistManualAssignment = async (slotKey, user) => {
+        const { payload, error } = buildManualAssignmentPayload(slotKey, user);
+        if (error) {
+          if (assignmentFeedback) {
+            assignmentFeedback.textContent = error;
+          }
+          return false;
+        }
+
+        await onSupabaseReady();
+        const supabase = getSupabaseClient();
+        if (!supabase) {
+          if (assignmentFeedback) {
+            assignmentFeedback.textContent = 'Connexion à Supabase requise.';
+          }
+          return false;
+        }
+
+        if (assignmentFeedback) {
+          assignmentFeedback.textContent = 'Enregistrement en cours…';
+        }
+
+        const { error: cleanupError } = await supabase
+          .from('planning_choices')
+          .delete()
+          .eq('planning_reference', payload.planning_reference)
+          .eq('tour_number', payload.tour_number)
+          .eq('day', payload.day)
+          .eq('column_number', payload.column_number)
+          .eq('choice_order', 0);
+
+        if (cleanupError) {
+          console.error(cleanupError);
+          if (assignmentFeedback) {
+            assignmentFeedback.textContent = "Impossible d'enregistrer la garde.";
+          }
+          return false;
+        }
+
+        const { error: insertError } = await supabase.from('planning_choices').insert(payload);
+        if (insertError) {
+          console.error(insertError);
+          if (assignmentFeedback) {
+            assignmentFeedback.textContent = "Impossible d'enregistrer la garde.";
+          }
+        }
+
+        if (assignmentFeedback && !insertError) {
+          assignmentFeedback.textContent = '';
+        }
+
+        return !insertError;
+      };
+
+      const removeManualAssignment = async (slotKey) => {
+        const parsed = parseSlotKey(slotKey);
+        if (!parsed) {
+          if (assignmentFeedback) {
+            assignmentFeedback.textContent = 'Créneau invalide.';
+          }
+          return false;
+        }
+        const reference = getActivePlanningReference();
+        if (!reference) {
+          if (assignmentFeedback) {
+            assignmentFeedback.textContent = 'Impossible de déterminer le planning actif.';
+          }
+          return false;
+        }
+
+        await onSupabaseReady();
+        const supabase = getSupabaseClient();
+        if (!supabase) {
+          if (assignmentFeedback) {
+            assignmentFeedback.textContent = 'Connexion à Supabase requise.';
+          }
+          return false;
+        }
+
+        if (assignmentFeedback) {
+          assignmentFeedback.textContent = 'Suppression en cours…';
+        }
+
+        const { error } = await supabase
+          .from('planning_choices')
+          .delete()
+          .eq('planning_reference', reference)
+          .eq('tour_number', selectedTourId)
+          .eq('day', parsed.day)
+          .eq('column_number', parsed.columnNumber)
+          .eq('choice_order', 0);
+
+        if (error) {
+          console.error(error);
+          if (assignmentFeedback) {
+            assignmentFeedback.textContent = "Impossible de supprimer la garde.";
+          }
+          return false;
+        }
+
+        if (assignmentFeedback) {
+          assignmentFeedback.textContent = '';
+        }
+
+        return true;
       };
 
       let editingUser = null;
@@ -1231,7 +1450,7 @@
       const buildProgramLabel = (index, rank) => {
         const numericIndex = Number.parseInt(index, 10);
         const numericRank = Number.parseInt(rank, 10);
-        if (!Number.isFinite(numericIndex)) {
+        if (!Number.isFinite(numericIndex) || numericIndex <= 0) {
           return '';
         }
         if (!Number.isFinite(numericRank) || numericRank <= 1) {
@@ -2855,7 +3074,7 @@
       }
 
       if (assignmentForm) {
-        assignmentForm.addEventListener('submit', (event) => {
+        assignmentForm.addEventListener('submit', async (event) => {
           event.preventDefault();
           if (!activeAssignmentButton) {
             closeAssignmentModal();
@@ -2868,6 +3087,10 @@
           }
           const selectedValue = assignmentSelect?.value ?? '';
           if (!selectedValue) {
+            const success = await removeManualAssignment(slotKey);
+            if (!success) {
+              return;
+            }
             planningAssignments.delete(slotKey);
           } else {
             const user = allUsers.find((candidate) => String(candidate.id) === selectedValue);
@@ -2878,6 +3101,10 @@
               return;
             }
             const normalizedRole = normalizeRole(user.role) || user.role;
+            const success = await persistManualAssignment(slotKey, user);
+            if (!success) {
+              return;
+            }
             planningAssignments.set(slotKey, {
               id: user.id,
               trigram: getUserTrigram(user),
