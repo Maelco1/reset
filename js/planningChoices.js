@@ -543,7 +543,11 @@ export function initializePlanningChoices({ userRole }) {
     stickyHeaderFrame: null,
     userProfile: null,
     isSaving: false,
-    groupedSelections: null
+    groupedSelections: null,
+    assignments: new Map(),
+    assignmentChannel: null,
+    assignmentSubscriptionKey: null,
+    assignmentsLoadToken: 0
   };
 
   const getHolidaysForYear = (year) => {
@@ -551,6 +555,126 @@ export function initializePlanningChoices({ userRole }) {
       state.holidaysByYear.set(year, getFrenchHolidays(year));
     }
     return state.holidaysByYear.get(year);
+  };
+
+  const getCurrentUserTrigram = () => (state.userProfile?.trigram ?? '').toUpperCase();
+
+  const clearButtonAssignment = (button) => {
+    if (!button || !button.dataset.assignmentState) {
+      return;
+    }
+    const tag = button.querySelector('.planning-assignment-tag');
+    const roleLabel = button.querySelector('.planning-assignment-role');
+    const srLabel = button.querySelector('.sr-only');
+    const summary = button.dataset.summary ?? '';
+    delete button.dataset.assignmentState;
+    delete button.dataset.assignmentLabel;
+    button.dataset.assignmentUserId = '';
+    if (tag) {
+      tag.textContent = '';
+      tag.classList.add('is-empty');
+    }
+    if (roleLabel) {
+      roleLabel.textContent = '';
+      roleLabel.classList.add('is-empty');
+    }
+    if (srLabel) {
+      srLabel.textContent = summary;
+    }
+    button.classList.remove('is-selected');
+    button.disabled = false;
+    button.removeAttribute('aria-disabled');
+    button.removeAttribute('tabindex');
+    if (button.dataset.state === 'assigned') {
+      delete button.dataset.state;
+    }
+    button.title = summary || button.title || '';
+  };
+
+  const applyAssignmentToButton = (button, assignment) => {
+    if (!button) {
+      return;
+    }
+    if (!assignment) {
+      clearButtonAssignment(button);
+      return;
+    }
+    const tag = button.querySelector('.planning-assignment-tag');
+    const roleLabel = button.querySelector('.planning-assignment-role');
+    const srLabel = button.querySelector('.sr-only');
+    const summary = button.dataset.summary ?? '';
+    const trigram = (assignment.trigram ?? '').toUpperCase();
+    const currentTrigram = getCurrentUserTrigram();
+    const isSelf = Boolean(trigram) && Boolean(currentTrigram) && trigram === currentTrigram;
+    button.dataset.assignmentState = isSelf ? 'self' : 'other';
+    button.dataset.assignmentLabel = trigram;
+    button.dataset.assignmentUserId = assignment.userId != null ? String(assignment.userId) : '';
+    if (tag) {
+      tag.textContent = trigram || '—';
+      if (trigram) {
+        tag.classList.remove('is-empty');
+      } else {
+        tag.classList.add('is-empty');
+      }
+    }
+    if (roleLabel) {
+      roleLabel.textContent = '';
+      roleLabel.classList.add('is-empty');
+    }
+    const srParts = [];
+    if (summary) {
+      srParts.push(summary);
+    }
+    if (trigram) {
+      srParts.push(isSelf ? `${trigram} (vous)` : trigram);
+    }
+    const srText = srParts.length ? srParts.join(' · ') : summary || 'Garde attribuée';
+    if (srLabel) {
+      srLabel.textContent = srText;
+    }
+    button.title = srText;
+    button.dataset.state = 'assigned';
+    button.disabled = true;
+    button.setAttribute('aria-disabled', 'true');
+    button.tabIndex = -1;
+    button.classList.remove('is-selected');
+  };
+
+  const applyAssignmentsToButtons = () => {
+    state.slotButtons.forEach((button, slotKey) => {
+      const assignment = state.assignments.get(slotKey);
+      applyAssignmentToButton(button, assignment);
+    });
+  };
+
+  const removeSelectionsForAssignedSlots = () => {
+    if (!state.assignments.size || !state.selections.length) {
+      return false;
+    }
+    const assignedKeys = new Set(state.assignments.keys());
+    let removed = false;
+    state.selections = state.selections.filter((selection) => {
+      if (assignedKeys.has(selection.slotKey)) {
+        state.selectionMap.delete(selection.slotKey);
+        if (selection.button) {
+          selection.button.classList.remove('is-selected');
+        }
+        removed = true;
+        return false;
+      }
+      return true;
+    });
+    if (removed) {
+      invalidateGroupedSelections();
+    }
+    return removed;
+  };
+
+  const getAssignmentSubscriptionKey = () => {
+    if (!state.planningReference || !Number.isFinite(state.selectedTourId)) {
+      return null;
+    }
+    return `${state.planningReference}::${state.selectedTourId}`;
   };
 
   const setPlanningFeedback = (message) => {
@@ -890,11 +1014,36 @@ export function initializePlanningChoices({ userRole }) {
       button.removeAttribute('data-choice-role');
       button.removeAttribute('data-choice-label');
       button.classList.remove('is-selected');
+      const assignmentState = button.dataset.assignmentState ?? '';
+      if (assignmentState) {
+        const assignmentLabel = button.dataset.assignmentLabel ?? '';
+        if (tag) {
+          const label = assignmentLabel || '—';
+          tag.textContent = label;
+          if (assignmentLabel) {
+            tag.classList.remove('is-empty');
+          }
+        }
+        if (srLabel) {
+          const summary = button.dataset.summary ?? '';
+          const srParts = [];
+          if (summary) {
+            srParts.push(summary);
+          }
+          if (assignmentLabel) {
+            srParts.push(assignmentState === 'self' ? `${assignmentLabel} (vous)` : assignmentLabel);
+          }
+          srLabel.textContent = srParts.length ? srParts.join(' · ') : summary || 'Garde attribuée';
+        }
+      }
     });
 
     state.selections.forEach((selection) => {
       const button = selection.button;
       if (!button) {
+        return;
+      }
+      if (button.dataset.assignmentState) {
         return;
       }
       const tag = button.querySelector('.planning-assignment-tag');
@@ -1279,6 +1428,13 @@ export function initializePlanningChoices({ userRole }) {
 
   const updateButtonAvailability = () => {
     state.slotButtons.forEach((button) => {
+      if (button.dataset.assignmentState) {
+        button.dataset.state = 'assigned';
+        button.disabled = true;
+        button.setAttribute('aria-disabled', 'true');
+        button.tabIndex = -1;
+        return;
+      }
       const isSelected = button.classList.contains('is-selected');
       const canSelect = state.selectionMode === 'normale'
         ? button.dataset.openNormale === 'true'
@@ -1331,7 +1487,7 @@ export function initializePlanningChoices({ userRole }) {
     if (!state.selectionMode) {
       return;
     }
-    if (button.dataset.state === 'closed') {
+    if (button.dataset.state === 'closed' || button.dataset.state === 'assigned') {
       return;
     }
     const existing = getSelectionForButton(button);
@@ -1560,6 +1716,7 @@ export function initializePlanningChoices({ userRole }) {
         selection.button = nextButton;
       }
     });
+    applyAssignmentsToButtons();
     schedulePlanningCellSize();
     scheduleStickyHeaderUpdate();
     updateButtonAvailability();
@@ -1657,6 +1814,8 @@ export function initializePlanningChoices({ userRole }) {
       monthOne,
       monthTwo
     });
+    state.assignmentsLoadToken += 1;
+    state.assignments = new Map();
   };
 
   const loadAdministrativeSettings = async () => {
@@ -1692,6 +1851,121 @@ export function initializePlanningChoices({ userRole }) {
       ...data,
       trigram: (data.trigram ?? data.username ?? '').slice(0, 3).toUpperCase()
     };
+  };
+
+  const loadAcceptedAssignments = async () => {
+    const reference = state.planningReference;
+    if (!reference || !Number.isFinite(state.selectedTourId)) {
+      state.assignments = new Map();
+      applyAssignmentsToButtons();
+      updateButtonAvailability();
+      refreshSelections();
+      return;
+    }
+
+    await onSupabaseReady();
+    const supabase = getSupabaseClient();
+    state.supabase = supabase;
+    if (!supabase) {
+      return;
+    }
+    if (!state.userProfile) {
+      state.userProfile = await fetchUserProfile();
+    }
+
+    const requestToken = ++state.assignmentsLoadToken;
+    const { data, error } = await supabase
+      .from('planning_choices')
+      .select('id, user_id, trigram, user_type, day, column_number')
+      .eq('planning_reference', reference)
+      .eq('tour_number', state.selectedTourId)
+      .eq('etat', 'validé')
+      .eq('is_active', true);
+
+    if (requestToken !== state.assignmentsLoadToken) {
+      return;
+    }
+
+    if (error) {
+      console.error(error);
+      return;
+    }
+
+    const nextAssignments = new Map();
+    (data ?? []).forEach((record) => {
+      if (!record || record.column_number == null || !record.day) {
+        return;
+      }
+      const parsedDay = new Date(record.day);
+      if (Number.isNaN(parsedDay.getTime())) {
+        return;
+      }
+      const dayKey = formatDateKey(parsedDay);
+      const slotKey = `${dayKey}:${record.column_number}`;
+      const trigram = typeof record.trigram === 'string'
+        ? record.trigram.trim().toUpperCase()
+        : '';
+      nextAssignments.set(slotKey, {
+        userId: record.user_id ?? null,
+        trigram: trigram || '—',
+        userType: record.user_type ?? ''
+      });
+    });
+
+    state.assignments = nextAssignments;
+    removeSelectionsForAssignedSlots();
+    applyAssignmentsToButtons();
+    updateButtonAvailability();
+    refreshSelections();
+  };
+
+  const subscribeToAssignmentChanges = async () => {
+    const key = getAssignmentSubscriptionKey();
+    if (!key) {
+      if (state.assignmentChannel) {
+        await state.assignmentChannel.unsubscribe();
+        state.assignmentChannel = null;
+      }
+      state.assignmentSubscriptionKey = null;
+      state.assignments = new Map();
+      applyAssignmentsToButtons();
+      updateButtonAvailability();
+      refreshSelections();
+      return;
+    }
+
+    if (state.assignmentChannel && state.assignmentSubscriptionKey === key) {
+      return;
+    }
+
+    await onSupabaseReady();
+    const supabase = getSupabaseClient();
+    state.supabase = supabase;
+    if (!supabase) {
+      return;
+    }
+
+    if (state.assignmentChannel) {
+      await state.assignmentChannel.unsubscribe();
+    }
+
+    state.assignmentChannel = supabase
+      .channel(`planning-choices-entry-${state.selectedTourId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'planning_choices' }, (payload) => {
+        const record = payload?.new ?? payload?.old ?? null;
+        if (!record) {
+          loadAcceptedAssignments();
+          return;
+        }
+        const matchesTour = Number(record.tour_number) === Number(state.selectedTourId);
+        const matchesReference = record.planning_reference === state.planningReference;
+        if (matchesTour && matchesReference) {
+          loadAcceptedAssignments();
+        }
+      })
+      .subscribe();
+
+    state.assignmentSubscriptionKey = key;
   };
 
   const loadPersistedSelections = async () => {
@@ -2040,11 +2314,20 @@ export function initializePlanningChoices({ userRole }) {
     scheduleStickyHeaderUpdate();
   });
 
+  window.addEventListener('beforeunload', () => {
+    if (state.assignmentChannel) {
+      state.assignmentChannel.unsubscribe();
+      state.assignmentChannel = null;
+    }
+  });
+
   const initialize = async () => {
     await loadAdministrativeSettings();
     await loadPlanningColumns();
     state.userProfile = await fetchUserProfile();
+    await loadAcceptedAssignments();
     await loadPersistedSelections();
+    await subscribeToAssignmentChanges();
     setStep(1);
   };
 
