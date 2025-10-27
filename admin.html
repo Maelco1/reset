@@ -522,6 +522,7 @@
         PLANNING_TOURS.find((tour) => tour.id === tourId) ?? PLANNING_TOURS[0];
 
       const getPlanningTableName = (tourId = selectedTourId) => getTourConfig(tourId).table;
+      const toMonthPart = (month) => String(month + 1).padStart(2, '0');
       const WEEKDAY_LABELS = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
       const MONTH_NAMES = [
         'Janvier',
@@ -542,6 +543,8 @@
         medecin: 'Médecin',
         remplacant: 'Remplaçant'
       };
+      const ASSIGNMENT_SOURCE_ACCEPTED = 'accepted';
+      const ASSIGNMENT_SOURCE_MANUAL = 'manual';
 
       const MAX_PLANNING_CELL_WIDTH = 132;
       const MAX_PLANNING_CELL_HEIGHT = 88;
@@ -597,6 +600,69 @@
         bonne: planningVisionBonne
       };
 
+      const parseSelectInteger = (element, fallback = null) => {
+        if (!element) {
+          return fallback;
+        }
+        const parsed = Number.parseInt(element.value, 10);
+        return Number.isInteger(parsed) ? parsed : fallback;
+      };
+
+      const getSelectedYear = () => {
+        const fromSelect = parseSelectInteger(planningYearSelect, null);
+        if (fromSelect != null) {
+          return fromSelect;
+        }
+        if (Number.isInteger(administrativeSettings?.planning_year)) {
+          return administrativeSettings.planning_year;
+        }
+        return new Date().getFullYear();
+      };
+
+      const getSelectedMonthOne = () => {
+        const fromSelect = parseSelectInteger(planningMonthOneSelect, null);
+        if (fromSelect != null) {
+          return fromSelect;
+        }
+        if (Number.isInteger(administrativeSettings?.planning_month_one)) {
+          return administrativeSettings.planning_month_one;
+        }
+        return new Date().getMonth();
+      };
+
+      const getSelectedMonthTwo = () => {
+        const fromSelect = parseSelectInteger(planningMonthTwoSelect, null);
+        if (fromSelect != null) {
+          return fromSelect;
+        }
+        if (Number.isInteger(administrativeSettings?.planning_month_two)) {
+          return administrativeSettings.planning_month_two;
+        }
+        const monthOne = getSelectedMonthOne();
+        return (monthOne + 1) % 12;
+      };
+
+      const getActivePlanningReference = () => {
+        const year = getSelectedYear();
+        const monthOne = getSelectedMonthOne();
+        const monthTwo = getSelectedMonthTwo();
+        if (!Number.isInteger(year) || !Number.isInteger(monthOne) || !Number.isInteger(monthTwo)) {
+          return null;
+        }
+        return `tour${selectedTourId}-${year}-${toMonthPart(monthOne)}-${toMonthPart(monthTwo)}`;
+      };
+
+      const toIsoDate = (value) => {
+        if (!value) {
+          return null;
+        }
+        const parsed = value instanceof Date ? value : new Date(value);
+        if (Number.isNaN(parsed.getTime())) {
+          return null;
+        }
+        return formatDateKey(parsed);
+      };
+
       if (requestProcessingBtn) {
         requestProcessingBtn.addEventListener('click', () => {
           window.location.assign('traitement-demandes.html');
@@ -625,6 +691,14 @@
         activePlanningVision = activePlanningVision === normalizedVision ? null : normalizedVision;
         updatePlanningVisionButtons();
         renderPlanningTables();
+        loadAcceptedAssignments();
+      };
+
+      const handlePlanningControlsChange = () => {
+        updatePlanningSummary();
+        renderPlanningTables();
+        loadAcceptedAssignments();
+        subscribeToChoiceChanges();
       };
 
       const measurePlanningCellSize = () => {
@@ -774,6 +848,7 @@
       let editingSlot = null;
       let usersChannel;
       let planningChannel;
+      let choicesChannel;
       let allUsers = [];
       let planningSlots = [];
       const planningAssignments = new Map();
@@ -781,6 +856,9 @@
       let planningLoading = false;
       let openPlanningConfigMenu = null;
       let planningLoadToken = 0;
+      let assignmentsLoadToken = 0;
+      let assignmentsLoading = false;
+      let choiceSubscriptionKey = null;
 
       const focusPlanningTourButton = (index) => {
         if (!planningTourTabs) {
@@ -866,6 +944,7 @@
         }
         selectedTourId = tourId;
         planningAssignments.clear();
+        refreshAssignmentButtons();
         cleanupAssignments();
         closePlanningConfigMenu();
         renderPlanningTourTabs();
@@ -873,7 +952,8 @@
           planningFeedback.textContent = 'Chargement des colonnes…';
         }
         await subscribeToPlanningChanges();
-        loadPlanningColumns(true);
+        await subscribeToChoiceChanges();
+        await loadPlanningColumns(true);
       };
 
       const sanitizeColor = (value) => {
@@ -1148,6 +1228,148 @@
         return `${dayLabel} · ${details.join(' · ')}`;
       };
 
+      const buildProgramLabel = (index, rank) => {
+        const numericIndex = Number.parseInt(index, 10);
+        const numericRank = Number.parseInt(rank, 10);
+        if (!Number.isFinite(numericIndex)) {
+          return '';
+        }
+        if (!Number.isFinite(numericRank) || numericRank <= 1) {
+          return `Programme ${numericIndex}`;
+        }
+        return `Programme ${numericIndex}.${numericRank}`;
+      };
+
+      const pruneAssignmentsBySource = (source) => {
+        if (!source) {
+          return;
+        }
+        [...planningAssignments.entries()].forEach(([slotKey, assignment]) => {
+          if (assignment?.source === source) {
+            planningAssignments.delete(slotKey);
+          }
+        });
+      };
+
+      const loadAcceptedAssignments = async () => {
+        const reference = getActivePlanningReference();
+        assignmentsLoading = true;
+        if (!reference) {
+          pruneAssignmentsBySource(ASSIGNMENT_SOURCE_ACCEPTED);
+          refreshAssignmentButtons();
+          assignmentsLoading = false;
+          return;
+        }
+
+        await onSupabaseReady();
+        const supabase = getSupabaseClient();
+        if (!supabase) {
+          assignmentsLoading = false;
+          return;
+        }
+
+        const requestToken = ++assignmentsLoadToken;
+        const { data, error } = await supabase
+          .from('planning_choices')
+          .select(
+            'id, user_id, trigram, user_type, day, column_number, choice_index, choice_rank'
+          )
+          .eq('planning_reference', reference)
+          .eq('tour_number', selectedTourId)
+          .eq('etat', 'validé')
+          .eq('is_active', true);
+
+        if (requestToken !== assignmentsLoadToken) {
+          assignmentsLoading = false;
+          return;
+        }
+
+        pruneAssignmentsBySource(ASSIGNMENT_SOURCE_ACCEPTED);
+
+        if (error) {
+          console.error(error);
+          refreshAssignmentButtons();
+          assignmentsLoading = false;
+          return;
+        }
+
+        (data ?? []).forEach((record) => {
+          if (!record || record.column_number == null) {
+            return;
+          }
+          const dayKey = toIsoDate(record.day);
+          if (!dayKey) {
+            return;
+          }
+          const slotKey = `${dayKey}:${record.column_number}`;
+          const trigram = typeof record.trigram === 'string'
+            ? record.trigram.trim().toUpperCase()
+            : '';
+          const normalizedRole = normalizeRole(record.user_type) || record.user_type || '';
+          const programLabel = buildProgramLabel(record.choice_index, record.choice_rank);
+          const numericIndex = Number.parseInt(record.choice_index, 10);
+          const numericRank = Number.parseInt(record.choice_rank, 10);
+          planningAssignments.set(slotKey, {
+            id: record.user_id ?? null,
+            trigram: trigram || '—',
+            role: normalizedRole,
+            username: record.trigram ?? '',
+            programLabel,
+            programIndex: Number.isFinite(numericIndex) ? numericIndex : null,
+            programRank: Number.isFinite(numericRank) ? numericRank : null,
+            source: ASSIGNMENT_SOURCE_ACCEPTED
+          });
+        });
+
+        refreshAssignmentButtons();
+        assignmentsLoading = false;
+      };
+
+      const subscribeToChoiceChanges = async () => {
+        const reference = getActivePlanningReference();
+        const key = reference ? `${reference}::${selectedTourId}` : null;
+        if (!reference) {
+          if (choicesChannel) {
+            await choicesChannel.unsubscribe();
+            choicesChannel = null;
+          }
+          choiceSubscriptionKey = null;
+          return;
+        }
+
+        if (choicesChannel && key === choiceSubscriptionKey) {
+          return;
+        }
+
+        await onSupabaseReady();
+        const supabase = getSupabaseClient();
+        if (!supabase) {
+          return;
+        }
+
+        if (choicesChannel) {
+          await choicesChannel.unsubscribe();
+        }
+
+        choicesChannel = supabase
+          .channel(`planning-choices-${selectedTourId}`)
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'planning_choices' }, (payload) => {
+            const record = payload?.new ?? payload?.old ?? null;
+            if (!record) {
+              loadAcceptedAssignments();
+              return;
+            }
+            const matchesTour = Number(record.tour_number) === Number(selectedTourId);
+            const matchesReference = record.planning_reference === reference;
+            if (matchesTour && matchesReference) {
+              loadAcceptedAssignments();
+            }
+          })
+          .subscribe();
+
+        choiceSubscriptionKey = key;
+      };
+
       const updateAssignmentButton = (button) => {
         if (!button) {
           return;
@@ -1157,6 +1379,7 @@
         const srLabel = button.querySelector('.sr-only');
         const tag = button.querySelector('.planning-assignment-tag');
         const roleLabel = button.querySelector('.planning-assignment-role');
+        const programLabel = button.querySelector('.planning-assignment-program');
         if (!slotKey) {
           schedulePlanningCellSize();
           return;
@@ -1179,6 +1402,11 @@
           }
           button.title = summary ? `${summary} · Indisponible` : 'Créneau indisponible';
           button.dataset.assignmentUserId = '';
+          if (programLabel) {
+            programLabel.textContent = '';
+            programLabel.classList.add('is-empty');
+          }
+          button.dataset.assignmentSource = '';
           schedulePlanningCellSize();
           return;
         }
@@ -1197,6 +1425,11 @@
           }
           button.title = summary ? `${summary} · Libre` : 'Créneau libre';
           button.dataset.assignmentUserId = '';
+          if (programLabel) {
+            programLabel.textContent = '';
+            programLabel.classList.add('is-empty');
+          }
+          button.dataset.assignmentSource = '';
           schedulePlanningCellSize();
           return;
         }
@@ -1214,11 +1447,41 @@
             roleLabel.classList.remove('is-empty');
           }
         }
-        if (srLabel) {
-          srLabel.textContent = summary ? `${summary} · ${assignment.trigram}` : assignment.trigram;
+        if (programLabel) {
+          if (assignment.programLabel) {
+            programLabel.textContent = assignment.programLabel;
+            programLabel.classList.remove('is-empty');
+          } else {
+            programLabel.textContent = '';
+            programLabel.classList.add('is-empty');
+          }
         }
-        button.title = summary ? `${summary} · ${assignment.trigram}` : assignment.trigram;
-        button.dataset.assignmentUserId = String(assignment.id);
+        if (srLabel) {
+          const srParts = [];
+          if (summary) {
+            srParts.push(summary);
+          }
+          if (assignment.trigram) {
+            srParts.push(assignment.trigram);
+          }
+          if (assignment.programLabel) {
+            srParts.push(assignment.programLabel);
+          }
+          srLabel.textContent = srParts.length ? srParts.join(' · ') : 'Créneau attribué';
+        }
+        const titleParts = [];
+        if (summary) {
+          titleParts.push(summary);
+        }
+        if (assignment.trigram) {
+          titleParts.push(assignment.trigram);
+        }
+        if (assignment.programLabel) {
+          titleParts.push(assignment.programLabel);
+        }
+        button.title = titleParts.length ? titleParts.join(' · ') : summary || assignment.trigram || '';
+        button.dataset.assignmentUserId = assignment.id != null ? String(assignment.id) : '';
+        button.dataset.assignmentSource = assignment.source ?? '';
         schedulePlanningCellSize();
       };
 
@@ -1287,6 +1550,9 @@
       const cleanupAssignments = () => {
         const validIds = new Set(allUsers.map((user) => String(user.id)));
         [...planningAssignments.entries()].forEach(([slotKey, assignment]) => {
+          if (assignment?.source === ASSIGNMENT_SOURCE_ACCEPTED) {
+            return;
+          }
           if (!validIds.has(String(assignment.id))) {
             planningAssignments.delete(slotKey);
           }
@@ -1506,6 +1772,10 @@
             const roleLabel = document.createElement('span');
             roleLabel.className = 'planning-assignment-role';
             button.appendChild(roleLabel);
+
+            const programLabel = document.createElement('span');
+            programLabel.className = 'planning-assignment-program';
+            button.appendChild(programLabel);
 
             const srLabel = document.createElement('span');
             srLabel.className = 'sr-only';
@@ -2208,6 +2478,7 @@
         }
         renderPlanningTables();
         renderPlanningConfig();
+        await loadAcceptedAssignments();
         if (requestToken === planningLoadToken) {
           planningLoading = false;
         }
@@ -2367,6 +2638,8 @@
           applyAdministrativeSettings(data);
           renderPlanningTourTabs();
           renderPlanningTables();
+          await loadAcceptedAssignments();
+          await subscribeToChoiceChanges();
 
           if (adminSettingsFeedback) {
             adminSettingsFeedback.textContent = 'Paramètres enregistrés.';
@@ -2604,15 +2877,21 @@
               }
               return;
             }
+            const normalizedRole = normalizeRole(user.role) || user.role;
             planningAssignments.set(slotKey, {
               id: user.id,
               trigram: getUserTrigram(user),
-              role: user.role,
-              username: user.username
+              role: normalizedRole,
+              username: user.username,
+              programLabel: null,
+              programIndex: null,
+              programRank: null,
+              source: ASSIGNMENT_SOURCE_MANUAL
             });
           }
           updateAssignmentButton(activeAssignmentButton);
           closeAssignmentModal();
+          loadAcceptedAssignments();
         });
       }
 
@@ -2803,6 +3082,10 @@
       });
       updatePlanningVisionButtons();
 
+      planningYearSelect?.addEventListener('change', handlePlanningControlsChange);
+      planningMonthOneSelect?.addEventListener('change', handlePlanningControlsChange);
+      planningMonthTwoSelect?.addEventListener('change', handlePlanningControlsChange);
+
       const initializeAdminPage = async () => {
         applyAdministrativeSettings(null);
 
@@ -2823,8 +3106,10 @@
 
         loadUsers();
         loadPlanningColumns();
+        loadAcceptedAssignments();
         subscribeToUserChanges();
         subscribeToPlanningChanges();
+        subscribeToChoiceChanges();
       };
 
       initializeAdminPage();
@@ -2832,6 +3117,7 @@
       window.addEventListener('beforeunload', () => {
         usersChannel?.unsubscribe();
         planningChannel?.unsubscribe();
+        choicesChannel?.unsubscribe();
       });
 
     </script>
