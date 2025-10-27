@@ -32,6 +32,7 @@
             <p>Gérez les comptes grâce aux trigrammes de vos collaborateurs.</p>
           </div>
           <nav>
+            <button id="open-request-processing" type="button">Traitement des demandes</button>
             <button id="open-admin-settings" type="button">Paramètres administrateur</button>
             <button id="disconnect" class="secondary" type="button">Changer d'instance</button>
             <button id="logout" class="secondary" type="button">Se déconnecter</button>
@@ -585,6 +586,7 @@
       const adminSettingsFeedback = document.querySelector('#admin-settings-feedback');
       const activeTourSelect = document.querySelector('#active-tour-select');
       const adminInstructionsField = document.querySelector('#admin-instructions');
+      const requestProcessingBtn = document.querySelector('#open-request-processing');
       const planningConfigContainer = document.querySelector('#planning-config');
       const planningTables = document.querySelector('#planning-tables');
       const planningFeedback = document.querySelector('#planning-feedback');
@@ -594,6 +596,12 @@
         normale: planningVisionNormale,
         bonne: planningVisionBonne
       };
+
+      if (requestProcessingBtn) {
+        requestProcessingBtn.addEventListener('click', () => {
+          window.location.assign('traitement-demandes.html');
+        });
+      }
 
       let adminSettingsRecordId = null;
       let administrativeSettings = null;
