@@ -40,32 +40,37 @@
         </header>
 
         <section class="request-controls" aria-label="Filtres et onglets">
+          <nav
+            id="request-user-tabs"
+            class="request-tabs request-user-tabs"
+            role="tablist"
+            aria-label="Type de compte"
+          >
+            <button
+              type="button"
+              class="request-tab"
+              data-user-type-tab="medecin"
+              role="tab"
+              aria-controls="requests-table"
+              aria-selected="false"
+            >
+              Médecins
+            </button>
+            <button
+              type="button"
+              class="request-tab"
+              data-user-type-tab="remplacant"
+              role="tab"
+              aria-controls="requests-table"
+              aria-selected="false"
+            >
+              Remplaçants
+            </button>
+          </nav>
+
           <nav id="request-tabs" class="request-tabs" role="tablist" aria-label="Statut des demandes"></nav>
 
           <form id="request-filters" class="request-filters" aria-label="Filtres des demandes">
-            <div
-              class="request-filter-toggle"
-              role="group"
-              aria-label="Filtrer les demandes par type de compte"
-            >
-              <span class="request-filter-toggle-label">Type de compte</span>
-              <button
-                type="button"
-                class="secondary request-filter-toggle-button"
-                data-user-type-filter="medecin"
-                aria-pressed="false"
-              >
-                Médecins
-              </button>
-              <button
-                type="button"
-                class="secondary request-filter-toggle-button"
-                data-user-type-filter="remplacant"
-                aria-pressed="false"
-              >
-                Remplaçants
-              </button>
-            </div>
             <div class="request-filter-field">
               <label for="filter-date">Date</label>
               <input id="filter-date" name="date" type="date" />
@@ -82,8 +87,15 @@
             </div>
 
             <div class="request-filter-field">
-              <label for="filter-doctor">Médecin</label>
-              <input id="filter-doctor" name="doctor" type="text" inputmode="text" autocomplete="off" placeholder="Trigramme" />
+              <label for="filter-doctor">Utilisateur</label>
+              <input
+                id="filter-doctor"
+                name="doctor"
+                type="text"
+                inputmode="text"
+                autocomplete="off"
+                placeholder="Trigramme"
+              />
             </div>
 
             <div class="request-filter-field">
@@ -118,10 +130,11 @@
               <thead>
                 <tr>
                   <th scope="col" data-column="date">Date de la garde</th>
-                  <th scope="col" data-column="column">Colonne</th>
+                  <th scope="col" data-column="columnLabel">Intitulé de colonne</th>
+                  <th scope="col" data-column="columnNumber">N° de colonne</th>
                   <th scope="col" data-column="type">Type</th>
                   <th scope="col" data-column="hours">Horaires</th>
-                  <th scope="col" data-column="doctor">Médecin</th>
+                  <th scope="col" data-column="user">Utilisateur</th>
                   <th scope="col" data-column="priority">Index de priorité</th>
                   <th scope="col" data-column="quality">Qualité</th>
                   <th scope="col" data-column="status">Statut</th>
