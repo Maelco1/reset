@@ -43,6 +43,29 @@
           <nav id="request-tabs" class="request-tabs" role="tablist" aria-label="Statut des demandes"></nav>
 
           <form id="request-filters" class="request-filters" aria-label="Filtres des demandes">
+            <div
+              class="request-filter-toggle"
+              role="group"
+              aria-label="Filtrer les demandes par type de compte"
+            >
+              <span class="request-filter-toggle-label">Type de compte</span>
+              <button
+                type="button"
+                class="secondary request-filter-toggle-button"
+                data-user-type-filter="medecin"
+                aria-pressed="false"
+              >
+                Médecins
+              </button>
+              <button
+                type="button"
+                class="secondary request-filter-toggle-button"
+                data-user-type-filter="remplacant"
+                aria-pressed="false"
+              >
+                Remplaçants
+              </button>
+            </div>
             <div class="request-filter-field">
               <label for="filter-date">Date</label>
               <input id="filter-date" name="date" type="date" />
