@@ -1558,7 +1558,8 @@ export function initializePlanningChoices({ userRole }) {
       const slotLabel = rawLabel || `Colonne ${slot.position}`;
       const slotType = slot.type_code ?? '';
       const slotTime = getSlotTimeRange(slot);
-      const buttonTitleParts = [slotNumber, slotLabel];
+      const maskedSlotLabel = 'Titre masqué';
+      const buttonTitleParts = [slotNumber, maskedSlotLabel];
       if (slotType) {
         buttonTitleParts.push(slotType);
       }
@@ -1579,6 +1580,7 @@ export function initializePlanningChoices({ userRole }) {
       button.style.setProperty('--slot-text-color', slotTextColor);
       button.title = buttonTitle;
       button.setAttribute('aria-label', buttonTitle);
+      button.dataset.columnLabel = slotLabel;
       const headingSpan = document.createElement('span');
       headingSpan.className = 'planning-slot-heading';
       if (slotType) {
@@ -1589,7 +1591,7 @@ export function initializePlanningChoices({ userRole }) {
       }
       const titleLabel = document.createElement('span');
       titleLabel.className = 'planning-slot-title';
-      titleLabel.textContent = slotLabel;
+      titleLabel.textContent = maskedSlotLabel;
       headingSpan.appendChild(titleLabel);
       const metaParts = [];
       if (slotTime) {
