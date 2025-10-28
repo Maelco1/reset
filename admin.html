@@ -3089,6 +3089,46 @@
         labelInput?.focus();
       };
 
+      const propagateSharedSlotSettings = async ({
+        supabase,
+        sourceTable,
+        position,
+        sharedFields
+      }) => {
+        const errors = [];
+        const otherTables = PLANNING_TOURS.map((tour) => tour.table).filter(
+          (table) => table !== sourceTable
+        );
+        await Promise.all(
+          otherTables.map(async (tableName) => {
+            const { data: updated, error: updateError } = await supabase
+              .from(tableName)
+              .update(sharedFields)
+              .eq('position', position)
+              .select('position');
+            if (updateError) {
+              errors.push({ tableName, error: updateError });
+              return;
+            }
+            if (!updated || updated.length === 0) {
+              const defaultSlot = getDefaultSlot(position);
+              const insertPayload = {
+                ...defaultSlot,
+                ...sharedFields,
+                position
+              };
+              const { error: insertError } = await supabase
+                .from(tableName)
+                .upsert(insertPayload, { onConflict: 'position' });
+              if (insertError) {
+                errors.push({ tableName, error: insertError });
+              }
+            }
+          })
+        );
+        return errors;
+      };
+
       const handleSlotSubmit = async (event) => {
         event.preventDefault();
         const formData = new FormData(slotForm);
@@ -3113,8 +3153,10 @@
         const openBonneWeekdays = selectToBoolean(formData.get('openBonneWeekdays'), true);
         const openBonneSaturday = selectToBoolean(formData.get('openBonneSaturday'), true);
         const openBonneSunday = selectToBoolean(formData.get('openBonneSunday'), true);
-        const startTime = formData.get('startTime') || null;
-        const endTime = formData.get('endTime') || null;
+        const rawStartTime = formData.get('startTime');
+        const rawEndTime = formData.get('endTime');
+        const startTime = rawStartTime && rawStartTime !== '' ? rawStartTime : null;
+        const endTime = rawEndTime && rawEndTime !== '' ? rawEndTime : null;
         if (slotFeedback) {
           slotFeedback.textContent = 'Enregistrement en cours…';
         }
@@ -3125,8 +3167,8 @@
           label: label || typeCode || `Colonne ${position}`,
           type_code: typeCode || null,
           type_category: typeCategory,
-          start_time: startTime && startTime !== '' ? startTime : null,
-          end_time: endTime && endTime !== '' ? endTime : null,
+          start_time: startTime,
+          end_time: endTime,
           color,
           quality_weekdays: qualityWeekdays,
           quality_saturday: qualitySaturday,
@@ -3146,6 +3188,23 @@
             slotFeedback.textContent = "Impossible d'enregistrer la colonne.";
           }
           return;
+        }
+        const sharedFields = {
+          label: payload.label,
+          type_code: payload.type_code,
+          type_category: payload.type_category,
+          start_time: payload.start_time,
+          end_time: payload.end_time,
+          color: payload.color
+        };
+        const propagationErrors = await propagateSharedSlotSettings({
+          supabase,
+          sourceTable: tableName,
+          position,
+          sharedFields
+        });
+        if (propagationErrors.length) {
+          console.error('Propagation errors', propagationErrors);
         }
         await loadPlanningColumns(true);
         closeSlotModal();
