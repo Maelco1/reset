@@ -431,6 +431,45 @@ main {
    ========================= */
 .planning-section { display: grid; gap: 24px; }
 
+.planning-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.planning-tab {
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  background: rgba(248, 250, 252, 0.85);
+  color: var(--primary);
+  border-radius: 999px;
+  padding: 8px 18px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition), border-color var(--transition), box-shadow var(--transition);
+  box-shadow: none;
+}
+
+.planning-tab:hover {
+  background: rgba(37, 99, 235, 0.12);
+  border-color: rgba(37, 99, 235, 0.35);
+  color: #1d4ed8;
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.12);
+}
+
+.planning-tab:focus-visible {
+  outline: 3px solid var(--focus-ring-color);
+  outline-offset: 2px;
+}
+
+.planning-tab.is-active,
+.planning-tab[aria-selected='true'] {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+  box-shadow: var(--shadow);
+}
+
 .planning-controls {
   display: grid; gap: 16px; align-items: end;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
