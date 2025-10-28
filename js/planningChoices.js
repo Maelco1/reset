@@ -483,6 +483,16 @@ const getPlanningReference = ({ tourId, year, monthOne, monthTwo }) => {
   return `tour${tourId}-${year}-${toPart(monthOne)}-${toPart(monthTwo)}`;
 };
 
+const getSharedPlanningReferences = ({ year, monthOne, monthTwo }) => {
+  if (!Number.isInteger(year) || !Number.isInteger(monthOne) || !Number.isInteger(monthTwo)) {
+    return [];
+  }
+  const uniqueReferences = new Set(
+    PLANNING_TOURS.map(({ id }) => getPlanningReference({ tourId: id, year, monthOne, monthTwo }))
+  );
+  return Array.from(uniqueReferences);
+};
+
 const formatSummaryLabel = (selection) => {
   const monthName = MONTH_NAMES[selection.dayDate.getMonth()];
   const dayNumber = String(selection.dayDate.getDate()).padStart(2, '0');
@@ -671,10 +681,15 @@ export function initializePlanningChoices({ userRole }) {
   };
 
   const getAssignmentSubscriptionKey = () => {
-    if (!state.planningReference || !Number.isFinite(state.selectedTourId)) {
+    const references = getSharedPlanningReferences({
+      year: state.planningYear,
+      monthOne: state.planningMonthOne,
+      monthTwo: state.planningMonthTwo
+    });
+    if (!references.length) {
       return null;
     }
-    return `${state.planningReference}::${state.selectedTourId}`;
+    return references.sort().join('|');
   };
 
   const setPlanningFeedback = (message) => {
@@ -1854,8 +1869,12 @@ export function initializePlanningChoices({ userRole }) {
   };
 
   const loadAcceptedAssignments = async () => {
-    const reference = state.planningReference;
-    if (!reference || !Number.isFinite(state.selectedTourId)) {
+    const references = getSharedPlanningReferences({
+      year: state.planningYear,
+      monthOne: state.planningMonthOne,
+      monthTwo: state.planningMonthTwo
+    });
+    if (!references.length) {
       state.assignments = new Map();
       applyAssignmentsToButtons();
       updateButtonAvailability();
@@ -1877,8 +1896,7 @@ export function initializePlanningChoices({ userRole }) {
     const { data, error } = await supabase
       .from('planning_choices')
       .select('id, user_id, trigram, user_type, day, column_number')
-      .eq('planning_reference', reference)
-      .eq('tour_number', state.selectedTourId)
+      .in('planning_reference', references)
       .eq('etat', 'validé')
       .eq('is_active', true);
 
@@ -1950,16 +1968,21 @@ export function initializePlanningChoices({ userRole }) {
     }
 
     state.assignmentChannel = supabase
-      .channel(`planning-choices-entry-${state.selectedTourId}`)
+      .channel(`planning-choices-entry-${key}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'planning_choices' }, (payload) => {
         const record = payload?.new ?? payload?.old ?? null;
         if (!record) {
           loadAcceptedAssignments();
           return;
         }
-        const matchesTour = Number(record.tour_number) === Number(state.selectedTourId);
-        const matchesReference = record.planning_reference === state.planningReference;
-        if (matchesTour && matchesReference) {
+        const references = new Set(
+          getSharedPlanningReferences({
+            year: state.planningYear,
+            monthOne: state.planningMonthOne,
+            monthTwo: state.planningMonthTwo
+          })
+        );
+        if (references.has(record.planning_reference)) {
           loadAcceptedAssignments();
         }
       })
