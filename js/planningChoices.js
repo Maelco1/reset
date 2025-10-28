@@ -620,7 +620,7 @@ export function initializePlanningChoices({ userRole }) {
     button.dataset.assignmentLabel = trigram;
     button.dataset.assignmentUserId = assignment.userId != null ? String(assignment.userId) : '';
     if (tag) {
-      tag.textContent = trigram || '—';
+      tag.textContent = trigram || '';
       if (trigram) {
         tag.classList.remove('is-empty');
       } else {
@@ -1033,10 +1033,11 @@ export function initializePlanningChoices({ userRole }) {
       if (assignmentState) {
         const assignmentLabel = button.dataset.assignmentLabel ?? '';
         if (tag) {
-          const label = assignmentLabel || '—';
-          tag.textContent = label;
+          tag.textContent = assignmentLabel || '';
           if (assignmentLabel) {
             tag.classList.remove('is-empty');
+          } else {
+            tag.classList.add('is-empty');
           }
         }
         if (srLabel) {
@@ -1925,7 +1926,7 @@ export function initializePlanningChoices({ userRole }) {
         : '';
       nextAssignments.set(slotKey, {
         userId: record.user_id ?? null,
-        trigram: trigram || '—',
+        trigram,
         userType: record.user_type ?? ''
       });
     });

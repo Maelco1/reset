@@ -1601,7 +1601,7 @@
           const programLabel = programParts.join(' · ');
           planningAssignments.set(slotKey, {
             id: record.user_id ?? null,
-            trigram: trigram || '—',
+            trigram,
             role: normalizedRole,
             username: record.trigram ?? '',
             programLabel,
@@ -1743,26 +1743,19 @@
         }
         if (tag) {
           tag.textContent = assignment.trigram;
-          tag.classList.remove('is-empty');
+          if (assignment.trigram) {
+            tag.classList.remove('is-empty');
+          } else {
+            tag.classList.add('is-empty');
+          }
         }
         if (roleLabel) {
-          const roleText = ASSIGNMENT_ROLE_LABELS[assignment.role] ?? '';
-          if (assignment.role === 'medecin' || !roleText) {
-            roleLabel.textContent = '';
-            roleLabel.classList.add('is-empty');
-          } else {
-            roleLabel.textContent = roleText;
-            roleLabel.classList.remove('is-empty');
-          }
+          roleLabel.textContent = '';
+          roleLabel.classList.add('is-empty');
         }
         if (programLabel) {
-          if (assignment.programLabel) {
-            programLabel.textContent = assignment.programLabel;
-            programLabel.classList.remove('is-empty');
-          } else {
-            programLabel.textContent = '';
-            programLabel.classList.add('is-empty');
-          }
+          programLabel.textContent = '';
+          programLabel.classList.add('is-empty');
         }
         if (srLabel) {
           const srParts = [];
@@ -1772,9 +1765,6 @@
           if (assignment.trigram) {
             srParts.push(assignment.trigram);
           }
-          if (assignment.programLabel) {
-            srParts.push(assignment.programLabel);
-          }
           srLabel.textContent = srParts.length ? srParts.join(' · ') : 'Créneau attribué';
         }
         const titleParts = [];
@@ -1783,9 +1773,6 @@
         }
         if (assignment.trigram) {
           titleParts.push(assignment.trigram);
-        }
-        if (assignment.programLabel) {
-          titleParts.push(assignment.programLabel);
         }
         button.title = titleParts.length ? titleParts.join(' · ') : summary || assignment.trigram || '';
         button.dataset.assignmentUserId = assignment.id != null ? String(assignment.id) : '';
