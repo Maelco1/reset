@@ -1147,11 +1147,36 @@
         const activeTour = getTourConfig();
         const totalTabs = PLANNING_TOURS.length + 1;
         planningTourTabs.innerHTML = '';
+
+        const consolidatedIndex = 0;
+        const consolidatedButton = document.createElement('button');
+        consolidatedButton.type = 'button';
+        consolidatedButton.className = 'planning-tab';
+        consolidatedButton.dataset.index = String(consolidatedIndex);
+        consolidatedButton.id = 'planning-tour-consolidated';
+        consolidatedButton.setAttribute('role', 'tab');
+        consolidatedButton.setAttribute('aria-controls', 'planning-board');
+        consolidatedButton.textContent = 'General';
+        const consolidatedActive = isConsolidatedView;
+        if (consolidatedActive) {
+          consolidatedButton.classList.add('is-active');
+        }
+        consolidatedButton.setAttribute('aria-selected', consolidatedActive ? 'true' : 'false');
+        consolidatedButton.setAttribute('tabindex', consolidatedActive ? '0' : '-1');
+        consolidatedButton.addEventListener('click', () => {
+          selectConsolidatedPlanning();
+        });
+        consolidatedButton.addEventListener('keydown', (event) => {
+          handlePlanningTourKeydown(event, consolidatedIndex, totalTabs, () => selectConsolidatedPlanning());
+        });
+        planningTourTabs.appendChild(consolidatedButton);
+
         PLANNING_TOURS.forEach((tour, index) => {
+          const tabIndex = index + 1;
           const button = document.createElement('button');
           button.type = 'button';
           button.className = 'planning-tab';
-          button.dataset.index = String(index);
+          button.dataset.index = String(tabIndex);
           button.id = `planning-tour-${tour.id}`;
           button.setAttribute('role', 'tab');
           button.setAttribute('aria-controls', 'planning-board');
@@ -1166,33 +1191,10 @@
             selectPlanningTour(tour.id);
           });
           button.addEventListener('keydown', (event) => {
-            handlePlanningTourKeydown(event, index, totalTabs, () => selectPlanningTour(tour.id));
+            handlePlanningTourKeydown(event, tabIndex, totalTabs, () => selectPlanningTour(tour.id));
           });
           planningTourTabs.appendChild(button);
         });
-
-        const consolidatedButton = document.createElement('button');
-        const consolidatedIndex = PLANNING_TOURS.length;
-        consolidatedButton.type = 'button';
-        consolidatedButton.className = 'planning-tab';
-        consolidatedButton.dataset.index = String(consolidatedIndex);
-        consolidatedButton.id = 'planning-tour-consolidated';
-        consolidatedButton.setAttribute('role', 'tab');
-        consolidatedButton.setAttribute('aria-controls', 'planning-board');
-        consolidatedButton.textContent = 'Planning consolidé';
-        const consolidatedActive = isConsolidatedView;
-        if (consolidatedActive) {
-          consolidatedButton.classList.add('is-active');
-        }
-        consolidatedButton.setAttribute('aria-selected', consolidatedActive ? 'true' : 'false');
-        consolidatedButton.setAttribute('tabindex', consolidatedActive ? '0' : '-1');
-        consolidatedButton.addEventListener('click', () => {
-          selectConsolidatedPlanning();
-        });
-        consolidatedButton.addEventListener('keydown', (event) => {
-          handlePlanningTourKeydown(event, consolidatedIndex, totalTabs, () => selectConsolidatedPlanning());
-        });
-        planningTourTabs.appendChild(consolidatedButton);
       };
 
       const selectPlanningTour = async (tourId) => {
