@@ -1953,10 +1953,9 @@
           const slotNumber = String(slot.position).padStart(2, '0');
           const rawLabel = (slot.label ?? '').trim();
           const slotLabel = rawLabel || `Colonne ${slot.position}`;
-          const maskedSlotLabel = 'Titre masqué';
           const slotType = slot.type_code ?? '';
           const slotTime = getSlotTimeRange(slot);
-          const buttonTitleParts = [slotNumber, maskedSlotLabel];
+          const buttonTitleParts = [slotNumber];
           if (slotType) {
             buttonTitleParts.push(slotType);
           }
@@ -1986,10 +1985,6 @@
             typeLabel.textContent = slotType;
             heading.appendChild(typeLabel);
           }
-          const titleLabel = document.createElement('span');
-          titleLabel.className = 'planning-slot-title';
-          titleLabel.textContent = maskedSlotLabel;
-          heading.appendChild(titleLabel);
           const metaParts = [];
           if (slotTime) {
             metaParts.push(slotTime);
