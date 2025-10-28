@@ -868,6 +868,8 @@
       const slotFeedback = document.querySelector('#slot-feedback');
       const closeSlotModalBtn = document.querySelector('#close-slot-modal');
       const cancelSlotBtn = document.querySelector('#cancel-slot');
+      const slotQualitiesFieldset = slotForm?.querySelector('.slot-qualities');
+      const slotOpeningsFieldset = slotForm?.querySelector('.slot-openings');
 
       const assignmentModal = document.querySelector('#assignment-modal');
       const assignmentModalSubtitle = document.querySelector('#assignment-modal-subtitle');
@@ -3003,6 +3005,12 @@
         editingSlot = slot;
         if (slotFeedback) {
           slotFeedback.textContent = '';
+        }
+        if (slotQualitiesFieldset) {
+          slotQualitiesFieldset.classList.toggle('hidden', isConsolidatedView);
+        }
+        if (slotOpeningsFieldset) {
+          slotOpeningsFieldset.classList.toggle('hidden', isConsolidatedView);
         }
         const position = slot.position;
         if (slotModalSubtitle) {
