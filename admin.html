@@ -523,6 +523,7 @@
       const ADMIN_SETTINGS_TABLE = 'parametres_administratifs';
 
       let selectedTourId = PLANNING_TOURS[0].id;
+      let isConsolidatedView = false;
 
       const getTourConfig = (tourId = selectedTourId) =>
         PLANNING_TOURS.find((tour) => tour.id === tourId) ?? PLANNING_TOURS[0];
@@ -656,6 +657,20 @@
           return null;
         }
         return `tour${selectedTourId}-${year}-${toMonthPart(monthOne)}-${toMonthPart(monthTwo)}`;
+      };
+
+      const getActivePlanningReferences = () => {
+        const year = getSelectedYear();
+        const monthOne = getSelectedMonthOne();
+        const monthTwo = getSelectedMonthTwo();
+        if (!Number.isInteger(year) || !Number.isInteger(monthOne) || !Number.isInteger(monthTwo)) {
+          return [];
+        }
+        const reference = `tour${selectedTourId}-${year}-${toMonthPart(monthOne)}-${toMonthPart(monthTwo)}`;
+        if (!isConsolidatedView) {
+          return reference ? [reference] : [];
+        }
+        return PLANNING_TOURS.map(({ id }) => `tour${id}-${year}-${toMonthPart(monthOne)}-${toMonthPart(monthTwo)}`);
       };
 
       const toIsoDate = (value) => {
@@ -1089,8 +1104,7 @@
         }
       };
 
-      const handlePlanningTourKeydown = (event, index, tourId) => {
-        const total = PLANNING_TOURS.length;
+      const handlePlanningTourKeydown = (event, index, total, onSelect) => {
         if (!total) {
           return;
         }
@@ -1118,7 +1132,7 @@
           case ' ':
           case 'Enter': {
             event.preventDefault();
-            selectPlanningTour(tourId);
+            onSelect();
             break;
           }
           default:
@@ -1131,6 +1145,7 @@
           return;
         }
         const activeTour = getTourConfig();
+        const totalTabs = PLANNING_TOURS.length + 1;
         planningTourTabs.innerHTML = '';
         PLANNING_TOURS.forEach((tour, index) => {
           const button = document.createElement('button');
@@ -1141,7 +1156,7 @@
           button.setAttribute('role', 'tab');
           button.setAttribute('aria-controls', 'planning-board');
           button.textContent = tour.label;
-          const isActive = tour.id === activeTour.id;
+          const isActive = !isConsolidatedView && tour.id === activeTour.id;
           if (isActive) {
             button.classList.add('is-active');
           }
@@ -1151,14 +1166,42 @@
             selectPlanningTour(tour.id);
           });
           button.addEventListener('keydown', (event) => {
-            handlePlanningTourKeydown(event, index, tour.id);
+            handlePlanningTourKeydown(event, index, totalTabs, () => selectPlanningTour(tour.id));
           });
           planningTourTabs.appendChild(button);
         });
+
+        const consolidatedButton = document.createElement('button');
+        const consolidatedIndex = PLANNING_TOURS.length;
+        consolidatedButton.type = 'button';
+        consolidatedButton.className = 'planning-tab';
+        consolidatedButton.dataset.index = String(consolidatedIndex);
+        consolidatedButton.id = 'planning-tour-consolidated';
+        consolidatedButton.setAttribute('role', 'tab');
+        consolidatedButton.setAttribute('aria-controls', 'planning-board');
+        consolidatedButton.textContent = 'Planning consolidé';
+        const consolidatedActive = isConsolidatedView;
+        if (consolidatedActive) {
+          consolidatedButton.classList.add('is-active');
+        }
+        consolidatedButton.setAttribute('aria-selected', consolidatedActive ? 'true' : 'false');
+        consolidatedButton.setAttribute('tabindex', consolidatedActive ? '0' : '-1');
+        consolidatedButton.addEventListener('click', () => {
+          selectConsolidatedPlanning();
+        });
+        consolidatedButton.addEventListener('keydown', (event) => {
+          handlePlanningTourKeydown(event, consolidatedIndex, totalTabs, () => selectConsolidatedPlanning());
+        });
+        planningTourTabs.appendChild(consolidatedButton);
       };
 
       const selectPlanningTour = async (tourId) => {
-        if (tourId === selectedTourId) {
+        if (!Number.isInteger(tourId)) {
+          return;
+        }
+        const wasConsolidated = isConsolidatedView;
+        isConsolidatedView = false;
+        if (!wasConsolidated && tourId === selectedTourId) {
           return;
         }
         selectedTourId = tourId;
@@ -1173,6 +1216,16 @@
         await subscribeToPlanningChanges();
         await subscribeToChoiceChanges();
         await loadPlanningColumns(true);
+      };
+
+      const selectConsolidatedPlanning = async () => {
+        if (isConsolidatedView) {
+          return;
+        }
+        isConsolidatedView = true;
+        renderPlanningTourTabs();
+        await subscribeToChoiceChanges();
+        loadAcceptedAssignments();
       };
 
       const sanitizeColor = (value) => {
@@ -1471,9 +1524,9 @@
       };
 
       const loadAcceptedAssignments = async () => {
-        const reference = getActivePlanningReference();
+        const references = getActivePlanningReferences();
         assignmentsLoading = true;
-        if (!reference) {
+        if (!references.length) {
           pruneAssignmentsBySource(ASSIGNMENT_SOURCE_ACCEPTED);
           refreshAssignmentButtons();
           assignmentsLoading = false;
@@ -1488,15 +1541,20 @@
         }
 
         const requestToken = ++assignmentsLoadToken;
-        const { data, error } = await supabase
+        let query = supabase
           .from('planning_choices')
           .select(
-            'id, user_id, trigram, user_type, day, column_number, choice_index, choice_rank'
+            'id, user_id, trigram, user_type, day, column_number, choice_index, choice_rank, tour_number, planning_reference'
           )
-          .eq('planning_reference', reference)
-          .eq('tour_number', selectedTourId)
+          .in('planning_reference', references)
           .eq('etat', 'validé')
           .eq('is_active', true);
+
+        if (!isConsolidatedView) {
+          query = query.eq('tour_number', selectedTourId);
+        }
+
+        const { data, error } = await query;
 
         if (requestToken !== assignmentsLoadToken) {
           assignmentsLoading = false;
@@ -1525,9 +1583,20 @@
             ? record.trigram.trim().toUpperCase()
             : '';
           const normalizedRole = normalizeRole(record.user_type) || record.user_type || '';
-          const programLabel = buildProgramLabel(record.choice_index, record.choice_rank);
+          const baseProgramLabel = buildProgramLabel(record.choice_index, record.choice_rank);
           const numericIndex = Number.parseInt(record.choice_index, 10);
           const numericRank = Number.parseInt(record.choice_rank, 10);
+          const numericTour = Number.parseInt(record.tour_number, 10);
+          const tourLabel = Number.isFinite(numericTour) ? `Tour ${numericTour}` : '';
+          const shouldIncludeTourLabel = isConsolidatedView && tourLabel;
+          const programParts = [];
+          if (shouldIncludeTourLabel) {
+            programParts.push(tourLabel);
+          }
+          if (baseProgramLabel) {
+            programParts.push(baseProgramLabel);
+          }
+          const programLabel = programParts.join(' · ');
           planningAssignments.set(slotKey, {
             id: record.user_id ?? null,
             trigram: trigram || '—',
@@ -1536,7 +1605,9 @@
             programLabel,
             programIndex: Number.isFinite(numericIndex) ? numericIndex : null,
             programRank: Number.isFinite(numericRank) ? numericRank : null,
-            source: ASSIGNMENT_SOURCE_ACCEPTED
+            source: ASSIGNMENT_SOURCE_ACCEPTED,
+            tourNumber: Number.isFinite(numericTour) ? numericTour : null,
+            planningReference: record.planning_reference ?? null
           });
         });
 
@@ -1545,9 +1616,13 @@
       };
 
       const subscribeToChoiceChanges = async () => {
-        const reference = getActivePlanningReference();
-        const key = reference ? `${reference}::${selectedTourId}` : null;
-        if (!reference) {
+        const references = getActivePlanningReferences();
+        const key = references.length
+          ? isConsolidatedView
+            ? `consolidated::${references.join('|')}`
+            : `${references[0]}::${selectedTourId}`
+          : null;
+        if (!references.length) {
           if (choicesChannel) {
             await choicesChannel.unsubscribe();
             choicesChannel = null;
@@ -1570,16 +1645,28 @@
           await choicesChannel.unsubscribe();
         }
 
+        const channelName = isConsolidatedView
+          ? 'planning-choices-consolidated'
+          : `planning-choices-${selectedTourId}`;
+
+        const referenceSet = new Set(references);
+
         choicesChannel = supabase
-          .channel(`planning-choices-${selectedTourId}`)
+          .channel(channelName)
           .on('postgres_changes', { event: '*', schema: 'public', table: 'planning_choices' }, (payload) => {
             const record = payload?.new ?? payload?.old ?? null;
             if (!record) {
               loadAcceptedAssignments();
               return;
             }
+            if (isConsolidatedView) {
+              if (referenceSet.has(record.planning_reference)) {
+                loadAcceptedAssignments();
+              }
+              return;
+            }
             const matchesTour = Number(record.tour_number) === Number(selectedTourId);
-            const matchesReference = record.planning_reference === reference;
+            const matchesReference = record.planning_reference === references[0];
             if (matchesTour && matchesReference) {
               loadAcceptedAssignments();
             }
