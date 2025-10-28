@@ -1558,8 +1558,7 @@ export function initializePlanningChoices({ userRole }) {
       const slotLabel = rawLabel || `Colonne ${slot.position}`;
       const slotType = slot.type_code ?? '';
       const slotTime = getSlotTimeRange(slot);
-      const maskedSlotLabel = 'Titre masqué';
-      const buttonTitleParts = [slotNumber, maskedSlotLabel];
+      const buttonTitleParts = [slotNumber];
       if (slotType) {
         buttonTitleParts.push(slotType);
       }
@@ -1589,10 +1588,6 @@ export function initializePlanningChoices({ userRole }) {
         typeLabel.textContent = slotType;
         headingSpan.appendChild(typeLabel);
       }
-      const titleLabel = document.createElement('span');
-      titleLabel.className = 'planning-slot-title';
-      titleLabel.textContent = maskedSlotLabel;
-      headingSpan.appendChild(titleLabel);
       const metaParts = [];
       if (slotTime) {
         metaParts.push(slotTime);
