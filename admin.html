@@ -279,7 +279,37 @@
 
             <div class="slot-field-group">
               <label for="slot-type-code">Type de colonne (acronyme)</label>
-              <input id="slot-type-code" name="typeCode" type="text" required />
+              <select id="slot-type-code" name="typeCode" required>
+                <option value="">Sélectionnez un type</option>
+                <optgroup label="Visite">
+                  <option value="1N">1N</option>
+                  <option value="2N">2N</option>
+                  <option value="3N">3N</option>
+                  <option value="4C">4C</option>
+                  <option value="5S">5S</option>
+                  <option value="6S">6S</option>
+                  <option value="N">N</option>
+                  <option value="C">C</option>
+                  <option value="S">S</option>
+                  <option value="VIS">VIS</option>
+                </optgroup>
+                <optgroup label="Consultation">
+                  <option value="C1COU">C1COU</option>
+                  <option value="C2COU">C2COU</option>
+                  <option value="C1BOU">C1BOU</option>
+                  <option value="C2BOU">C2BOU</option>
+                  <option value="PFG">PFG</option>
+                  <option value="C1ANT">C1ANT</option>
+                  <option value="C2ANT">C2ANT</option>
+                  <option value="C1">C1</option>
+                  <option value="C2">C2</option>
+                  <option value="C3">C3</option>
+                </optgroup>
+                <optgroup label="Téléconsultation">
+                  <option value="TC">TC</option>
+                  <option value="TCN">TCN</option>
+                </optgroup>
+              </select>
             </div>
 
             <div class="slot-field-group">
@@ -848,15 +878,22 @@
       const cancelAssignmentBtn = document.querySelector('#cancel-assignment');
 
       const slotTypeCodeInput = slotForm?.elements['typeCode'];
+      const syncTypeCategoryForForm = (code) => {
+        if (!slotForm) {
+          return;
+        }
+        const normalized = typeof code === 'string' ? code.trim().toUpperCase() : '';
+        const mappedCategory = TYPE_CATEGORY_MAP.get(normalized);
+        if (mappedCategory && slotForm.elements['typeCategory']) {
+          slotForm.elements['typeCategory'].value = mappedCategory;
+        }
+      };
       if (slotTypeCodeInput) {
-        slotTypeCodeInput.addEventListener('input', () => {
-          const sanitized = slotTypeCodeInput.value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
-          slotTypeCodeInput.value = sanitized;
-          const mappedCategory = TYPE_CATEGORY_MAP.get(sanitized);
-          if (mappedCategory && slotForm.elements['typeCategory']) {
-            slotForm.elements['typeCategory'].value = mappedCategory;
-          }
-        });
+        const handleTypeCodeChange = () => {
+          syncTypeCategoryForForm(slotTypeCodeInput.value);
+        };
+        slotTypeCodeInput.addEventListener('change', handleTypeCodeChange);
+        slotTypeCodeInput.addEventListener('input', handleTypeCodeChange);
       }
 
       const formatTrigram = (value) => value.replace(/[^a-zA-Z0-9]/g, '').slice(0, 3).toUpperCase();
@@ -2981,14 +3018,25 @@
         if (labelInput) {
           labelInput.value = slot.label ?? slot.type_code ?? `Colonne ${position}`;
         }
+        const normalizedTypeCode = (slot.type_code ?? '').trim().toUpperCase();
         const typeCodeInput = slotForm.elements['typeCode'];
         if (typeCodeInput) {
-          typeCodeInput.value = (slot.type_code ?? '').toUpperCase();
+          if (typeCodeInput.tagName === 'SELECT') {
+            const options = Array.from(typeCodeInput.options ?? []);
+            const hasOption = options.some((option) => option.value === normalizedTypeCode);
+            if (normalizedTypeCode && !hasOption) {
+              const customOption = document.createElement('option');
+              customOption.value = normalizedTypeCode;
+              customOption.textContent = normalizedTypeCode;
+              customOption.dataset.dynamicOption = 'true';
+              typeCodeInput.appendChild(customOption);
+            }
+          }
+          typeCodeInput.value = normalizedTypeCode;
         }
         const typeCategorySelect = slotForm.elements['typeCategory'];
         if (typeCategorySelect) {
-          const normalizedCode = (slot.type_code ?? '').trim().toUpperCase();
-          const mapped = TYPE_CATEGORY_MAP.get(normalizedCode) ?? slot.type_category ?? 'Visite';
+          const mapped = TYPE_CATEGORY_MAP.get(normalizedTypeCode) ?? slot.type_category ?? 'Visite';
           typeCategorySelect.value = mapped;
         }
         const startInput = slotForm.elements['startTime'];
