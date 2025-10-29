@@ -60,6 +60,7 @@ const TYPE_LABELS = new Map([
 const ADMIN_SETTINGS_TABLE = 'parametres_administratifs';
 const AUDIT_TABLE = 'planning_choice_audit';
 const CHOICES_TABLE = 'planning_choices';
+const AUTO_ASSIGNMENT_WORK_TABLE = 'auto_assignment_work_queue';
 const AUTO_ASSIGNMENT_RUNS_TABLE = 'auto_assignment_runs';
 const AUTO_ASSIGNMENT_RUN_ENTRIES_TABLE = 'auto_assignment_run_entries';
 
@@ -420,6 +421,23 @@ const formatPriority = (request) => {
     return String(index);
   }
   return `${index}.${rank}`;
+};
+
+const computeConsolidatedIndex = (choiceIndex, choiceRank) => {
+  const numericIndex = Number.parseInt(choiceIndex, 10);
+  const numericRank = Number.parseInt(choiceRank, 10);
+  if (!Number.isFinite(numericIndex)) {
+    return null;
+  }
+  if (!Number.isFinite(numericRank) || numericRank <= 1) {
+    return String(numericIndex);
+  }
+  return `${numericIndex}.${numericRank}`;
+};
+
+const getRootChoiceIndex = (choiceIndex) => {
+  const numericIndex = Number.parseInt(choiceIndex, 10);
+  return Number.isFinite(numericIndex) ? numericIndex : null;
 };
 
 const getStatusConfig = (status) => STATUS_LABELS.get(status) ?? { label: status ?? '—', className: 'badge' };
@@ -1714,6 +1732,93 @@ const runAutoAssignment = (params) => {
   throw new Error('Algorithme non pris en charge.');
 };
 
+const prepareAutoAssignmentWorkspace = async () => {
+  const supabase = await ensureSupabase();
+  if (!supabase) {
+    return { success: false, message: 'Connexion à Supabase requise.' };
+  }
+  if (!state.planningReference || !state.activeTourId) {
+    return { success: false, message: 'Référence de planning introuvable.' };
+  }
+
+  const { error: cleanupError } = await supabase
+    .from(AUTO_ASSIGNMENT_WORK_TABLE)
+    .delete()
+    .eq('planning_reference', state.planningReference)
+    .eq('tour_number', state.activeTourId);
+  if (cleanupError) {
+    console.error(cleanupError);
+    return { success: false, message: 'Impossible de réinitialiser la table de travail.' };
+  }
+
+  const { data, error } = await supabase
+    .from(CHOICES_TABLE)
+    .select(
+      'id, user_id, trigram, user_type, day, column_number, column_label, planning_day_label, slot_type_code, guard_nature, activity_type, choice_index, choice_rank, etat, is_active, planning_reference, tour_number, created_at'
+    )
+    .eq('planning_reference', state.planningReference)
+    .eq('tour_number', state.activeTourId)
+    .eq('etat', 'en attente');
+
+  if (error) {
+    console.error(error);
+    return { success: false, message: 'Impossible de préparer les choix en attente.' };
+  }
+
+  const entries = (data ?? [])
+    .filter((record) => record && record.is_active !== false)
+    .map((record) => {
+      const consolidatedIndex = computeConsolidatedIndex(record.choice_index, record.choice_rank);
+      const rootChoiceIndex = getRootChoiceIndex(record.choice_index);
+      const choiceIndexValue = getRootChoiceIndex(record.choice_index);
+      const choiceRankValue = Number.parseInt(record.choice_rank, 10);
+      const priorityValue = Number.parseInt(record.choice_rank, 10);
+      return {
+        choice_id: record.id,
+        planning_reference: record.planning_reference ?? state.planningReference,
+        planning_version: record.planning_reference ?? state.planningReference,
+        tour_number: record.tour_number ?? state.activeTourId,
+        trigram: normalizeTrigram(record.trigram ?? ''),
+        user_id: record.user_id ?? null,
+        user_type: normalizeUserTypeFilter(record.user_type ?? '') || null,
+        day: record.day ?? null,
+        column_number: record.column_number ?? null,
+        column_label: record.column_label ?? null,
+        planning_day_label: record.planning_day_label ?? null,
+        slot_type_code: record.slot_type_code ?? null,
+        guard_nature: record.guard_nature ?? null,
+        activity_type: record.activity_type ?? null,
+        choice_index: Number.isFinite(choiceIndexValue) ? choiceIndexValue : null,
+        root_choice_index: rootChoiceIndex,
+        choice_rank: Number.isFinite(choiceRankValue) ? choiceRankValue : null,
+        consolidated_index: consolidatedIndex,
+        priority: Number.isFinite(priorityValue) ? priorityValue : null,
+        status: record.etat ?? 'en attente',
+        is_active: record.is_active ?? null,
+        created_at: record.created_at ?? new Date().toISOString(),
+        metadata: {
+          planning_day_label: record.planning_day_label ?? null,
+          slot_type_code: record.slot_type_code ?? null
+        }
+      };
+    });
+
+  const chunkSize = 100;
+  for (let index = 0; index < entries.length; index += chunkSize) {
+    const chunk = entries.slice(index, index + chunkSize);
+    if (!chunk.length) {
+      continue;
+    }
+    const { error: insertError } = await supabase.from(AUTO_ASSIGNMENT_WORK_TABLE).insert(chunk);
+    if (insertError) {
+      console.error(insertError);
+      return { success: false, message: 'Impossible de sauvegarder la table de travail.' };
+    }
+  }
+
+  return { success: true };
+};
+
 const formatAutoAssignmentGuard = (request) => {
   if (!request) {
     return '—';
@@ -1846,6 +1951,57 @@ const fetchLastAutoAssignmentRun = async () => {
     state.autoAssignment.lastRunId = data?.id ?? null;
   }
   updateUndoButtonState();
+};
+
+const cleanupAutoAssignmentWorkspaceAfterAcceptance = async ({
+  supabase,
+  accepted,
+  alternativeIds = [],
+  additionalAlternatives = [],
+  competingIds = []
+}) => {
+  if (!supabase || !state.planningReference || !state.activeTourId) {
+    return;
+  }
+
+  const idsToRemove = new Set();
+  if (accepted?.id) {
+    idsToRemove.add(accepted.id);
+  }
+  (alternativeIds ?? []).forEach((id) => idsToRemove.add(id));
+  (additionalAlternatives ?? []).forEach((record) => {
+    if (record?.id) {
+      idsToRemove.add(record.id);
+    }
+  });
+  (competingIds ?? []).forEach((id) => idsToRemove.add(id));
+
+  if (idsToRemove.size) {
+    const { error: deleteByIdError } = await supabase
+      .from(AUTO_ASSIGNMENT_WORK_TABLE)
+      .delete()
+      .eq('planning_reference', state.planningReference)
+      .eq('tour_number', state.activeTourId)
+      .in('choice_id', Array.from(idsToRemove));
+    if (deleteByIdError) {
+      console.error(deleteByIdError);
+    }
+  }
+
+  const trigram = typeof accepted?.trigram === 'string' ? accepted.trigram.trim().toUpperCase() : null;
+  const rootChoiceIndex = getRootChoiceIndex(accepted?.choiceIndex ?? accepted?.choice_index);
+  if (trigram && rootChoiceIndex != null) {
+    const { error: deleteByRootError } = await supabase
+      .from(AUTO_ASSIGNMENT_WORK_TABLE)
+      .delete()
+      .eq('planning_reference', state.planningReference)
+      .eq('tour_number', state.activeTourId)
+      .eq('trigram', trigram)
+      .eq('root_choice_index', rootChoiceIndex);
+    if (deleteByRootError) {
+      console.error(deleteByRootError);
+    }
+  }
 };
 
 const applyAutomaticAcceptance = async (request, { guardType }) => {
@@ -2073,6 +2229,14 @@ const applyAutomaticAcceptance = async (request, { guardType }) => {
     }
   }
 
+  await cleanupAutoAssignmentWorkspaceAfterAcceptance({
+    supabase,
+    accepted: stored,
+    alternativeIds,
+    additionalAlternatives,
+    competingIds
+  });
+
   return { success: true, operations };
 };
 
@@ -2234,6 +2398,10 @@ const undoLastAutoAssignment = async () => {
     state.autoAssignment.lastRunId = null;
     updateUndoButtonState();
     await loadRequests();
+    const workspaceReset = await prepareAutoAssignmentWorkspace();
+    if (!workspaceReset.success) {
+      console.warn('Préparation de la table de travail échouée après annulation.', workspaceReset.message);
+    }
     await fetchLastAutoAssignmentRun();
     setAutoAssignmentFeedback('Dernière attribution automatique annulée.');
   } catch (error) {
@@ -2255,6 +2423,11 @@ const executeAutoAssignment = async ({ apply }) => {
   setAutoAssignmentFeedback(apply ? 'Attribution automatique en cours…' : 'Prévisualisation en cours…');
   try {
     await loadRequests();
+    const preparation = await prepareAutoAssignmentWorkspace();
+    if (!preparation.success) {
+      setAutoAssignmentFeedback(preparation.message ?? "Impossible de préparer l'attribution automatique.");
+      return;
+    }
     const result = runAutoAssignment(params);
     renderAutoAssignmentResults(result);
     if (apply) {
