@@ -866,6 +866,7 @@ const mapRequestRecord = (record) => {
   const columnNumberValue = Number.parseInt(record.column_number ?? record.columnNumber ?? '', 10);
   const choiceIndexValue = Number.parseFloat(record.choice_index ?? record.choiceIndex ?? '');
   const choiceRankValue = Number.parseFloat(record.choice_rank ?? record.choiceRank ?? '');
+  const choiceOrderValue = Number.parseInt(record.choice_order ?? record.choiceOrder ?? '', 10);
   return {
     id: record.id,
     trigram: (record.trigram ?? '').toUpperCase(),
@@ -879,6 +880,7 @@ const mapRequestRecord = (record) => {
     activityType: (record.activity_type ?? 'visite').toLowerCase(),
     choiceIndex: Number.isNaN(choiceIndexValue) ? null : choiceIndexValue,
     choiceRank: Number.isNaN(choiceRankValue) ? null : choiceRankValue,
+    choiceOrder: Number.isNaN(choiceOrderValue) ? null : choiceOrderValue,
     createdAt,
     status: (record.etat ?? 'en attente').toLowerCase(),
     isActive: record.is_active,
@@ -898,7 +900,7 @@ const loadRequests = async () => {
   const query = supabase
     .from(CHOICES_TABLE)
     .select(
-      'id, trigram, user_type, day, column_number, column_label, planning_day_label, slot_type_code, guard_nature, activity_type, choice_index, choice_rank, created_at, etat, is_active, planning_reference, tour_number'
+      'id, trigram, user_type, day, column_number, column_label, planning_day_label, slot_type_code, guard_nature, activity_type, choice_index, choice_rank, choice_order, created_at, etat, is_active, planning_reference, tour_number'
     );
   if (state.planningReference) {
     query.eq('planning_reference', state.planningReference);
@@ -1062,6 +1064,39 @@ const findAlternativesToDeactivate = async ({
   });
 };
 
+const findChoiceOrderAlternatives = async ({
+  supabase,
+  trigram,
+  choiceOrder,
+  selectedId,
+  excludedIds = []
+}) => {
+  if (!supabase || !state.planningReference || !state.activeTourId) {
+    return [];
+  }
+  const normalizedTrigram = typeof trigram === 'string' ? trigram.trim().toUpperCase() : '';
+  const parsedChoiceOrder = Number.parseInt(choiceOrder, 10);
+  if (!normalizedTrigram || !Number.isFinite(parsedChoiceOrder)) {
+    return [];
+  }
+
+  const excluded = new Set((excludedIds ?? []).map((value) => Number(value)));
+  const { data, error } = await supabase
+    .from(CHOICES_TABLE)
+    .select('id, etat, is_active, choice_rank, day, column_number, choice_order')
+    .eq('planning_reference', state.planningReference)
+    .eq('tour_number', state.activeTourId)
+    .eq('trigram', normalizedTrigram)
+    .eq('choice_order', parsedChoiceOrder)
+    .neq('id', selectedId);
+  if (error) {
+    console.error(error);
+    return [];
+  }
+
+  return (data ?? []).filter((record) => record && !excluded.has(Number(record.id)));
+};
+
 const fetchCompetingRequests = async (request) => {
   const supabase = await ensureSupabase();
   if (!supabase) {
@@ -1151,18 +1186,29 @@ const acceptRequest = async (requestId) => {
     selectedRank: choiceRankThreshold,
     excludedIds: alternativeIds
   });
-  if (additionalAlternatives.length) {
-    const extended = new Set(alternativeIds);
-    additionalAlternatives.forEach((record) => {
-      if (!extended.has(record.id)) {
-        extended.add(record.id);
-      }
-    });
-    alternativeIds.length = 0;
-    extended.forEach((id) => {
-      alternativeIds.push(id);
-    });
-  }
+  const alternativeIdSet = new Set(alternativeIds);
+  additionalAlternatives.forEach((record) => {
+    if (record?.id) {
+      alternativeIdSet.add(record.id);
+    }
+  });
+  const orderAlternatives = await findChoiceOrderAlternatives({
+    supabase,
+    trigram: request.trigram,
+    choiceOrder: request.choiceOrder,
+    selectedId: request.id,
+    excludedIds: Array.from(alternativeIdSet)
+  });
+  orderAlternatives.forEach((record) => {
+    if (record?.id && !alternativeIdSet.has(record.id)) {
+      alternativeIdSet.add(record.id);
+      additionalAlternatives.push(record);
+    }
+  });
+  alternativeIds.length = 0;
+  alternativeIdSet.forEach((id) => {
+    alternativeIds.push(id);
+  });
   const competingIds = competing
     .filter((item) => item.trigram !== request.trigram)
     .map((item) => item.id);
@@ -2065,7 +2111,7 @@ const applyAutomaticAcceptance = async (request, { guardType }) => {
   if (idsToFetch.length) {
     const { data: states, error } = await supabase
       .from(CHOICES_TABLE)
-      .select('id, etat, is_active, choice_rank')
+      .select('id, etat, is_active, choice_rank, choice_order')
       .in('id', idsToFetch);
     if (error) {
       console.error(error);
@@ -2081,7 +2127,8 @@ const applyAutomaticAcceptance = async (request, { guardType }) => {
   const targetState = stateById.get(stored.id) ?? {
     etat: stored.status ?? 'en attente',
     is_active: stored.isActive ?? true,
-    choice_rank: stored.choiceRank ?? 1
+    choice_rank: stored.choiceRank ?? 1,
+    choice_order: stored.choiceOrder ?? stored.choice_order ?? null
   };
   const parsedTargetRank = parseNumeric(targetState.choice_rank);
   const parsedStoredRank = parseNumeric(stored.choiceRank ?? stored.choice_rank);
@@ -2093,8 +2140,7 @@ const applyAutomaticAcceptance = async (request, { guardType }) => {
   };
 
   const normalizedAlternativeIds = collectAlternativeIds(competing, selectedForAlternatives);
-  alternativeIds.length = 0;
-  normalizedAlternativeIds.forEach((id) => alternativeIds.push(id));
+  const alternativeIdSet = new Set([...alternativeIds, ...normalizedAlternativeIds]);
 
   const additionalAlternatives = await findAlternativesToDeactivate({
     supabase,
@@ -2104,6 +2150,50 @@ const applyAutomaticAcceptance = async (request, { guardType }) => {
     selectedRank: selectedRankThreshold,
     excludedIds: alternativeIds
   });
+
+  additionalAlternatives.forEach((record) => {
+    if (record?.id) {
+      alternativeIdSet.add(record.id);
+    }
+  });
+
+  const storedChoiceOrder = parseNumeric(
+    targetState.choice_order ?? stored.choiceOrder ?? stored.choice_order
+  );
+
+  const choiceOrderAlternatives = await findChoiceOrderAlternatives({
+    supabase,
+    trigram: stored.trigram,
+    choiceOrder: storedChoiceOrder,
+    selectedId: stored.id,
+    excludedIds: Array.from(alternativeIdSet)
+  });
+
+  const additionalAlternativeRecords = [...additionalAlternatives];
+  choiceOrderAlternatives.forEach((record) => {
+    if (record?.id && !alternativeIdSet.has(record.id)) {
+      alternativeIdSet.add(record.id);
+      additionalAlternativeRecords.push(record);
+    }
+  });
+
+  alternativeIds.length = 0;
+  alternativeIdSet.forEach((id) => alternativeIds.push(id));
+
+  const missingStateIds = alternativeIds.filter((id) => !stateById.has(id));
+  if (missingStateIds.length) {
+    const { data: extraStates, error: extraStatesError } = await supabase
+      .from(CHOICES_TABLE)
+      .select('id, etat, is_active, choice_rank, choice_order')
+      .in('id', missingStateIds);
+    if (extraStatesError) {
+      console.error(extraStatesError);
+      return { success: false, message: "Impossible de récupérer l'état des alternatives." };
+    }
+    (extraStates ?? []).forEach((record) => {
+      stateById.set(record.id, record);
+    });
+  }
 
   if (targetState.etat !== 'validé' || targetState.is_active !== true) {
     updates.push(async () => {
@@ -2164,7 +2254,7 @@ const applyAutomaticAcceptance = async (request, { guardType }) => {
     });
   });
 
-  additionalAlternatives.forEach((record) => {
+  additionalAlternativeRecords.forEach((record) => {
     updates.push(async () => {
       const { error } = await supabase
         .from(CHOICES_TABLE)
@@ -2273,7 +2363,7 @@ const applyAutomaticAcceptance = async (request, { guardType }) => {
     supabase,
     accepted: stored,
     alternativeIds,
-    additionalAlternatives,
+    additionalAlternatives: additionalAlternativeRecords,
     competingIds
   });
 
