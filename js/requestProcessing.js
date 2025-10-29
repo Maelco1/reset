@@ -1708,6 +1708,38 @@ const runSimpleAutoAssignment = (params) => {
   const assignedSlots = buildAssignedSlotsMap();
   const occupiedSlots = buildOccupiedSlotsSet();
   const usedGroupKeys = new Set();
+  state.requests.forEach((request) => {
+    if (request?.status !== 'validé') {
+      return;
+    }
+    const trigram = normalizeTrigram(request.trigram);
+    if (!trigram) {
+      return;
+    }
+    const guardType = request.guardNature === 'bonne'
+      ? 'bonne'
+      : request.guardNature === 'normale'
+        ? 'normale'
+        : '';
+    if (!guardType) {
+      return;
+    }
+    const groupKey = getRequestGroupKey(request);
+    if (!groupKey) {
+      return;
+    }
+    const stateKey = buildGroupStateKey(trigram, guardType, groupKey);
+    if (stateKey) {
+      usedGroupKeys.add(stateKey);
+    }
+    const entry = pendingMap.get(trigram);
+    if (entry) {
+      const listKey = guardType === 'bonne' ? 'bonne' : 'normale';
+      entry[listKey] = entry[listKey].filter(
+        (item) => getRequestGroupKey(item) !== groupKey
+      );
+    }
+  });
   const assignments = [];
   let analysed = 0;
   let normals = 0;
