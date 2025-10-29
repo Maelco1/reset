@@ -1057,7 +1057,7 @@ const acceptRequest = async (requestId) => {
     updates.push(
       supabase
         .from(CHOICES_TABLE)
-        .update({ is_active: false })
+        .update({ etat: 'refusé', is_active: false })
         .in('id', alternativeIds)
     );
   }
@@ -1503,15 +1503,20 @@ const runSimpleAutoAssignment = (params) => {
     };
   }
 
-  for (let rotation = 1; rotation <= params.rotations; rotation += 1) {
-    let rotationAssignments = 0;
+  let passNumber = 0;
+  while (rotationsUsed < params.rotations) {
+    passNumber += 1;
+    let passAssignments = 0;
     for (const trigram of orderedTrigrams) {
+      if (rotationsUsed >= params.rotations) {
+        break;
+      }
       analysed += 1;
       const entry = pendingMap.get(trigram);
       const result = {
         trigram,
         userType: entry?.userType ?? getUserTypeForTrigram(trigram),
-        rotation,
+        rotation: passNumber,
         assigned: false,
         normal: null,
         good: null,
@@ -1551,11 +1556,13 @@ const runSimpleAutoAssignment = (params) => {
         }
 
         if (!pairConflict) {
+          rotationsUsed += 1;
+          result.rotation = rotationsUsed;
           result.assigned = true;
           result.normal = normalRequest;
           result.good = goodRequest;
           assignments.push(result);
-          rotationAssignments += 1;
+          passAssignments += 1;
           normals += 1;
           good += 1;
 
@@ -1585,6 +1592,9 @@ const runSimpleAutoAssignment = (params) => {
           if (goodCandidate.slotKey) {
             occupiedSlots.add(goodCandidate.slotKey);
           }
+          if (rotationsUsed >= params.rotations) {
+            break;
+          }
           continue;
         }
         result.reason = 'Conflit horaire entre les gardes proposées.';
@@ -1607,8 +1617,7 @@ const runSimpleAutoAssignment = (params) => {
       skips += 1;
       assignments.push(result);
     }
-    rotationsUsed = rotation;
-    if (rotationAssignments === 0) {
+    if (passAssignments === 0) {
       break;
     }
   }
@@ -1842,32 +1851,34 @@ const applyAutomaticAcceptance = async (request, { guardType }) => {
 
   alternativeIds.forEach((id) => {
     const state = stateById.get(id);
-    if (state && state.is_active !== false) {
-      updates.push(async () => {
-        const { error } = await supabase
-          .from(CHOICES_TABLE)
-          .update({ is_active: false })
-          .eq('id', id);
-        if (error) {
-          throw error;
-        }
-      });
-      operations.push({
-        choiceId: id,
-        action: 'deactivate',
-        previous: {
-          etat: state.etat ?? null,
-          is_active: state.is_active ?? null,
-          choice_rank: state.choice_rank ?? null
-        },
-        next: {
-          etat: state.etat ?? null,
-          is_active: false,
-          choice_rank: state.choice_rank ?? null
-        },
-        reason: 'Alternative désactivée automatiquement'
-      });
+    const shouldUpdate = !state || state.etat !== 'refusé' || state.is_active !== false;
+    if (!shouldUpdate) {
+      return;
     }
+    updates.push(async () => {
+      const { error } = await supabase
+        .from(CHOICES_TABLE)
+        .update({ etat: 'refusé', is_active: false })
+        .eq('id', id);
+      if (error) {
+        throw error;
+      }
+    });
+    operations.push({
+      choiceId: id,
+      action: 'refuse_alternative',
+      previous: {
+        etat: state?.etat ?? null,
+        is_active: state?.is_active ?? null,
+        choice_rank: state?.choice_rank ?? null
+      },
+      next: {
+        etat: 'refusé',
+        is_active: false,
+        choice_rank: state?.choice_rank ?? null
+      },
+      reason: 'Alternative refusée automatiquement'
+    });
   });
 
   competingIds.forEach((id) => {
