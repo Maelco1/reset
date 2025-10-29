@@ -210,7 +210,18 @@ const haveMatchingChoiceIndex = (candidate, selectedIndex) => {
   return candidateIndex != null && candidateIndex === selectedIndex;
 };
 
-const shouldTreatAsAlternative = (candidate, selectedRank, selectedIndex) => {
+const haveMatchingChoiceOrder = (candidate, selectedOrder) => {
+  if (selectedOrder == null) {
+    return false;
+  }
+  const candidateOrder = parseNumeric(candidate.choice_order ?? candidate.choiceOrder);
+  return candidateOrder != null && candidateOrder === selectedOrder;
+};
+
+const shouldTreatAsAlternative = (candidate, selectedRank, selectedIndex, selectedOrder) => {
+  if (haveMatchingChoiceOrder(candidate, selectedOrder)) {
+    return true;
+  }
   if (haveMatchingChoiceIndex(candidate, selectedIndex)) {
     return true;
   }
@@ -222,12 +233,40 @@ const shouldTreatAsAlternative = (candidate, selectedRank, selectedIndex) => {
   return candidateRank > threshold;
 };
 
+const getRequestGroupKey = (request) => {
+  if (!request) {
+    return null;
+  }
+  const order = parseNumeric(request.choiceOrder ?? request.choice_order);
+  if (Number.isFinite(order)) {
+    return `order:${order}`;
+  }
+  const index = parseNumeric(request.choiceIndex ?? request.choice_index);
+  if (Number.isFinite(index)) {
+    return `index:${index}`;
+  }
+  if (request.id != null) {
+    return `id:${String(request.id)}`;
+  }
+  return null;
+};
+
+const buildGroupStateKey = (trigram, guardType, groupKey) => {
+  if (!groupKey) {
+    return null;
+  }
+  const normalizedTrigram = normalizeTrigram(trigram ?? '');
+  const normalizedGuard = guardType === 'bonne' ? 'bonne' : 'normale';
+  return `${normalizedTrigram}:${normalizedGuard}:${groupKey}`;
+};
+
 const collectAlternativeIds = (competing, request) => {
   const selectedRank = parseNumeric(request.choiceRank ?? request.choice_rank);
   const selectedIndex = parseNumeric(request.choiceIndex ?? request.choice_index);
+  const selectedOrder = parseNumeric(request.choiceOrder ?? request.choice_order);
   const alternatives = competing
     .filter((item) => item.trigram === request.trigram && item.id !== request.id)
-    .filter((item) => shouldTreatAsAlternative(item, selectedRank, selectedIndex))
+    .filter((item) => shouldTreatAsAlternative(item, selectedRank, selectedIndex, selectedOrder))
     .map((item) => item.id);
   return Array.from(new Set(alternatives));
 };
@@ -1615,16 +1654,29 @@ const buildOccupiedSlotsSet = () => {
   return set;
 };
 
-const findNextAvailableRequest = (list, trigram, assignedSlots, occupiedSlots, extraOccupied = new Set()) => {
+const findNextAvailableRequest = (
+  list,
+  trigram,
+  assignedSlots,
+  occupiedSlots,
+  extraOccupied = new Set(),
+  options = {}
+) => {
   if (!Array.isArray(list) || !list.length) {
     return null;
   }
+  const { usedGroups = null, guardType = '' } = options;
   for (let index = 0; index < list.length; index += 1) {
     const candidate = list[index];
     if (!candidate) {
       continue;
     }
     if (candidate.status && candidate.status !== 'en attente') {
+      continue;
+    }
+    const groupKey = getRequestGroupKey(candidate);
+    const stateKey = buildGroupStateKey(trigram, guardType, groupKey);
+    if (stateKey && usedGroups?.has(stateKey)) {
       continue;
     }
     const slotKey = getSlotKey(candidate);
@@ -1643,7 +1695,8 @@ const findNextAvailableRequest = (list, trigram, assignedSlots, occupiedSlots, e
     return {
       request: candidate,
       index,
-      slotKey
+      slotKey,
+      groupKey
     };
   }
   return null;
@@ -1654,6 +1707,7 @@ const runSimpleAutoAssignment = (params) => {
   const pendingMap = buildPendingRequestsMap(params);
   const assignedSlots = buildAssignedSlotsMap();
   const occupiedSlots = buildOccupiedSlotsSet();
+  const usedGroupKeys = new Set();
   const assignments = [];
   let analysed = 0;
   let normals = 0;
@@ -1703,11 +1757,25 @@ const runSimpleAutoAssignment = (params) => {
       }
 
       const tempOccupied = new Set();
-      const normalCandidate = findNextAvailableRequest(entry.normale, trigram, assignedSlots, occupiedSlots, tempOccupied);
+      const normalCandidate = findNextAvailableRequest(
+        entry.normale,
+        trigram,
+        assignedSlots,
+        occupiedSlots,
+        tempOccupied,
+        { usedGroups: usedGroupKeys, guardType: 'normale' }
+      );
       if (normalCandidate?.slotKey) {
         tempOccupied.add(normalCandidate.slotKey);
       }
-      const goodCandidate = findNextAvailableRequest(entry.bonne, trigram, assignedSlots, occupiedSlots, tempOccupied);
+      const goodCandidate = findNextAvailableRequest(
+        entry.bonne,
+        trigram,
+        assignedSlots,
+        occupiedSlots,
+        tempOccupied,
+        { usedGroups: usedGroupKeys, guardType: 'bonne' }
+      );
 
       if (normalCandidate && goodCandidate) {
         const normalRequest = normalCandidate.request;
@@ -1738,8 +1806,27 @@ const runSimpleAutoAssignment = (params) => {
           normals += 1;
           good += 1;
 
+          const registerGroupSelection = (guardType, candidate) => {
+            if (!candidate?.request) {
+              return;
+            }
+            const candidateGroupKey = candidate.groupKey ?? getRequestGroupKey(candidate.request);
+            if (!candidateGroupKey) {
+              return;
+            }
+            const stateKey = buildGroupStateKey(trigram, guardType, candidateGroupKey);
+            if (stateKey) {
+              usedGroupKeys.add(stateKey);
+            }
+            const listKey = guardType === 'bonne' ? 'bonne' : 'normale';
+            entry[listKey] = entry[listKey].filter((item) => getRequestGroupKey(item) !== candidateGroupKey);
+          };
+
           entry.normale = entry.normale.filter((item) => item.id !== normalRequest.id);
           entry.bonne = entry.bonne.filter((item) => item.id !== goodRequest.id);
+
+          registerGroupSelection('normale', normalCandidate);
+          registerGroupSelection('bonne', goodCandidate);
 
           const assignedList = assignedSlots.get(trigram) ?? [];
           if (normalDay) {
