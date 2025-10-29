@@ -194,6 +194,44 @@ const sanitizeActiveTour = (value) => {
 const getTourConfig = (tourId = state.activeTourId) =>
   PLANNING_TOURS.find((tour) => tour.id === tourId) ?? PLANNING_TOURS[0];
 
+const parseNumeric = (value) => {
+  if (value == null || value === '') {
+    return null;
+  }
+  const parsed = Number.parseFloat(value);
+  return Number.isNaN(parsed) ? null : parsed;
+};
+
+const haveMatchingChoiceIndex = (candidate, selectedIndex) => {
+  if (selectedIndex == null) {
+    return false;
+  }
+  const candidateIndex = parseNumeric(candidate.choice_index ?? candidate.choiceIndex);
+  return candidateIndex != null && candidateIndex === selectedIndex;
+};
+
+const shouldTreatAsAlternative = (candidate, selectedRank, selectedIndex) => {
+  if (haveMatchingChoiceIndex(candidate, selectedIndex)) {
+    return true;
+  }
+  const candidateRank = parseNumeric(candidate.choice_rank ?? candidate.choiceRank);
+  if (candidateRank == null) {
+    return true;
+  }
+  const threshold = selectedRank ?? 1;
+  return candidateRank > threshold;
+};
+
+const collectAlternativeIds = (competing, request) => {
+  const selectedRank = parseNumeric(request.choiceRank ?? request.choice_rank);
+  const selectedIndex = parseNumeric(request.choiceIndex ?? request.choice_index);
+  const alternatives = competing
+    .filter((item) => item.trigram === request.trigram && item.id !== request.id)
+    .filter((item) => shouldTreatAsAlternative(item, selectedRank, selectedIndex))
+    .map((item) => item.id);
+  return Array.from(new Set(alternatives));
+};
+
 const toMonthPart = (month) => String(month + 1).padStart(2, '0');
 
 const getPlanningReference = ({ tourId, year, monthOne, monthTwo }) =>
@@ -1101,12 +1139,10 @@ const acceptRequest = async (requestId) => {
 
   const competing = await fetchCompetingRequests(request);
 
-  const alternativeIds = competing
-    .filter((item) => item.trigram === request.trigram && item.id !== request.id && item.choice_rank > 1)
-    .map((item) => item.id);
+  const alternativeIds = collectAlternativeIds(competing, request);
 
-  const parsedRequestRank = Number.parseFloat(request.choiceRank ?? request.choice_rank);
-  const choiceRankThreshold = Number.isNaN(parsedRequestRank) ? 1 : parsedRequestRank;
+  const parsedRequestRank = parseNumeric(request.choiceRank ?? request.choice_rank);
+  const choiceRankThreshold = parsedRequestRank ?? 1;
   const additionalAlternatives = await findAlternativesToDeactivate({
     supabase,
     trigram: request.trigram,
@@ -2016,9 +2052,7 @@ const applyAutomaticAcceptance = async (request, { guardType }) => {
   const stored = state.requests.find((item) => item.id === request.id) ?? request;
   const competing = await fetchCompetingRequests(stored);
 
-  const alternativeIds = competing
-    .filter((item) => item.trigram === stored.trigram && item.id !== stored.id && item.choice_rank > 1)
-    .map((item) => item.id);
+  const alternativeIds = collectAlternativeIds(competing, stored);
   const competingIds = competing
     .filter((item) => item.trigram !== stored.trigram)
     .map((item) => item.id);
@@ -2049,12 +2083,18 @@ const applyAutomaticAcceptance = async (request, { guardType }) => {
     is_active: stored.isActive ?? true,
     choice_rank: stored.choiceRank ?? 1
   };
-  const parsedTargetRank = Number.parseFloat(targetState.choice_rank);
-  const parsedStoredRank = Number.parseFloat(stored.choiceRank ?? stored.choice_rank);
-  let selectedRankThreshold = parsedTargetRank;
-  if (Number.isNaN(selectedRankThreshold)) {
-    selectedRankThreshold = Number.isNaN(parsedStoredRank) ? 1 : parsedStoredRank;
-  }
+  const parsedTargetRank = parseNumeric(targetState.choice_rank);
+  const parsedStoredRank = parseNumeric(stored.choiceRank ?? stored.choice_rank);
+  const selectedRankThreshold = parsedTargetRank ?? parsedStoredRank ?? 1;
+
+  const selectedForAlternatives = {
+    ...stored,
+    choiceRank: selectedRankThreshold
+  };
+
+  const normalizedAlternativeIds = collectAlternativeIds(competing, selectedForAlternatives);
+  alternativeIds.length = 0;
+  normalizedAlternativeIds.forEach((id) => alternativeIds.push(id));
 
   const additionalAlternatives = await findAlternativesToDeactivate({
     supabase,
