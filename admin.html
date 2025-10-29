@@ -543,13 +543,14 @@
       ]);
 
       const PLANNING_TOURS = [
-        { id: 1, label: 'Tour 1', table: 'planning_columns' },
-        { id: 2, label: 'Tour 2', table: 'planning_columns_tour2' },
-        { id: 3, label: 'Tour 3', table: 'planning_columns_tour3' },
-        { id: 4, label: 'Tour 4', table: 'planning_columns_tour4' },
-        { id: 5, label: 'Tour 5', table: 'planning_columns_tour5' },
-        { id: 6, label: 'Tour 6', table: 'planning_columns_tour6' }
+        { id: 1, label: 'Tour 1' },
+        { id: 2, label: 'Tour 2' },
+        { id: 3, label: 'Tour 3' },
+        { id: 4, label: 'Tour 4' },
+        { id: 5, label: 'Tour 5' },
+        { id: 6, label: 'Tour 6' }
       ];
+      const PLANNING_COLUMNS_TABLE = 'planning_columns';
       const ADMIN_SETTINGS_TABLE = 'parametres_administratifs';
 
       let selectedTourId = PLANNING_TOURS[0].id;
@@ -557,8 +558,6 @@
 
       const getTourConfig = (tourId = selectedTourId) =>
         PLANNING_TOURS.find((tour) => tour.id === tourId) ?? PLANNING_TOURS[0];
-
-      const getPlanningTableName = (tourId = selectedTourId) => getTourConfig(tourId).table;
       const toMonthPart = (month) => String(month + 1).padStart(2, '0');
       const WEEKDAY_LABELS = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
       const MONTH_NAMES = [
@@ -1386,11 +1385,12 @@
         return fallback;
       };
 
-      const getDefaultSlot = (position) => {
+      const getDefaultSlot = (position, tourNumber = selectedTourId ?? 1) => {
         const defaults = COLUMN_DEFAULTS.find((item) => item.position === position);
         const typeCode = defaults?.typeCode ?? `COL${String(position).padStart(2, '0')}`;
         const category = inferTypeCategory(typeCode);
         return {
+          tour_number: tourNumber,
           position,
           label: typeCode,
           type_code: typeCode,
@@ -2668,25 +2668,28 @@
         refreshAssignmentButtons();
       };
 
-      const ensurePlanningColumns = async (supabase, slots, tableName) => {
+      const ensurePlanningColumns = async (supabase, slots, tourId) => {
         const missing = [];
         for (let position = 1; position <= 46; position += 1) {
           if (!slots.some((slot) => slot.position === position)) {
-            missing.push(getDefaultSlot(position));
+            missing.push(getDefaultSlot(position, tourId));
           }
         }
         if (missing.length === 0) {
           return slots;
         }
-        const { error } = await supabase.from(tableName).upsert(missing, { onConflict: 'position' });
+        const { error } = await supabase
+          .from(PLANNING_COLUMNS_TABLE)
+          .upsert(missing, { onConflict: 'tour_number,position' });
         if (error) {
           console.error(error);
           return slots;
         }
         const { data, error: reloadError } = await supabase
-          .from(tableName)
+          .from(PLANNING_COLUMNS_TABLE)
           .select(
             `id,
+            tour_number,
             position,
             label,
             type_code,
@@ -2704,6 +2707,7 @@
             open_bonne_saturday,
             open_bonne_sunday`
           )
+          .eq('tour_number', tourId)
           .order('position');
         if (reloadError) {
           console.error(reloadError);
@@ -2718,7 +2722,7 @@
         }
         planningLoading = true;
         const requestToken = ++planningLoadToken;
-        const tableName = getPlanningTableName();
+        const tourId = selectedTourId;
         if (planningFeedback) {
           planningFeedback.textContent = 'Chargement des colonnes…';
         }
@@ -2731,9 +2735,10 @@
         await onSupabaseReady();
         const supabase = getSupabaseClient();
         const { data, error } = await supabase
-          .from(tableName)
+          .from(PLANNING_COLUMNS_TABLE)
           .select(
             `id,
+            tour_number,
             position,
             label,
             type_code,
@@ -2751,6 +2756,7 @@
             open_bonne_saturday,
             open_bonne_sunday`
           )
+          .eq('tour_number', tourId)
           .order('position');
         if (error) {
           console.error(error);
@@ -2769,7 +2775,7 @@
           return;
         }
         let slots = data ?? [];
-        slots = await ensurePlanningColumns(supabase, slots, tableName);
+        slots = await ensurePlanningColumns(supabase, slots, tourId);
         if (requestToken !== planningLoadToken) {
           return;
         }
@@ -3099,37 +3105,37 @@
 
       const propagateSharedSlotSettings = async ({
         supabase,
-        sourceTable,
+        sourceTourId,
         position,
         sharedFields
       }) => {
         const errors = [];
-        const otherTables = PLANNING_TOURS.map((tour) => tour.table).filter(
-          (table) => table !== sourceTable
-        );
+        const otherTourIds = PLANNING_TOURS.map((tour) => tour.id).filter((tourId) => tourId !== sourceTourId);
         await Promise.all(
-          otherTables.map(async (tableName) => {
+          otherTourIds.map(async (tourId) => {
             const { data: updated, error: updateError } = await supabase
-              .from(tableName)
+              .from(PLANNING_COLUMNS_TABLE)
               .update(sharedFields)
+              .eq('tour_number', tourId)
               .eq('position', position)
               .select('position');
             if (updateError) {
-              errors.push({ tableName, error: updateError });
+              errors.push({ tourId, error: updateError });
               return;
             }
             if (!updated || updated.length === 0) {
-              const defaultSlot = getDefaultSlot(position);
+              const defaultSlot = getDefaultSlot(position, tourId);
               const insertPayload = {
                 ...defaultSlot,
                 ...sharedFields,
-                position
+                position,
+                tour_number: tourId
               };
               const { error: insertError } = await supabase
-                .from(tableName)
-                .upsert(insertPayload, { onConflict: 'position' });
+                .from(PLANNING_COLUMNS_TABLE)
+                .upsert(insertPayload, { onConflict: 'tour_number,position' });
               if (insertError) {
-                errors.push({ tableName, error: insertError });
+                errors.push({ tourId, error: insertError });
               }
             }
           })
@@ -3171,6 +3177,7 @@
         await onSupabaseReady();
         const supabase = getSupabaseClient();
         const payload = {
+          tour_number: selectedTourId,
           position,
           label: label || typeCode || `Colonne ${position}`,
           type_code: typeCode || null,
@@ -3188,8 +3195,9 @@
           open_bonne_saturday: openBonneSaturday,
           open_bonne_sunday: openBonneSunday
         };
-        const tableName = getPlanningTableName();
-        const { error } = await supabase.from(tableName).upsert(payload, { onConflict: 'position' });
+        const { error } = await supabase
+          .from(PLANNING_COLUMNS_TABLE)
+          .upsert(payload, { onConflict: 'tour_number,position' });
         if (error) {
           console.error(error);
           if (slotFeedback) {
@@ -3207,7 +3215,7 @@
         };
         const propagationErrors = await propagateSharedSlotSettings({
           supabase,
-          sourceTable: tableName,
+          sourceTourId: selectedTourId,
           position,
           sharedFields
         });
@@ -3475,15 +3483,24 @@
       const subscribeToPlanningChanges = async () => {
         await onSupabaseReady();
         const supabase = getSupabaseClient();
-        const tableName = getPlanningTableName();
+        const tourId = selectedTourId;
         if (planningChannel) {
           await planningChannel.unsubscribe();
         }
         planningChannel = supabase
-          .channel(`planning-columns-changes-${tableName}`)
-          .on('postgres_changes', { event: '*', schema: 'public', table: tableName }, () => {
+          .channel(`planning-columns-changes-tour-${tourId}`)
+          .on(
+            'postgres_changes',
+            {
+              event: '*',
+              schema: 'public',
+              table: PLANNING_COLUMNS_TABLE,
+              filter: `tour_number=eq.${tourId}`
+            },
+            () => {
             loadPlanningColumns(true);
-          })
+            }
+          )
           .subscribe();
       };
 

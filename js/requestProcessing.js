@@ -8,13 +8,15 @@ import {
 } from './supabaseClient.js';
 
 const PLANNING_TOURS = [
-  { id: 1, table: 'planning_columns' },
-  { id: 2, table: 'planning_columns_tour2' },
-  { id: 3, table: 'planning_columns_tour3' },
-  { id: 4, table: 'planning_columns_tour4' },
-  { id: 5, table: 'planning_columns_tour5' },
-  { id: 6, table: 'planning_columns_tour6' }
+  { id: 1 },
+  { id: 2 },
+  { id: 3 },
+  { id: 4 },
+  { id: 5 },
+  { id: 6 }
 ];
+
+const PLANNING_COLUMNS_TABLE = 'planning_columns';
 
 const STATUS_TABS = [
   { id: 'pending', label: 'En attente', statuses: ['en attente'] },
@@ -191,8 +193,6 @@ const sanitizeActiveTour = (value) => {
 
 const getTourConfig = (tourId = state.activeTourId) =>
   PLANNING_TOURS.find((tour) => tour.id === tourId) ?? PLANNING_TOURS[0];
-
-const getPlanningTableName = (tourId = state.activeTourId) => getTourConfig(tourId).table;
 
 const toMonthPart = (month) => String(month + 1).padStart(2, '0');
 
@@ -718,10 +718,10 @@ const loadPlanningColumns = async () => {
   if (!supabase) {
     return;
   }
-  const tableName = getPlanningTableName();
   const { data, error } = await supabase
-    .from(tableName)
-    .select('position, label, type_category, start_time, end_time');
+    .from(PLANNING_COLUMNS_TABLE)
+    .select('tour_number, position, label, type_category, start_time, end_time')
+    .eq('tour_number', state.activeTourId);
   if (error) {
     console.error(error);
     return;

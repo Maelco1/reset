@@ -84,13 +84,15 @@ const TYPE_CATEGORY_MAP = new Map([
 ]);
 
 const PLANNING_TOURS = [
-  { id: 1, label: 'Tour 1', table: 'planning_columns' },
-  { id: 2, label: 'Tour 2', table: 'planning_columns_tour2' },
-  { id: 3, label: 'Tour 3', table: 'planning_columns_tour3' },
-  { id: 4, label: 'Tour 4', table: 'planning_columns_tour4' },
-  { id: 5, label: 'Tour 5', table: 'planning_columns_tour5' },
-  { id: 6, label: 'Tour 6', table: 'planning_columns_tour6' }
+  { id: 1, label: 'Tour 1' },
+  { id: 2, label: 'Tour 2' },
+  { id: 3, label: 'Tour 3' },
+  { id: 4, label: 'Tour 4' },
+  { id: 5, label: 'Tour 5' },
+  { id: 6, label: 'Tour 6' }
 ];
+
+const PLANNING_COLUMNS_TABLE = 'planning_columns';
 
 const ADMIN_SETTINGS_TABLE = 'parametres_administratifs';
 const WEEKDAY_LABELS = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
@@ -235,11 +237,12 @@ const getSlotTimeRange = (slot) => {
   return '';
 };
 
-const getDefaultSlot = (position) => {
+const getDefaultSlot = (position, tourNumber = 1) => {
   const defaults = COLUMN_DEFAULTS.find((item) => item.position === position);
   const typeCode = defaults?.typeCode ?? `COL${String(position).padStart(2, '0')}`;
   const category = inferTypeCategory(typeCode);
   return {
+    tour_number: tourNumber,
     position,
     label: typeCode,
     type_code: typeCode,
@@ -393,8 +396,6 @@ const buildSlotTitle = (slot, dayLabel, isHoliday, holidayName, isOpen, quality)
 const getTourConfig = (tourId) =>
   PLANNING_TOURS.find((tour) => tour.id === tourId) ?? PLANNING_TOURS[0];
 
-const getPlanningTableName = (tourId) => getTourConfig(tourId).table;
-
 const sanitizeActiveTour = (value) => {
   if (value == null || value === '') {
     return null;
@@ -409,25 +410,28 @@ const sanitizeActiveTour = (value) => {
   return numeric;
 };
 
-const ensurePlanningColumns = async (supabase, slots, tableName) => {
+const ensurePlanningColumns = async (supabase, slots, tourId) => {
   const missing = [];
   for (let position = 1; position <= 46; position += 1) {
     if (!slots.some((slot) => slot.position === position)) {
-      missing.push(getDefaultSlot(position));
+      missing.push(getDefaultSlot(position, tourId));
     }
   }
   if (missing.length === 0) {
     return slots;
   }
-  const { error } = await supabase.from(tableName).upsert(missing, { onConflict: 'position' });
+  const { error } = await supabase
+    .from(PLANNING_COLUMNS_TABLE)
+    .upsert(missing, { onConflict: 'tour_number,position' });
   if (error) {
     console.error(error);
     return slots;
   }
   const { data, error: reloadError } = await supabase
-    .from(tableName)
+    .from(PLANNING_COLUMNS_TABLE)
     .select(
       `id,
+        tour_number,
         position,
         label,
         type_code,
@@ -445,6 +449,7 @@ const ensurePlanningColumns = async (supabase, slots, tableName) => {
         open_bonne_saturday,
         open_bonne_sunday`
     )
+    .eq('tour_number', tourId)
     .order('position');
   if (reloadError) {
     console.error(reloadError);
@@ -1745,11 +1750,12 @@ export function initializePlanningChoices({ userRole }) {
       return;
     }
     setPlanningFeedback('Chargement des colonnes…');
-    const tableName = getPlanningTableName(state.selectedTourId);
+    const tourId = state.selectedTourId;
     const { data, error } = await supabase
-      .from(tableName)
+      .from(PLANNING_COLUMNS_TABLE)
       .select(
         `id,
+          tour_number,
           position,
           label,
           type_code,
@@ -1767,6 +1773,7 @@ export function initializePlanningChoices({ userRole }) {
           open_bonne_saturday,
           open_bonne_sunday`
       )
+      .eq('tour_number', tourId)
       .order('position');
     if (error) {
       console.error(error);
@@ -1775,7 +1782,7 @@ export function initializePlanningChoices({ userRole }) {
       return;
     }
     let slots = data ?? [];
-    slots = await ensurePlanningColumns(supabase, slots, tableName);
+    slots = await ensurePlanningColumns(supabase, slots, tourId);
     state.planningSlots = sortSlotsByPosition(slots).map((slot) => ({
       ...slot,
       color: normalizeColor(slot.color),
