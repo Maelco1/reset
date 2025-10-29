@@ -39,7 +39,40 @@
           </nav>
         </header>
 
-        <section class="request-controls" aria-label="Filtres et onglets">
+        <nav
+          id="request-mode-tabs"
+          class="request-tabs request-mode-tabs"
+          role="tablist"
+          aria-label="Mode de traitement"
+        >
+          <button
+            type="button"
+            class="request-tab"
+            data-mode="requests"
+            role="tab"
+            aria-controls="requests-panel"
+            aria-selected="true"
+          >
+            Demandes
+          </button>
+          <button
+            type="button"
+            class="request-tab"
+            data-mode="auto"
+            role="tab"
+            aria-controls="auto-assignment-panel"
+            aria-selected="false"
+          >
+            Attribution automatique
+          </button>
+        </nav>
+
+        <section
+          id="requests-panel"
+          class="request-panel"
+          data-mode-panel="requests"
+          aria-label="Filtres et onglets"
+        >
           <nav
             id="request-user-tabs"
             class="request-tabs request-user-tabs"
@@ -119,7 +152,7 @@
           </form>
         </section>
 
-        <section class="requests-table-section" aria-labelledby="requests-table-title">
+        <section class="requests-table-section" aria-labelledby="requests-table-title" data-mode-panel="requests">
           <div class="section-header">
             <h2 id="requests-table-title">Demandes</h2>
             <p id="request-feedback" role="status"></p>
@@ -145,6 +178,117 @@
               <tbody id="requests-body"></tbody>
             </table>
           </div>
+        </section>
+
+        <section
+          id="auto-assignment-panel"
+          class="auto-assignment-panel hidden"
+          data-mode-panel="auto"
+          aria-labelledby="auto-assignment-title"
+        >
+          <div class="section-header">
+            <h2 id="auto-assignment-title">Attribution automatique</h2>
+            <p id="auto-assignment-feedback" role="status"></p>
+          </div>
+
+          <div class="auto-assignment-meta" aria-live="polite">
+            <span class="auto-assignment-meta-label">Tour actif</span>
+            <span id="auto-assignment-active-tour" class="auto-assignment-meta-value">—</span>
+          </div>
+
+          <form id="auto-assignment-form" class="auto-assignment-form" novalidate>
+            <div class="auto-assignment-grid">
+              <fieldset class="auto-assignment-fieldset">
+                <legend>Population concernée</legend>
+                <label class="auto-assignment-option">
+                  <input type="checkbox" name="population" value="medecin" checked />
+                  Médecins titulaires
+                </label>
+                <label class="auto-assignment-option">
+                  <input type="checkbox" name="population" value="remplacant" checked />
+                  Remplaçants
+                </label>
+              </fieldset>
+
+              <fieldset class="auto-assignment-fieldset">
+                <legend>Ordre d'attribution</legend>
+                <label class="auto-assignment-option">
+                  <input type="radio" name="order" value="asc" checked />
+                  A → Z
+                </label>
+                <label class="auto-assignment-option">
+                  <input type="radio" name="order" value="desc" />
+                  Z → A
+                </label>
+              </fieldset>
+
+              <div class="auto-assignment-field">
+                <label for="auto-assignment-start">Trigramme de départ</label>
+                <input
+                  id="auto-assignment-start"
+                  name="startTrigram"
+                  type="text"
+                  inputmode="text"
+                  autocomplete="off"
+                  list="auto-assignment-trigram-options"
+                  required
+                />
+                <datalist id="auto-assignment-trigram-options"></datalist>
+              </div>
+
+              <div class="auto-assignment-field">
+                <label for="auto-assignment-algorithm">Algorithme</label>
+                <select id="auto-assignment-algorithm" name="algorithm" required>
+                  <option value="simple" selected>Algorithme simple</option>
+                </select>
+              </div>
+
+              <div class="auto-assignment-field">
+                <label for="auto-assignment-rotations">Nombre maximum de rotations</label>
+                <input
+                  id="auto-assignment-rotations"
+                  name="rotations"
+                  type="number"
+                  min="1"
+                  step="1"
+                  value="1"
+                  required
+                />
+              </div>
+            </div>
+
+            <div class="auto-assignment-actions">
+              <button type="button" data-auto-action="preview" class="subtle-button">Prévisualiser</button>
+              <button type="button" data-auto-action="apply">Appliquer</button>
+              <button type="button" data-auto-action="undo" class="danger-link">Annuler la dernière attribution</button>
+            </div>
+          </form>
+
+          <section
+            id="auto-assignment-results"
+            class="auto-assignment-results hidden"
+            aria-labelledby="auto-assignment-results-title"
+          >
+            <div class="section-header">
+              <h3 id="auto-assignment-results-title">Résultats</h3>
+              <p id="auto-assignment-summary"></p>
+            </div>
+
+            <div class="table-container">
+              <table class="table auto-assignment-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Rotation</th>
+                    <th scope="col">Médecin</th>
+                    <th scope="col">Garde normale</th>
+                    <th scope="col">Bonne garde</th>
+                    <th scope="col">Statut</th>
+                  </tr>
+                </thead>
+                <tbody id="auto-assignment-results-body"></tbody>
+              </table>
+            </div>
+          </section>
         </section>
       </section>
     </main>
