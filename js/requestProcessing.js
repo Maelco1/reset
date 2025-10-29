@@ -957,6 +957,55 @@ const promoteAlternative = async (trigram, choiceIndex) => {
   };
 };
 
+const findAlternativesToDeactivate = async ({
+  supabase,
+  trigram,
+  choiceIndex,
+  selectedId,
+  selectedRank,
+  excludedIds = []
+}) => {
+  if (!supabase || !state.planningReference || !state.activeTourId) {
+    return [];
+  }
+  const normalizedTrigram = typeof trigram === 'string' ? trigram.trim().toUpperCase() : '';
+  const parsedChoiceIndex = Number.parseFloat(choiceIndex);
+  const numericChoiceIndex = Number.isNaN(parsedChoiceIndex) ? Number.NaN : parsedChoiceIndex;
+  if (!normalizedTrigram || Number.isNaN(numericChoiceIndex)) {
+    return [];
+  }
+
+  const { data, error } = await supabase
+    .from(CHOICES_TABLE)
+    .select('id, etat, is_active, choice_rank, day, column_number')
+    .eq('planning_reference', state.planningReference)
+    .eq('tour_number', state.activeTourId)
+    .eq('trigram', normalizedTrigram)
+    .eq('choice_index', numericChoiceIndex)
+    .neq('id', selectedId);
+  if (error) {
+    console.error(error);
+    return [];
+  }
+
+  const excluded = new Set((excludedIds ?? []).map((value) => Number(value)));
+  const parsedRank = Number.parseFloat(selectedRank);
+  const rankThreshold = Number.isNaN(parsedRank) ? 1 : parsedRank;
+  return (data ?? []).filter((record) => {
+    if (!record || excluded.has(Number(record.id))) {
+      return false;
+    }
+    const rankValue = Number.parseFloat(record.choice_rank);
+    if (!Number.isNaN(rankValue) && rankValue <= rankThreshold) {
+      return false;
+    }
+    if (record.etat === 'refusé' && record.is_active === false) {
+      return false;
+    }
+    return true;
+  });
+};
+
 const fetchCompetingRequests = async (request) => {
   const supabase = await ensureSupabase();
   if (!supabase) {
@@ -1037,6 +1086,29 @@ const acceptRequest = async (requestId) => {
   const alternativeIds = competing
     .filter((item) => item.trigram === request.trigram && item.id !== request.id && item.choice_rank > 1)
     .map((item) => item.id);
+
+  const parsedRequestRank = Number.parseFloat(request.choiceRank ?? request.choice_rank);
+  const choiceRankThreshold = Number.isNaN(parsedRequestRank) ? 1 : parsedRequestRank;
+  const additionalAlternatives = await findAlternativesToDeactivate({
+    supabase,
+    trigram: request.trigram,
+    choiceIndex: request.choiceIndex,
+    selectedId: request.id,
+    selectedRank: choiceRankThreshold,
+    excludedIds: alternativeIds
+  });
+  if (additionalAlternatives.length) {
+    const extended = new Set(alternativeIds);
+    additionalAlternatives.forEach((record) => {
+      if (!extended.has(record.id)) {
+        extended.add(record.id);
+      }
+    });
+    alternativeIds.length = 0;
+    extended.forEach((id) => {
+      alternativeIds.push(id);
+    });
+  }
   const competingIds = competing
     .filter((item) => item.trigram !== request.trigram)
     .map((item) => item.id);
@@ -1821,6 +1893,21 @@ const applyAutomaticAcceptance = async (request, { guardType }) => {
     is_active: stored.isActive ?? true,
     choice_rank: stored.choiceRank ?? 1
   };
+  const parsedTargetRank = Number.parseFloat(targetState.choice_rank);
+  const parsedStoredRank = Number.parseFloat(stored.choiceRank ?? stored.choice_rank);
+  let selectedRankThreshold = parsedTargetRank;
+  if (Number.isNaN(selectedRankThreshold)) {
+    selectedRankThreshold = Number.isNaN(parsedStoredRank) ? 1 : parsedStoredRank;
+  }
+
+  const additionalAlternatives = await findAlternativesToDeactivate({
+    supabase,
+    trigram: stored.trigram,
+    choiceIndex: stored.choiceIndex,
+    selectedId: stored.id,
+    selectedRank: selectedRankThreshold,
+    excludedIds: alternativeIds
+  });
 
   if (targetState.etat !== 'validé' || targetState.is_active !== true) {
     updates.push(async () => {
@@ -1878,6 +1965,33 @@ const applyAutomaticAcceptance = async (request, { guardType }) => {
         choice_rank: state?.choice_rank ?? null
       },
       reason: 'Alternative refusée automatiquement'
+    });
+  });
+
+  additionalAlternatives.forEach((record) => {
+    updates.push(async () => {
+      const { error } = await supabase
+        .from(CHOICES_TABLE)
+        .update({ etat: 'refusé', is_active: false })
+        .eq('id', record.id);
+      if (error) {
+        throw error;
+      }
+    });
+    operations.push({
+      choiceId: record.id,
+      action: 'refuse_alternative',
+      previous: {
+        etat: record.etat ?? null,
+        is_active: record.is_active ?? null,
+        choice_rank: record.choice_rank ?? null
+      },
+      next: {
+        etat: 'refusé',
+        is_active: false,
+        choice_rank: record.choice_rank ?? null
+      },
+      reason: 'Alternative retirée automatiquement'
     });
   });
 
