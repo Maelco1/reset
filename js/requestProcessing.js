@@ -612,10 +612,10 @@ const getFilteredRequests = (statuses) => {
 };
 
 const compareRequestsByPriority = (a, b) => {
-  const indexA = Number.isFinite(a?.choiceIndex) ? a.choiceIndex : Number.NEGATIVE_INFINITY;
-  const indexB = Number.isFinite(b?.choiceIndex) ? b.choiceIndex : Number.NEGATIVE_INFINITY;
+  const indexA = Number.isFinite(a?.choiceIndex) ? a.choiceIndex : Number.POSITIVE_INFINITY;
+  const indexB = Number.isFinite(b?.choiceIndex) ? b.choiceIndex : Number.POSITIVE_INFINITY;
   if (indexA !== indexB) {
-    return indexB - indexA;
+    return indexA - indexB;
   }
   const rankA = Number.isFinite(a?.choiceRank) ? a.choiceRank : Number.MAX_SAFE_INTEGER;
   const rankB = Number.isFinite(b?.choiceRank) ? b.choiceRank : Number.MAX_SAFE_INTEGER;
@@ -946,7 +946,7 @@ const loadRequests = async () => {
     query.eq('tour_number', state.activeTourId);
   }
   query
-    .order('choice_index', { ascending: false })
+    .order('choice_index', { ascending: true })
     .order('choice_rank', { ascending: true })
     .order('created_at', { ascending: true });
   const { data, error } = await query;
