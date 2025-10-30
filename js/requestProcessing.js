@@ -221,20 +221,23 @@ const haveMatchingChoiceOrder = (candidate, selectedOrder) => {
   return candidateOrder != null && candidateOrder === selectedOrder;
 };
 
-const shouldTreatAsAlternative = (candidate, selectedRank, selectedIndex, selectedOrder) => {
+const getAlternativeRelation = (candidate, selectedRank, selectedIndex, selectedOrder) => {
   if (haveMatchingChoiceOrder(candidate, selectedOrder)) {
-    return true;
+    return 'order';
   }
   if (haveMatchingChoiceIndex(candidate, selectedIndex)) {
-    return true;
+    return 'index';
   }
   const candidateRank = parseNumeric(candidate.choice_rank ?? candidate.choiceRank);
   if (candidateRank == null) {
-    return true;
+    return 'rank';
   }
   const threshold = selectedRank ?? 1;
-  return candidateRank > threshold;
+  return candidateRank > threshold ? 'rank' : null;
 };
+
+const shouldTreatAsAlternative = (candidate, selectedRank, selectedIndex, selectedOrder) =>
+  getAlternativeRelation(candidate, selectedRank, selectedIndex, selectedOrder) != null;
 
 const getRequestGroupKey = (request) => {
   if (!request) {
@@ -1599,6 +1602,116 @@ const getOrderedTrigrams = (params) => {
 };
 
 
+
+
+const formatChoicePrimaryLabel = (choiceIndex) => {
+  if (!Number.isFinite(choiceIndex)) {
+    return '—';
+  }
+  return String(Math.trunc(choiceIndex));
+};
+
+const formatChoiceAlternativeLabel = (choiceIndex, choiceRank, choiceOrder) => {
+  const hasIndex = Number.isFinite(choiceIndex);
+  const hasRank = Number.isFinite(choiceRank);
+  if (hasIndex && hasRank) {
+    const normalizedIndex = Math.trunc(choiceIndex);
+    const normalizedRank = Math.max(1, Math.trunc(choiceRank));
+    return `${normalizedIndex}.${normalizedRank}`;
+  }
+  if (hasRank) {
+    return String(Math.max(1, Math.trunc(choiceRank)));
+  }
+  if (Number.isFinite(choiceOrder)) {
+    return `Ord.${Math.trunc(choiceOrder)}`;
+  }
+  return '—';
+};
+
+const describeAlternativeRelation = (relation) => {
+  if (relation === 'order') {
+    return "Alternative (ordre identique)";
+  }
+  if (relation === 'index') {
+    return "Alternative (index identique)";
+  }
+  if (relation === 'rank') {
+    return 'Alternative (rang supérieur)';
+  }
+  return 'Sélection';
+};
+
+const createSemiAssignmentImpact = (request, guardType, role, relation = null) => {
+  if (!request) {
+    return null;
+  }
+  const dayKey = getRequestDayKey(request);
+  const normalizedGuard = guardType === 'bonne' ? 'bonne' : 'normale';
+  const columnLabel =
+    request.columnLabel ||
+    request.planningDayLabel ||
+    request.slotTypeCode ||
+    (Number.isFinite(request.columnNumber) ? `Colonne ${request.columnNumber}` : '');
+  return {
+    id: request.id ?? null,
+    trigram: normalizeTrigram(request.trigram),
+    guardType: normalizedGuard,
+    role,
+    relation,
+    day: request.day ?? null,
+    dayKey,
+    columnNumber: Number.isFinite(request.columnNumber) ? request.columnNumber : null,
+    choiceIndex: Number.isFinite(request.choiceIndex) ? request.choiceIndex : null,
+    choiceRank: Number.isFinite(request.choiceRank) ? request.choiceRank : null,
+    choiceOrder: Number.isFinite(request.choiceOrder) ? request.choiceOrder : null,
+    primaryLabel: formatChoicePrimaryLabel(request.choiceIndex),
+    alternativeLabel: formatChoiceAlternativeLabel(
+      request.choiceIndex,
+      request.choiceRank,
+      request.choiceOrder
+    ),
+    description: describeAlternativeRelation(relation),
+    location: columnLabel,
+    summary: formatSemiAssignmentGuard(request)
+  };
+};
+
+const findLocalAlternativesForRequest = (request) => {
+  if (!request) {
+    return [];
+  }
+  const trigram = normalizeTrigram(request.trigram);
+  const guardNature = normalizeGuardNature(request.guardNature);
+  const selectedRank = parseNumeric(request.choiceRank ?? request.choice_rank);
+  const selectedIndex = parseNumeric(request.choiceIndex ?? request.choice_index);
+  const selectedOrder = parseNumeric(request.choiceOrder ?? request.choice_order);
+  return state.requests
+    .filter((item) => item.id !== request.id)
+    .filter((item) => normalizeTrigram(item.trigram) === trigram)
+    .filter((item) => normalizeGuardNature(item.guardNature ?? item.guard_nature) === guardNature)
+    .filter((item) => (item.status ?? '').toLowerCase() === 'en attente')
+    .map((item) => ({
+      record: item,
+      relation: getAlternativeRelation(item, selectedRank, selectedIndex, selectedOrder)
+    }))
+    .filter((entry) => entry.relation != null)
+    .map((entry) => ({
+      record: entry.record,
+      relation: entry.relation
+    }));
+};
+
+const buildSemiAssignmentImpacts = (request, guardType) => {
+  const selection = createSemiAssignmentImpact(request, guardType, 'assigned');
+  const alternatives = findLocalAlternativesForRequest(request).map((entry) =>
+    createSemiAssignmentImpact(entry.record, guardType, 'alternative', entry.relation)
+  );
+  return {
+    assigned: selection ? [selection] : [],
+    alternatives: alternatives.filter(Boolean)
+  };
+};
+
 const computeSemiAssignmentSteps = (params) => {
   const orderedTrigrams = getOrderedTrigrams(params);
   const pendingMap = buildPendingRequestsMap(params);
@@ -1699,13 +1812,15 @@ const computeSemiAssignmentSteps = (params) => {
         if (!candidate?.request) {
           return;
         }
+        const impacts = buildSemiAssignmentImpacts(candidate.request, guardType);
         steps.push({
           trigram,
           userType: entry?.userType ?? getUserTypeForTrigram(trigram),
           rotation,
           guardType,
           request: candidate.request,
-          status: 'pending'
+          status: 'pending',
+          impacts
         });
         registerSelection(guardType, candidate);
         if (guardType === 'bonne') {
@@ -1832,6 +1947,142 @@ const moveSemiAssignmentIndex = (offset) => {
   renderSemiAssignmentState();
 };
 
+
+const createSemiAssignmentMiniSlot = (item) => {
+  if (!item) {
+    return null;
+  }
+  const slot = document.createElement('div');
+  slot.className = 'semi-assignment-mini-slot';
+  const typeKey = item.guardType === 'bonne' ? 'good' : 'normal';
+  const roleKey = item.role === 'alternative' ? 'alternative' : 'assigned';
+  slot.classList.add(`semi-assignment-mini-slot--${typeKey}-${roleKey}`);
+  const trigram = document.createElement('span');
+  trigram.className = 'semi-assignment-mini-trigram';
+  trigram.textContent = item.trigram || '—';
+  slot.appendChild(trigram);
+  const primary = document.createElement('span');
+  primary.className = 'semi-assignment-mini-label semi-assignment-mini-label--primary';
+  primary.textContent = `P: ${item.primaryLabel ?? '—'}`;
+  slot.appendChild(primary);
+  const alternative = document.createElement('span');
+  alternative.className = 'semi-assignment-mini-label semi-assignment-mini-label--alt';
+  alternative.textContent = `A: ${item.alternativeLabel ?? '—'}`;
+  slot.appendChild(alternative);
+  const sr = document.createElement('span');
+  sr.className = 'sr-only';
+  const descriptors = [item.trigram || '', item.summary || '', item.description || ''].filter(Boolean);
+  sr.textContent = descriptors.join(' • ');
+  slot.appendChild(sr);
+  slot.title = descriptors.join(' • ');
+  return slot;
+};
+
+const createSemiAssignmentPreview = (step) => {
+  const container = document.createElement('div');
+  container.className = 'semi-assignment-impacts';
+  if (!step) {
+    const empty = document.createElement('p');
+    empty.className = 'semi-assignment-mini-empty';
+    empty.textContent = 'Aucun impact identifié.';
+    container.appendChild(empty);
+    return container;
+  }
+  const impacts = step.impacts ?? buildSemiAssignmentImpacts(step.request, step.guardType);
+  if (step && !step.impacts) {
+    step.impacts = impacts;
+  }
+  const assigned = impacts?.assigned ?? [];
+  const alternatives = impacts?.alternatives ?? [];
+  const items = [...assigned, ...alternatives].filter(Boolean);
+  if (!items.length) {
+    const empty = document.createElement('p');
+    empty.className = 'semi-assignment-mini-empty';
+    empty.textContent = 'Aucun impact identifié.';
+    container.appendChild(empty);
+    return container;
+  }
+  const positioned = items.filter((item) => item.dayKey && Number.isFinite(item.columnNumber));
+  if (positioned.length) {
+    const columnNumbers = Array.from(new Set(positioned.map((item) => item.columnNumber))).sort((a, b) => a - b);
+    const dayEntries = new Map();
+    positioned.forEach((item) => {
+      const key = item.dayKey;
+      if (!dayEntries.has(key)) {
+        const label = formatDate(item.day ?? key);
+        dayEntries.set(key, { key, label, cells: new Map() });
+      }
+      const entry = dayEntries.get(key);
+      if (!entry.cells.has(item.columnNumber)) {
+        entry.cells.set(item.columnNumber, []);
+      }
+      entry.cells.get(item.columnNumber).push(item);
+    });
+    const dayRows = Array.from(dayEntries.values()).sort((a, b) => a.key.localeCompare(b.key));
+    const table = document.createElement('table');
+    table.className = 'semi-assignment-mini';
+    const thead = document.createElement('thead');
+    const headerRow = document.createElement('tr');
+    const dayHeader = document.createElement('th');
+    dayHeader.scope = 'col';
+    dayHeader.textContent = 'Jour';
+    headerRow.appendChild(dayHeader);
+    columnNumbers.forEach((columnNumber) => {
+      const th = document.createElement('th');
+      th.scope = 'col';
+      th.textContent = `Col. ${columnNumber}`;
+      headerRow.appendChild(th);
+    });
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
+    const tbody = document.createElement('tbody');
+    dayRows.forEach((dayRow) => {
+      const row = document.createElement('tr');
+      const dayCell = document.createElement('th');
+      dayCell.scope = 'row';
+      dayCell.textContent = dayRow.label;
+      row.appendChild(dayCell);
+      columnNumbers.forEach((columnNumber) => {
+        const td = document.createElement('td');
+        const cellItems = dayRow.cells.get(columnNumber) ?? [];
+        if (!cellItems.length) {
+          td.classList.add('is-empty');
+        } else {
+          td.classList.add('has-content');
+          cellItems.forEach((item) => {
+            const slot = createSemiAssignmentMiniSlot(item);
+            if (slot) {
+              td.appendChild(slot);
+            }
+          });
+        }
+        row.appendChild(td);
+      });
+      tbody.appendChild(row);
+    });
+    table.appendChild(tbody);
+    container.appendChild(table);
+  }
+  const otherItems = items.filter((item) => !item.dayKey || !Number.isFinite(item.columnNumber));
+  if (otherItems.length) {
+    const chips = document.createElement('div');
+    chips.className = 'semi-assignment-mini-meta';
+    otherItems.forEach((item) => {
+      const chip = document.createElement('span');
+      chip.className = 'semi-assignment-mini-chip';
+      const typeKey = item.guardType === 'bonne' ? 'good' : 'normal';
+      const roleKey = item.role === 'alternative' ? 'alternative' : 'assigned';
+      chip.classList.add(`semi-assignment-mini-chip--${typeKey}-${roleKey}`);
+      chip.textContent = `${item.trigram || '—'} • P:${item.primaryLabel} • A:${item.alternativeLabel}`;
+      chip.title = item.summary || '';
+      chips.appendChild(chip);
+    });
+    container.appendChild(chips);
+  }
+  return container;
+};
+
+
 const renderSemiAssignmentState = () => {
   if (!elements.semiResultsSection || !elements.semiResultsBody) {
     return;
@@ -1875,6 +2126,10 @@ const renderSemiAssignmentState = () => {
     const slotCell = document.createElement('td');
     slotCell.textContent = formatSemiAssignmentGuard(step.request);
     row.appendChild(slotCell);
+
+    const impactsCell = document.createElement('td');
+    impactsCell.appendChild(createSemiAssignmentPreview(step));
+    row.appendChild(impactsCell);
 
     const statusCell = document.createElement('td');
     const badge = document.createElement('span');
