@@ -239,23 +239,27 @@ const getAlternativeRelation = (candidate, selectedRank, selectedIndex, selected
 const shouldTreatAsAlternative = (candidate, selectedRank, selectedIndex, selectedOrder) =>
   getAlternativeRelation(candidate, selectedRank, selectedIndex, selectedOrder) != null;
 
-const getRequestGroupKey = (request) => {
-  if (!request) {
-    return null;
+// Remplacer la fonction existante
+function getRequestGroupKey(request) {
+  // On privilégie l'INDEX PRINCIPAL (partie entière de 1.x) pour regrouper les alternatives
+  const indexRaw = request?.choiceIndex ?? request?.choice_index;
+  const indexNum = parseNumeric(indexRaw);
+  if (Number.isFinite(indexNum)) {
+    // Math.trunc() garantit que 1.0, 1.2, 1.9 => groupe "1"
+    return `index:${Math.trunc(indexNum)}`;
   }
-  const order = parseNumeric(request.choiceOrder ?? request.choice_order);
-  if (Number.isFinite(order)) {
-    return `order:${order}`;
+
+  // Si pas d'index, on retombe sur l'ordre
+  const orderRaw = request?.choiceOrder ?? request?.choice_order;
+  const orderNum = parseNumeric(orderRaw);
+  if (Number.isFinite(orderNum)) {
+    return `order:${orderNum}`;
   }
-  const index = parseNumeric(request.choiceIndex ?? request.choice_index);
-  if (Number.isFinite(index)) {
-    return `index:${index}`;
-  }
-  if (request.id != null) {
-    return `id:${String(request.id)}`;
-  }
-  return null;
-};
+
+  // Fallback stable pour éviter des regroupements incohérents
+  const id = request?.id ?? request?.request_id ?? JSON.stringify(request);
+  return `misc:${String(id)}`;
+}
 
 const buildGroupStateKey = (trigram, guardType, groupKey) => {
   if (!groupKey) {
@@ -1749,6 +1753,28 @@ const computeSemiAssignmentSteps = (params) => {
     if (entry) {
       const listKey = guardType === 'bonne' ? 'bonne' : 'normale';
       entry[listKey] = entry[listKey].filter((item) => getRequestGroupKey(item) !== groupKey);
+      // --- ÉCARTER AUSSI TOUTES LES ALTERNATIVES DES DEMANDES DÉJÀ VALIDÉES ---
+      try {
+        const validated = request;
+        const listKeyForAlternatives =
+          normalizeGuardNature(validated.guardNature ?? validated.guard_nature) === 'bonne'
+            ? 'bonne'
+            : 'normale';
+
+        // entry est l'objet { bonne: [...], normale: [...] } du créneau concerné
+        if (entry && Array.isArray(entry[listKeyForAlternatives])) {
+          // Récupère les IDs d'alternatives de ce même groupe d'index/rang/ordre
+          const altIds = collectAlternativeIds(entry[listKeyForAlternatives], validated);
+          if (altIds && altIds.length) {
+            const altSet = new Set(altIds);
+            entry[listKeyForAlternatives] = entry[listKeyForAlternatives].filter(
+              (item) => !altSet.has(item.id)
+            );
+          }
+        }
+      } catch (e) {
+        console.warn('Semi-auto: purge alternatives (pré-filtrage validés) — soft error:', e);
+      }
     }
   });
 
@@ -1786,6 +1812,39 @@ const computeSemiAssignmentSteps = (params) => {
         usedGroupKeys.add(stateKey);
       }
       entry[listKey] = entry[listKey].filter((item) => getRequestGroupKey(item) !== groupKey);
+    }
+    // --- PURGE COMPLÈTE DES ALTERNATIVES DU MÊME GROUPE 1.x / même médecin / même nature ---
+    try {
+      const selected = candidate.request;
+      const selectedRank = parseNumeric(selected.choiceRank ?? selected.choice_rank);
+      const selectedIndex = parseNumeric(selected.choiceIndex ?? selected.choice_index);
+      const selectedOrder = parseNumeric(selected.choiceOrder ?? selected.choice_order);
+
+      // Clés d'égalité contextuelle
+      const sameTrigram = (x) => normalizeTrigram(x.trigram) === normalizeTrigram(selected.trigram);
+      const sameNature = (x) =>
+        normalizeGuardNature(x.guardNature ?? x.guard_nature) ===
+        normalizeGuardNature(selected.guardNature ?? selected.guard_nature);
+
+      // On travaille sur l'entrée date/slot concernée
+      const listKeyForPurge =
+        normalizeGuardNature(selected.guardNature ?? selected.guard_nature) === 'bonne'
+          ? 'bonne'
+          : 'normale';
+      const targetEntry = entry;
+
+      if (targetEntry && Array.isArray(targetEntry[listKeyForPurge])) {
+        targetEntry[listKeyForPurge] = targetEntry[listKeyForPurge].filter((item) => {
+          // On ne touche pas aux autres médecins / autres natures
+          if (!sameTrigram(item) || !sameNature(item)) {
+            return true;
+          }
+          // Retire tout ce qui est considéré comme alternative au regard de la sélection en cours
+          return !shouldTreatAsAlternative(item, selectedRank, selectedIndex, selectedOrder);
+        });
+      }
+    } catch (e) {
+      console.warn('Semi-auto: purge alternatives (applySelection) — soft error:', e);
     }
     if (candidate.slotKey) {
       occupiedSlots.add(candidate.slotKey);
