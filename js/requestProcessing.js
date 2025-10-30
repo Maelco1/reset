@@ -59,6 +59,11 @@ const TYPE_LABELS = new Map([
   ['téléconsultation', 'Téléconsultation']
 ]);
 
+const CHOICE_SERIES_LABELS = new Map([
+  ['normale', 'Gardes normales'],
+  ['bonne', 'Bonnes gardes']
+]);
+
 const ADMIN_SETTINGS_TABLE = 'parametres_administratifs';
 const AUDIT_TABLE = 'planning_choice_audit';
 const CHOICES_TABLE = 'planning_choices';
@@ -167,6 +172,14 @@ const normalizeTrigram = (value) => {
     .toUpperCase();
 };
 
+const normalizeGuardNature = (value) => {
+  if (typeof value !== 'string') {
+    return 'normale';
+  }
+  const normalized = value.toString().trim().toLowerCase();
+  return normalized === 'bonne' ? 'bonne' : 'normale';
+};
+
 const sanitizeActiveTour = (value) => {
   if (value == null || value === '') {
     return null;
@@ -254,8 +267,10 @@ const collectAlternativeIds = (competing, request) => {
   const selectedRank = parseNumeric(request.choiceRank ?? request.choice_rank);
   const selectedIndex = parseNumeric(request.choiceIndex ?? request.choice_index);
   const selectedOrder = parseNumeric(request.choiceOrder ?? request.choice_order);
+  const selectedNature = normalizeGuardNature(request.guardNature ?? request.guard_nature);
   const alternatives = competing
     .filter((item) => item.trigram === request.trigram && item.id !== request.id)
+    .filter((item) => normalizeGuardNature(item.guard_nature ?? item.guardNature) === selectedNature)
     .filter((item) => shouldTreatAsAlternative(item, selectedRank, selectedIndex, selectedOrder))
     .map((item) => item.id);
   return Array.from(new Set(alternatives));
@@ -895,7 +910,7 @@ const mapRequestRecord = (record) => {
     columnLabel: record.column_label ?? null,
     planningDayLabel: record.planning_day_label ?? null,
     slotTypeCode: record.slot_type_code ?? null,
-    guardNature: record.guard_nature ?? 'normale',
+    guardNature: normalizeGuardNature(record.guard_nature),
     activityType: (record.activity_type ?? 'visite').toLowerCase(),
     choiceIndex: Number.isNaN(choiceIndexValue) ? null : choiceIndexValue,
     choiceRank: Number.isNaN(choiceRankValue) ? null : choiceRankValue,
@@ -985,18 +1000,20 @@ const recordAudit = async ({
   }
 };
 
-const promoteAlternative = async (trigram, choiceIndex) => {
+const promoteAlternative = async (trigram, choiceIndex, guardNature) => {
   const supabase = await ensureSupabase();
   if (!supabase) {
     return null;
   }
+  const normalizedNature = normalizeGuardNature(guardNature);
   const { data: alternative, error } = await supabase
     .from(CHOICES_TABLE)
-    .select('id, choice_rank, day, column_number')
+    .select('id, choice_rank, day, column_number, guard_nature')
     .eq('planning_reference', state.planningReference)
     .eq('tour_number', state.activeTourId)
     .eq('trigram', trigram)
     .eq('choice_index', choiceIndex)
+    .eq('guard_nature', normalizedNature)
     .eq('etat', 'en attente')
     .gt('choice_rank', 1)
     .order('choice_rank', { ascending: true })
@@ -1038,6 +1055,7 @@ const findAlternativesToDeactivate = async ({
   supabase,
   trigram,
   choiceIndex,
+  guardNature,
   selectedId,
   selectedRank,
   excludedIds = []
@@ -1051,14 +1069,16 @@ const findAlternativesToDeactivate = async ({
   if (!normalizedTrigram || Number.isNaN(numericChoiceIndex)) {
     return [];
   }
+  const normalizedNature = normalizeGuardNature(guardNature);
 
   const { data, error } = await supabase
     .from(CHOICES_TABLE)
-    .select('id, etat, is_active, choice_rank, day, column_number')
+    .select('id, etat, is_active, choice_rank, day, column_number, guard_nature')
     .eq('planning_reference', state.planningReference)
     .eq('tour_number', state.activeTourId)
     .eq('trigram', normalizedTrigram)
     .eq('choice_index', numericChoiceIndex)
+    .eq('guard_nature', normalizedNature)
     .neq('id', selectedId);
   if (error) {
     console.error(error);
@@ -1087,6 +1107,7 @@ const findChoiceOrderAlternatives = async ({
   supabase,
   trigram,
   choiceOrder,
+  guardNature,
   selectedId,
   excludedIds = []
 }) => {
@@ -1100,13 +1121,15 @@ const findChoiceOrderAlternatives = async ({
   }
 
   const excluded = new Set((excludedIds ?? []).map((value) => Number(value)));
+  const normalizedNature = normalizeGuardNature(guardNature);
   const { data, error } = await supabase
     .from(CHOICES_TABLE)
-    .select('id, etat, is_active, choice_rank, day, column_number, choice_order')
+    .select('id, etat, is_active, choice_rank, day, column_number, choice_order, guard_nature')
     .eq('planning_reference', state.planningReference)
     .eq('tour_number', state.activeTourId)
     .eq('trigram', normalizedTrigram)
     .eq('choice_order', parsedChoiceOrder)
+    .eq('guard_nature', normalizedNature)
     .neq('id', selectedId);
   if (error) {
     console.error(error);
@@ -1123,7 +1146,7 @@ const fetchCompetingRequests = async (request) => {
   }
   const { data, error } = await supabase
     .from(CHOICES_TABLE)
-    .select('id, trigram, choice_index, choice_rank, etat, day, column_number, is_active')
+    .select('id, trigram, choice_index, choice_rank, etat, day, column_number, is_active, guard_nature')
     .eq('planning_reference', request.planningReference)
     .eq('tour_number', request.tourNumber)
     .eq('day', request.day)
@@ -1201,6 +1224,7 @@ const acceptRequest = async (requestId) => {
     supabase,
     trigram: request.trigram,
     choiceIndex: request.choiceIndex,
+    guardNature: request.guardNature,
     selectedId: request.id,
     selectedRank: choiceRankThreshold,
     excludedIds: alternativeIds
@@ -1215,6 +1239,7 @@ const acceptRequest = async (requestId) => {
     supabase,
     trigram: request.trigram,
     choiceOrder: request.choiceOrder,
+    guardNature: request.guardNature,
     selectedId: request.id,
     excludedIds: Array.from(alternativeIdSet)
   });
@@ -1296,7 +1321,11 @@ const acceptRequest = async (requestId) => {
   }
 
   for (const competitor of primaryRefused) {
-    await promoteAlternative(competitor.trigram, competitor.choice_index);
+    await promoteAlternative(
+      competitor.trigram,
+      competitor.choice_index,
+      competitor.guard_nature ?? competitor.guardNature
+    );
   }
 
   await loadRequests();
