@@ -58,12 +58,12 @@
           <button
             type="button"
             class="request-tab"
-            data-mode="auto"
+            data-mode="semi"
             role="tab"
-            aria-controls="auto-assignment-panel"
+            aria-controls="semi-assignment-panel"
             aria-selected="false"
           >
-            Attribution automatique
+            Attribution semi-automatique
           </button>
         </nav>
 
@@ -181,72 +181,65 @@
         </section>
 
         <section
-          id="auto-assignment-panel"
-          class="auto-assignment-panel hidden"
-          data-mode-panel="auto"
-          aria-labelledby="auto-assignment-title"
+          id="semi-assignment-panel"
+          class="semi-assignment-panel hidden"
+          data-mode-panel="semi"
+          aria-labelledby="semi-assignment-title"
         >
           <div class="section-header">
-            <h2 id="auto-assignment-title">Attribution automatique</h2>
-            <p id="auto-assignment-feedback" role="status"></p>
+            <h2 id="semi-assignment-title">Attribution semi-automatique</h2>
+            <p id="semi-assignment-feedback" role="status"></p>
           </div>
 
-          <div class="auto-assignment-meta" aria-live="polite">
-            <span class="auto-assignment-meta-label">Tour actif</span>
-            <span id="auto-assignment-active-tour" class="auto-assignment-meta-value">—</span>
+          <div class="semi-assignment-meta" aria-live="polite">
+            <span class="semi-assignment-meta-label">Tour actif</span>
+            <span id="semi-assignment-active-tour" class="semi-assignment-meta-value">—</span>
           </div>
 
-          <form id="auto-assignment-form" class="auto-assignment-form" novalidate>
-            <div class="auto-assignment-grid">
-              <fieldset class="auto-assignment-fieldset">
+          <form id="semi-assignment-form" class="semi-assignment-form" novalidate>
+            <div class="semi-assignment-grid">
+              <fieldset class="semi-assignment-fieldset">
                 <legend>Population concernée</legend>
-                <label class="auto-assignment-option">
+                <label class="semi-assignment-option">
                   <input type="checkbox" name="population" value="medecin" checked />
                   Médecins titulaires
                 </label>
-                <label class="auto-assignment-option">
+                <label class="semi-assignment-option">
                   <input type="checkbox" name="population" value="remplacant" checked />
                   Remplaçants
                 </label>
               </fieldset>
 
-              <fieldset class="auto-assignment-fieldset">
+              <fieldset class="semi-assignment-fieldset">
                 <legend>Ordre d'attribution</legend>
-                <label class="auto-assignment-option">
+                <label class="semi-assignment-option">
                   <input type="radio" name="order" value="asc" checked />
                   A → Z
                 </label>
-                <label class="auto-assignment-option">
+                <label class="semi-assignment-option">
                   <input type="radio" name="order" value="desc" />
                   Z → A
                 </label>
               </fieldset>
 
-              <div class="auto-assignment-field">
-                <label for="auto-assignment-start">Trigramme de départ</label>
+              <div class="semi-assignment-field">
+                <label for="semi-assignment-start">Trigramme de départ</label>
                 <input
-                  id="auto-assignment-start"
+                  id="semi-assignment-start"
                   name="startTrigram"
                   type="text"
                   inputmode="text"
                   autocomplete="off"
-                  list="auto-assignment-trigram-options"
+                  list="semi-assignment-trigram-options"
                   required
                 />
-                <datalist id="auto-assignment-trigram-options"></datalist>
+                <datalist id="semi-assignment-trigram-options"></datalist>
               </div>
 
-              <div class="auto-assignment-field">
-                <label for="auto-assignment-algorithm">Algorithme</label>
-                <select id="auto-assignment-algorithm" name="algorithm" required>
-                  <option value="simple" selected>Algorithme simple</option>
-                </select>
-              </div>
-
-              <div class="auto-assignment-field">
-                <label for="auto-assignment-rotations">Nombre maximum de rotations</label>
+              <div class="semi-assignment-field">
+                <label for="semi-assignment-rotations">Nombre de rotations</label>
                 <input
-                  id="auto-assignment-rotations"
+                  id="semi-assignment-rotations"
                   name="rotations"
                   type="number"
                   min="1"
@@ -255,37 +248,72 @@
                   required
                 />
               </div>
+
+              <div class="semi-assignment-field">
+                <label for="semi-assignment-normal-threshold">Gardes normales par palier (X)</label>
+                <input
+                  id="semi-assignment-normal-threshold"
+                  name="normalThreshold"
+                  type="number"
+                  min="1"
+                  step="1"
+                  value="2"
+                  required
+                />
+              </div>
+
+              <div class="semi-assignment-field">
+                <label for="semi-assignment-good-quota">Bonnes gardes accordées (Y)</label>
+                <input
+                  id="semi-assignment-good-quota"
+                  name="goodQuota"
+                  type="number"
+                  min="0"
+                  step="1"
+                  value="1"
+                  required
+                />
+              </div>
+
+              <div class="semi-assignment-field">
+                <label class="semi-assignment-option">
+                  <input type="checkbox" name="stepValidation" value="on" checked />
+                  Validation pas-à-pas obligatoire
+                </label>
+              </div>
             </div>
 
-            <div class="auto-assignment-actions">
-              <button type="button" data-auto-action="preview" class="subtle-button">Prévisualiser</button>
-              <button type="button" data-auto-action="apply">Appliquer</button>
-              <button type="button" data-auto-action="undo" class="danger-link">Annuler la dernière attribution</button>
+            <div class="semi-assignment-actions">
+              <button type="button" data-semi-action="prepare" class="subtle-button">Préparer la séquence</button>
+              <button type="button" data-semi-action="previous" class="subtle-button">Étape précédente</button>
+              <button type="button" data-semi-action="next">Étape suivante</button>
+              <button type="button" data-semi-action="accept" class="primary">Valider l'étape</button>
+              <button type="button" data-semi-action="skip" class="danger-link">Ignorer l'étape</button>
             </div>
           </form>
 
           <section
-            id="auto-assignment-results"
-            class="auto-assignment-results hidden"
-            aria-labelledby="auto-assignment-results-title"
+            id="semi-assignment-results"
+            class="semi-assignment-results hidden"
+            aria-labelledby="semi-assignment-results-title"
           >
             <div class="section-header">
-              <h3 id="auto-assignment-results-title">Résultats</h3>
-              <p id="auto-assignment-summary"></p>
+              <h3 id="semi-assignment-results-title">Proposition en cours</h3>
+              <p id="semi-assignment-summary"></p>
             </div>
 
             <div class="table-container">
-              <table class="table auto-assignment-table">
+              <table class="table semi-assignment-table">
                 <thead>
                   <tr>
                     <th scope="col">Rotation</th>
                     <th scope="col">Médecin</th>
-                    <th scope="col">Garde normale</th>
-                    <th scope="col">Bonne garde</th>
+                    <th scope="col">Type de garde</th>
+                    <th scope="col">Créneau</th>
                     <th scope="col">Statut</th>
                   </tr>
                 </thead>
-                <tbody id="auto-assignment-results-body"></tbody>
+                <tbody id="semi-assignment-results-body"></tbody>
               </table>
             </div>
           </section>

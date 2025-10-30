@@ -62,26 +62,15 @@ const TYPE_LABELS = new Map([
 const ADMIN_SETTINGS_TABLE = 'parametres_administratifs';
 const AUDIT_TABLE = 'planning_choice_audit';
 const CHOICES_TABLE = 'planning_choices';
-const AUTO_ASSIGNMENT_WORK_TABLE = 'auto_assignment_work_queue';
-const AUTO_ASSIGNMENT_RUNS_TABLE = 'auto_assignment_runs';
-const AUTO_ASSIGNMENT_RUN_ENTRIES_TABLE = 'auto_assignment_run_entries';
 
-const AUTO_ASSIGNMENT_ALGORITHMS = new Map([
-  [
-    'simple',
-    {
-      id: 'simple',
-      label: 'Algorithme simple'
-    }
-  ]
-]);
-
-const AUTO_ASSIGNMENT_DEFAULTS = {
+const SEMI_ASSIGNMENT_DEFAULTS = {
   populations: ['medecin', 'remplacant'],
   order: 'asc',
   startTrigram: '',
-  algorithm: 'simple',
-  rotations: 1
+  rotations: 1,
+  normalThreshold: 2,
+  goodQuota: 1,
+  stepValidation: true
 };
 
 const DATE_FORMAT = new Intl.DateTimeFormat('fr-FR', {
@@ -121,11 +110,13 @@ const state = {
     userType: ''
   },
   viewMode: 'requests',
-  autoAssignment: {
+  semiAssignment: {
     isRunning: false,
     directory: [],
-    lastResult: null,
-    lastRunId: null
+    steps: [],
+    currentIndex: -1,
+    params: null,
+    summary: null
   }
 };
 
@@ -141,16 +132,15 @@ const elements = {
   tableBody: document.querySelector('#requests-body'),
   userTypeTabButtons: Array.from(document.querySelectorAll('[data-user-type-tab]')),
   requestPanels: Array.from(document.querySelectorAll('[data-mode-panel="requests"]')),
-  autoPanel: document.querySelector('#auto-assignment-panel'),
-  autoForm: document.querySelector('#auto-assignment-form'),
-  autoFeedback: document.querySelector('#auto-assignment-feedback'),
-  autoActiveTour: document.querySelector('#auto-assignment-active-tour'),
-  autoResultsSection: document.querySelector('#auto-assignment-results'),
-  autoResultsBody: document.querySelector('#auto-assignment-results-body'),
-  autoSummary: document.querySelector('#auto-assignment-summary'),
-  autoTrigramOptions: document.querySelector('#auto-assignment-trigram-options'),
-  autoStartInput: document.querySelector('#auto-assignment-start'),
-  autoUndoButton: document.querySelector('[data-auto-action="undo"]')
+  semiPanel: document.querySelector('#semi-assignment-panel'),
+  semiForm: document.querySelector('#semi-assignment-form'),
+  semiFeedback: document.querySelector('#semi-assignment-feedback'),
+  semiActiveTour: document.querySelector('#semi-assignment-active-tour'),
+  semiResultsSection: document.querySelector('#semi-assignment-results'),
+  semiResultsBody: document.querySelector('#semi-assignment-results-body'),
+  semiSummary: document.querySelector('#semi-assignment-summary'),
+  semiTrigramOptions: document.querySelector('#semi-assignment-trigram-options'),
+  semiStartInput: document.querySelector('#semi-assignment-start')
 };
 
 const normalizeUserTypeFilter = (value) => {
@@ -292,35 +282,25 @@ const setFeedback = (message) => {
   }
 };
 
-const setAutoAssignmentFeedback = (message) => {
-  if (elements.autoFeedback) {
-    elements.autoFeedback.textContent = message ?? '';
+const setSemiAssignmentFeedback = (message) => {
+  if (elements.semiFeedback) {
+    elements.semiFeedback.textContent = message ?? '';
   }
 };
 
-const setAutoAssignmentRunning = (isRunning) => {
-  state.autoAssignment.isRunning = isRunning;
-  const form = elements.autoForm;
+const setSemiAssignmentRunning = (isRunning) => {
+  state.semiAssignment.isRunning = isRunning;
+  const form = elements.semiForm;
   if (form) {
     form.classList.toggle('is-loading', isRunning);
     form.querySelectorAll('input, select, button').forEach((control) => {
       if (!control) {
         return;
       }
-      if (control.dataset?.autoAction === 'undo' && state.autoAssignment.lastRunId == null) {
-        control.disabled = true;
-        return;
-      }
       control.disabled = isRunning;
     });
   }
-  if (elements.autoUndoButton) {
-    if (!isRunning) {
-      elements.autoUndoButton.disabled = state.autoAssignment.lastRunId == null;
-    } else {
-      elements.autoUndoButton.disabled = true;
-    }
-  }
+  updateSemiAssignmentControlState();
 };
 
 const updateModeTabs = () => {
@@ -332,7 +312,7 @@ const updateModeTabs = () => {
     if (!button) {
       return;
     }
-    const mode = button.dataset.mode === 'auto' ? 'auto' : 'requests';
+    const mode = button.dataset.mode === 'semi' ? 'semi' : 'requests';
     const isActive = mode === active;
     button.classList.toggle('is-active', isActive);
     button.setAttribute('aria-selected', isActive ? 'true' : 'false');
@@ -341,15 +321,15 @@ const updateModeTabs = () => {
 };
 
 const updateModePanels = () => {
-  const isAuto = state.viewMode === 'auto';
+  const isSemi = state.viewMode === 'semi';
   elements.requestPanels.forEach((panel) => {
     if (!panel) {
       return;
     }
-    panel.classList.toggle('hidden', isAuto);
+    panel.classList.toggle('hidden', isSemi);
   });
-  if (elements.autoPanel) {
-    elements.autoPanel.classList.toggle('hidden', !isAuto);
+  if (elements.semiPanel) {
+    elements.semiPanel.classList.toggle('hidden', !isSemi);
   }
 };
 
@@ -787,7 +767,7 @@ const loadAdministrativeSettings = async () => {
     monthOne: state.planningMonthOne,
     monthTwo: state.planningMonthTwo
   });
-  updateAutoAssignmentActiveTour();
+  updateSemiAssignmentActiveTour();
 };
 
 const loadPlanningColumns = async () => {
@@ -806,23 +786,23 @@ const loadPlanningColumns = async () => {
   state.columns = new Map((data ?? []).map((column) => [column.position, column]));
 };
 
-const updateAutoAssignmentActiveTour = () => {
-  if (!elements.autoActiveTour) {
+const updateSemiAssignmentActiveTour = () => {
+  if (!elements.semiActiveTour) {
     return;
   }
   if (!state.activeTourId) {
-    elements.autoActiveTour.textContent = '—';
+    elements.semiActiveTour.textContent = '—';
     return;
   }
   const parts = [`Tour ${state.activeTourId}`];
   if (Number.isInteger(state.planningYear)) {
     parts.push(String(state.planningYear));
   }
-  elements.autoActiveTour.textContent = parts.join(' • ');
+  elements.semiActiveTour.textContent = parts.join(' • ');
 };
 
-const getSelectedAutoPopulations = () => {
-  const form = elements.autoForm;
+const getSelectedSemiPopulations = () => {
+  const form = elements.semiForm;
   if (!form) {
     return new Set();
   }
@@ -833,8 +813,8 @@ const getSelectedAutoPopulations = () => {
   return new Set(selected.filter(Boolean));
 };
 
-const ensureAutoAssignmentStartTrigram = (options) => {
-  const input = elements.autoStartInput;
+const ensureSemiAssignmentStartTrigram = (options) => {
+  const input = elements.semiStartInput;
   if (!input) {
     return;
   }
@@ -849,14 +829,14 @@ const ensureAutoAssignmentStartTrigram = (options) => {
   }
 };
 
-const updateAutoAssignmentTrigramOptions = () => {
-  const datalist = elements.autoTrigramOptions;
+const updateSemiAssignmentTrigramOptions = () => {
+  const datalist = elements.semiTrigramOptions;
   if (!datalist) {
     return;
   }
   datalist.innerHTML = '';
-  const populations = getSelectedAutoPopulations();
-  const filtered = state.autoAssignment.directory.filter((entry) => {
+  const populations = getSelectedSemiPopulations();
+  const filtered = state.semiAssignment.directory.filter((entry) => {
     if (!entry.trigram) {
       return false;
     }
@@ -874,10 +854,10 @@ const updateAutoAssignmentTrigramOptions = () => {
     }
     datalist.appendChild(option);
   });
-  ensureAutoAssignmentStartTrigram(filtered);
+  ensureSemiAssignmentStartTrigram(filtered);
 };
 
-const loadAutoAssignmentDirectory = async () => {
+const loadSemiAssignmentDirectory = async () => {
   const supabase = await ensureSupabase();
   if (!supabase) {
     return;
@@ -891,13 +871,13 @@ const loadAutoAssignmentDirectory = async () => {
     console.error(error);
     return;
   }
-  state.autoAssignment.directory = (data ?? []).map((record) => ({
+  state.semiAssignment.directory = (data ?? []).map((record) => ({
     id: record.id ?? null,
     username: record.username ?? '',
     trigram: normalizeTrigram(record.trigram ?? record.username ?? ''),
     role: normalizeUserTypeFilter(record.role ?? '')
   }));
-  updateAutoAssignmentTrigramOptions();
+  updateSemiAssignmentTrigramOptions();
 };
 
 const mapRequestRecord = (record) => {
@@ -1460,13 +1440,14 @@ const handleFiltersChange = () => {
 };
 
 const setViewMode = (mode) => {
-  const normalized = mode === 'auto' ? 'auto' : 'requests';
+  const normalized = mode === 'semi' ? 'semi' : 'requests';
   state.viewMode = normalized;
   updateModeTabs();
   updateModePanels();
-  if (normalized === 'auto') {
-    updateAutoAssignmentActiveTour();
-    updateAutoAssignmentTrigramOptions();
+  if (normalized === 'semi') {
+    updateSemiAssignmentActiveTour();
+    updateSemiAssignmentTrigramOptions();
+    renderSemiAssignmentState();
   }
 };
 
@@ -1475,23 +1456,23 @@ const handleModeTabClick = (event) => {
   if (!button) {
     return;
   }
-  const mode = button.dataset.mode === 'auto' ? 'auto' : 'requests';
+  const mode = button.dataset.mode === 'semi' ? 'semi' : 'requests';
   setViewMode(mode);
 };
 
-const handleAutoAssignmentFormChange = (event) => {
+const handleSemiAssignmentFormChange = (event) => {
   const target = event.target;
   if (!target) {
     return;
   }
   if (target.name === 'population') {
-    updateAutoAssignmentTrigramOptions();
+    updateSemiAssignmentTrigramOptions();
   }
 };
 
-const getAutoAssignmentParameters = () => {
-  const defaults = AUTO_ASSIGNMENT_DEFAULTS;
-  const form = elements.autoForm;
+const getSemiAssignmentParameters = () => {
+  const defaults = SEMI_ASSIGNMENT_DEFAULTS;
+  const form = elements.semiForm;
   if (!form) {
     return { ...defaults };
   }
@@ -1507,36 +1488,46 @@ const getAutoAssignmentParameters = () => {
   const orderValue = formData.get('order');
   const order = orderValue === 'desc' ? 'desc' : 'asc';
   const startTrigram = normalizeTrigram(formData.get('startTrigram'));
-  const algorithmValue = formData.get('algorithm');
-  const algorithm = AUTO_ASSIGNMENT_ALGORITHMS.has(algorithmValue)
-    ? algorithmValue
-    : defaults.algorithm;
   let rotations = Number.parseInt(formData.get('rotations'), 10);
   if (!Number.isInteger(rotations) || rotations < 1) {
     rotations = defaults.rotations;
   }
+  let normalThreshold = Number.parseInt(formData.get('normalThreshold'), 10);
+  if (!Number.isInteger(normalThreshold) || normalThreshold < 1) {
+    normalThreshold = defaults.normalThreshold;
+  }
+  let goodQuota = Number.parseInt(formData.get('goodQuota'), 10);
+  if (!Number.isInteger(goodQuota) || goodQuota < 0) {
+    goodQuota = defaults.goodQuota;
+  }
+  const stepValidation = formData.get('stepValidation') != null;
   return {
     populations,
     order,
     startTrigram,
-    algorithm,
-    rotations
+    rotations,
+    normalThreshold,
+    goodQuota,
+    stepValidation
   };
 };
 
-const validateAutoAssignmentParameters = (params) => {
+const validateSemiAssignmentParameters = (params) => {
   const errors = [];
   if (!params.populations || !params.populations.length) {
     errors.push('Sélectionnez au moins une population.');
   }
-  if (!AUTO_ASSIGNMENT_ALGORITHMS.has(params.algorithm)) {
-    errors.push('Algorithme inconnu.');
-  }
   if (!Number.isInteger(params.rotations) || params.rotations < 1) {
     errors.push('Le nombre de rotations doit être un entier positif.');
   }
+  if (!Number.isInteger(params.normalThreshold) || params.normalThreshold < 1) {
+    errors.push('Le palier de gardes normales doit être un entier positif.');
+  }
+  if (!Number.isInteger(params.goodQuota) || params.goodQuota < 0) {
+    errors.push('Le nombre de bonnes gardes doit être positif ou nul.');
+  }
   const availableTrigrams = new Set(
-    state.autoAssignment.directory
+    state.semiAssignment.directory
       .filter((entry) => params.populations.includes(entry.role))
       .map((entry) => entry.trigram)
       .filter(Boolean)
@@ -1557,12 +1548,12 @@ const getUserTypeForTrigram = (trigram) => {
   if (!normalized) {
     return '';
   }
-  const directoryEntry = state.autoAssignment.directory.find((entry) => entry.trigram === normalized);
+  const directoryEntry = state.semiAssignment.directory.find((entry) => entry.trigram === normalized);
   return directoryEntry?.role ?? '';
 };
 
 const getOrderedTrigrams = (params) => {
-  const candidates = state.autoAssignment.directory
+  const candidates = state.semiAssignment.directory
     .filter((entry) => params.populations.includes(entry.role))
     .map((entry) => entry.trigram)
     .filter(Boolean);
@@ -1578,6 +1569,383 @@ const getOrderedTrigrams = (params) => {
   return unique;
 };
 
+
+const computeSemiAssignmentSteps = (params) => {
+  const orderedTrigrams = getOrderedTrigrams(params);
+  const pendingMap = buildPendingRequestsMap(params);
+  const assignedSlots = buildAssignedSlotsMap();
+  const occupiedSlots = buildOccupiedSlotsSet();
+  const usedGroupKeys = new Set();
+  const validatedCounts = buildValidatedGuardCounts();
+
+  state.requests.forEach((request) => {
+    if (request?.status !== 'validé') {
+      return;
+    }
+    const trigram = normalizeTrigram(request.trigram);
+    if (!trigram) {
+      return;
+    }
+    const guardType =
+      request.guardNature === 'bonne'
+        ? 'bonne'
+        : request.guardNature === 'normale'
+          ? 'normale'
+          : '';
+    if (!guardType) {
+      return;
+    }
+    const groupKey = getRequestGroupKey(request);
+    if (!groupKey) {
+      return;
+    }
+    const stateKey = buildGroupStateKey(trigram, guardType, groupKey);
+    if (stateKey) {
+      usedGroupKeys.add(stateKey);
+    }
+    const entry = pendingMap.get(trigram);
+    if (entry) {
+      const listKey = guardType === 'bonne' ? 'bonne' : 'normale';
+      entry[listKey] = entry[listKey].filter((item) => getRequestGroupKey(item) !== groupKey);
+    }
+  });
+
+  const simulatedCounts = new Map();
+  orderedTrigrams.forEach((trigram) => {
+    const base = validatedCounts.get(trigram) ?? { normal: 0, good: 0 };
+    simulatedCounts.set(trigram, { normal: base.normal, good: base.good });
+  });
+
+  const steps = [];
+  let analysed = 0;
+  let normals = 0;
+  let good = 0;
+
+  for (let rotation = 1; rotation <= params.rotations; rotation += 1) {
+    for (const trigram of orderedTrigrams) {
+      analysed += 1;
+      const entry = pendingMap.get(trigram);
+      if (!entry) {
+        continue;
+      }
+      const counts = simulatedCounts.get(trigram) ?? { normal: 0, good: 0 };
+      simulatedCounts.set(trigram, counts);
+      const extraOccupied = new Set();
+
+      const selectCandidate = (listKey, guardType) => {
+        const candidate = findNextAvailableRequest(
+          entry[listKey],
+          trigram,
+          assignedSlots,
+          occupiedSlots,
+          extraOccupied,
+          { usedGroups: usedGroupKeys, guardType }
+        );
+        if (candidate?.slotKey) {
+          extraOccupied.add(candidate.slotKey);
+        }
+        return candidate;
+      };
+
+      const registerSelection = (guardType, candidate) => {
+        if (!candidate?.request) {
+          return;
+        }
+        const listKey = guardType === 'bonne' ? 'bonne' : 'normale';
+        entry[listKey] = entry[listKey].filter((item) => item.id !== candidate.request.id);
+        const groupKey = candidate.groupKey ?? getRequestGroupKey(candidate.request);
+        if (groupKey) {
+          const stateKey = buildGroupStateKey(trigram, guardType, groupKey);
+          if (stateKey) {
+            usedGroupKeys.add(stateKey);
+          }
+          entry[listKey] = entry[listKey].filter((item) => getRequestGroupKey(item) !== groupKey);
+        }
+        if (candidate.slotKey) {
+          occupiedSlots.add(candidate.slotKey);
+        }
+      };
+
+      const addStep = (guardType, candidate) => {
+        if (!candidate?.request) {
+          return;
+        }
+        steps.push({
+          trigram,
+          userType: entry?.userType ?? getUserTypeForTrigram(trigram),
+          rotation,
+          guardType,
+          request: candidate.request,
+          status: 'pending'
+        });
+        registerSelection(guardType, candidate);
+        if (guardType === 'bonne') {
+          counts.good += 1;
+          good += 1;
+        } else {
+          counts.normal += 1;
+          normals += 1;
+        }
+      };
+
+      const normalCandidate = selectCandidate('normale', 'normale');
+      if (normalCandidate) {
+        addStep('normale', normalCandidate);
+      }
+
+      const grantedBlocks = params.normalThreshold > 0 ? Math.floor(counts.normal / params.normalThreshold) : 0;
+      const allowedGood = grantedBlocks * params.goodQuota;
+      if (params.goodQuota > 0 && allowedGood > counts.good) {
+        const goodCandidate = selectCandidate('bonne', 'bonne');
+        if (goodCandidate) {
+          addStep('bonne', goodCandidate);
+        }
+      }
+    }
+  }
+
+  return {
+    steps,
+    summary: {
+      analysed,
+      normals,
+      good,
+      rotations: params.rotations,
+      uniqueDoctors: orderedTrigrams.length
+    }
+  };
+};
+
+const formatSemiAssignmentGuard = (request) => {
+  if (!request) {
+    return '—';
+  }
+  const parts = [];
+  parts.push(formatDate(request.day));
+  const label =
+    request.columnLabel ||
+    request.planningDayLabel ||
+    request.slotTypeCode ||
+    (request.columnNumber != null ? `Colonne ${request.columnNumber}` : null);
+  if (label) {
+    parts.push(label);
+  }
+  return parts.join(' • ');
+};
+
+const formatSemiAssignmentSummary = (summary) => {
+  if (!summary) {
+    return '';
+  }
+  const analysedLabel = `${summary.analysed ?? 0} passage${summary.analysed === 1 ? '' : 's'}`;
+  const normalsLabel = `${summary.normals ?? 0} garde${summary.normals === 1 ? '' : 's'} normale${summary.normals === 1 ? '' : 's'}`;
+  const goodLabel = `${summary.good ?? 0} bonne${summary.good === 1 ? '' : 's'}`;
+  const rotationsLabel = `${summary.rotations ?? 0} rotation${summary.rotations === 1 ? '' : 's'}`;
+  return `${analysedLabel} analysé${summary.analysed === 1 ? '' : 's'} • ${normalsLabel} proposées • ${goodLabel} proposées • ${rotationsLabel}`;
+};
+
+const getCurrentSemiAssignmentStep = () => {
+  if (state.semiAssignment.currentIndex < 0) {
+    return null;
+  }
+  return state.semiAssignment.steps[state.semiAssignment.currentIndex] ?? null;
+};
+
+const updateSemiAssignmentControlState = () => {
+  const form = elements.semiForm;
+  if (!form) {
+    return;
+  }
+  const { steps, currentIndex, isRunning } = state.semiAssignment;
+  const hasSteps = steps.length > 0;
+  const currentStep = getCurrentSemiAssignmentStep();
+  form.querySelectorAll('[data-semi-action]').forEach((control) => {
+    if (!(control instanceof HTMLButtonElement)) {
+      return;
+    }
+    const action = control.dataset.semiAction;
+    if (action === 'prepare') {
+      control.disabled = isRunning;
+    } else if (action === 'previous') {
+      control.disabled = isRunning || !hasSteps || currentIndex <= 0;
+    } else if (action === 'next') {
+      control.disabled = isRunning || !hasSteps || currentIndex >= steps.length - 1;
+    } else if (action === 'accept') {
+      control.disabled = isRunning || !currentStep?.request;
+    } else if (action === 'skip') {
+      control.disabled = isRunning || !hasSteps;
+    } else {
+      control.disabled = isRunning;
+    }
+  });
+};
+
+const setSemiAssignmentSteps = (steps, summary, params) => {
+  state.semiAssignment.steps = steps.map((step) => ({ ...step, status: step.status ?? 'pending' }));
+  state.semiAssignment.summary = summary ?? null;
+  state.semiAssignment.params = params ?? state.semiAssignment.params;
+  state.semiAssignment.currentIndex = state.semiAssignment.steps.length ? 0 : -1;
+  renderSemiAssignmentState();
+};
+
+const moveSemiAssignmentIndex = (offset) => {
+  if (!state.semiAssignment.steps.length) {
+    state.semiAssignment.currentIndex = -1;
+    renderSemiAssignmentState();
+    return;
+  }
+  const nextIndex = clamp(
+    state.semiAssignment.currentIndex + offset,
+    0,
+    state.semiAssignment.steps.length - 1
+  );
+  state.semiAssignment.currentIndex = nextIndex;
+  renderSemiAssignmentState();
+};
+
+const renderSemiAssignmentState = () => {
+  if (!elements.semiResultsSection || !elements.semiResultsBody) {
+    return;
+  }
+  const { steps, currentIndex, summary } = state.semiAssignment;
+  if (!steps.length) {
+    elements.semiResultsSection.classList.add('hidden');
+    if (elements.semiSummary) {
+      elements.semiSummary.textContent = '';
+    }
+    updateSemiAssignmentControlState();
+    return;
+  }
+  elements.semiResultsSection.classList.remove('hidden');
+  elements.semiResultsBody.innerHTML = '';
+  steps.forEach((step, index) => {
+    const row = document.createElement('tr');
+    if (index === currentIndex) {
+      row.classList.add('is-active');
+    }
+
+    const rotationCell = document.createElement('td');
+    rotationCell.textContent = String(step.rotation ?? '—');
+    row.appendChild(rotationCell);
+
+    const doctorCell = document.createElement('td');
+    const trigram = normalizeTrigram(step.trigram ?? '');
+    let userTypeLabel = '';
+    if (step.userType === 'medecin') {
+      userTypeLabel = ' (Médecin)';
+    } else if (step.userType === 'remplacant') {
+      userTypeLabel = ' (Remplaçant)';
+    }
+    doctorCell.textContent = trigram ? `${trigram}${userTypeLabel}` : `—${userTypeLabel}`;
+    row.appendChild(doctorCell);
+
+    const typeCell = document.createElement('td');
+    typeCell.textContent = CHOICE_SERIES_LABELS.get(step.guardType) ?? step.guardType ?? '—';
+    row.appendChild(typeCell);
+
+    const slotCell = document.createElement('td');
+    slotCell.textContent = formatSemiAssignmentGuard(step.request);
+    row.appendChild(slotCell);
+
+    const statusCell = document.createElement('td');
+    const badge = document.createElement('span');
+    badge.className = 'badge';
+    if (step.status === 'accepted') {
+      badge.classList.add('badge-success');
+      badge.textContent = 'Validée';
+    } else if (step.status === 'skipped') {
+      badge.classList.add('badge-danger');
+      badge.textContent = 'Ignorée';
+    } else if (index === currentIndex) {
+      badge.classList.add('badge-warning');
+      badge.textContent = 'Étape active';
+    } else {
+      badge.textContent = 'En attente';
+    }
+    statusCell.appendChild(badge);
+    row.appendChild(statusCell);
+
+    elements.semiResultsBody.appendChild(row);
+  });
+
+  if (elements.semiSummary) {
+    elements.semiSummary.textContent = formatSemiAssignmentSummary(summary);
+  }
+  updateSemiAssignmentControlState();
+};
+
+const prepareSemiAssignmentSequence = () => {
+  const params = getSemiAssignmentParameters();
+  const validation = validateSemiAssignmentParameters(params);
+  if (!validation.isValid) {
+    setSemiAssignmentFeedback(validation.errors.join(' '));
+    return;
+  }
+  const { steps, summary } = computeSemiAssignmentSteps(params);
+  setSemiAssignmentSteps(steps, summary, params);
+  if (!steps.length) {
+    setSemiAssignmentFeedback('Aucune attribution proposée pour ces paramètres.');
+  } else {
+    setSemiAssignmentFeedback(formatSemiAssignmentSummary(summary));
+  }
+};
+
+const applySemiAssignmentAcceptance = async () => {
+  const currentStep = getCurrentSemiAssignmentStep();
+  if (!currentStep?.request) {
+    setSemiAssignmentFeedback('Aucune attribution à valider.');
+    return;
+  }
+  setSemiAssignmentRunning(true);
+  try {
+    await acceptRequest(currentStep.request.id);
+    state.semiAssignment.steps[state.semiAssignment.currentIndex].status = 'accepted';
+    if (state.semiAssignment.params) {
+      const { steps, summary } = computeSemiAssignmentSteps(state.semiAssignment.params);
+      setSemiAssignmentSteps(steps, summary, state.semiAssignment.params);
+      if (steps.length) {
+        setSemiAssignmentFeedback('Garde validée. Séquence recalculée.');
+      } else {
+        setSemiAssignmentFeedback('Garde validée. Plus aucune proposition.');
+      }
+    }
+  } catch (error) {
+    console.error('Erreur lors de la validation semi-automatique', error);
+    setSemiAssignmentFeedback('Impossible de valider cette attribution.');
+  } finally {
+    setSemiAssignmentRunning(false);
+  }
+};
+
+const skipSemiAssignmentStep = () => {
+  const currentStep = getCurrentSemiAssignmentStep();
+  if (!currentStep) {
+    setSemiAssignmentFeedback('Aucune étape à ignorer.');
+    return;
+  }
+  currentStep.status = 'skipped';
+  moveSemiAssignmentIndex(1);
+  setSemiAssignmentFeedback('Étape ignorée.');
+};
+
+const handleSemiAssignmentAction = (event) => {
+  const button = event.target.closest('[data-semi-action]');
+  if (!button || state.semiAssignment.isRunning) {
+    return;
+  }
+  const action = button.dataset.semiAction;
+  if (action === 'prepare') {
+    prepareSemiAssignmentSequence();
+  } else if (action === 'previous') {
+    moveSemiAssignmentIndex(-1);
+  } else if (action === 'next') {
+    moveSemiAssignmentIndex(1);
+  } else if (action === 'accept') {
+    applySemiAssignmentAcceptance();
+  } else if (action === 'skip') {
+    skipSemiAssignmentStep();
+  }
+};
 const buildPendingRequestsMap = (params) => {
   const populations = new Set(params.populations);
   const map = new Map();
@@ -1654,6 +2022,29 @@ const buildOccupiedSlotsSet = () => {
   return set;
 };
 
+const buildValidatedGuardCounts = () => {
+  const map = new Map();
+  state.requests.forEach((request) => {
+    if (request.status !== 'validé') {
+      return;
+    }
+    const trigram = normalizeTrigram(request.trigram);
+    if (!trigram) {
+      return;
+    }
+    if (!map.has(trigram)) {
+      map.set(trigram, { normal: 0, good: 0 });
+    }
+    const entry = map.get(trigram);
+    if (request.guardNature === 'bonne') {
+      entry.good += 1;
+    } else if (request.guardNature === 'normale') {
+      entry.normal += 1;
+    }
+  });
+  return map;
+};
+
 const findNextAvailableRequest = (
   list,
   trigram,
@@ -1702,1015 +2093,7 @@ const findNextAvailableRequest = (
   return null;
 };
 
-const runSimpleAutoAssignment = (params) => {
-  const orderedTrigrams = getOrderedTrigrams(params);
-  const pendingMap = buildPendingRequestsMap(params);
-  const assignedSlots = buildAssignedSlotsMap();
-  const occupiedSlots = buildOccupiedSlotsSet();
-  const usedGroupKeys = new Set();
-  state.requests.forEach((request) => {
-    if (request?.status !== 'validé') {
-      return;
-    }
-    const trigram = normalizeTrigram(request.trigram);
-    if (!trigram) {
-      return;
-    }
-    const guardType = request.guardNature === 'bonne'
-      ? 'bonne'
-      : request.guardNature === 'normale'
-        ? 'normale'
-        : '';
-    if (!guardType) {
-      return;
-    }
-    const groupKey = getRequestGroupKey(request);
-    if (!groupKey) {
-      return;
-    }
-    const stateKey = buildGroupStateKey(trigram, guardType, groupKey);
-    if (stateKey) {
-      usedGroupKeys.add(stateKey);
-    }
-    const entry = pendingMap.get(trigram);
-    if (entry) {
-      const listKey = guardType === 'bonne' ? 'bonne' : 'normale';
-      entry[listKey] = entry[listKey].filter(
-        (item) => getRequestGroupKey(item) !== groupKey
-      );
-    }
-  });
-  const assignments = [];
-  let analysed = 0;
-  let normals = 0;
-  let good = 0;
-  let skips = 0;
-  let rotationsUsed = 0;
 
-  if (!orderedTrigrams.length) {
-    return {
-      assignments: [],
-      summary: {
-        analysed: 0,
-        normals: 0,
-        good: 0,
-        skips: 0,
-        rotationsUsed: 0,
-        maxRotations: params.rotations
-      }
-    };
-  }
-
-  let passNumber = 0;
-  while (rotationsUsed < params.rotations) {
-    passNumber += 1;
-    let passAssignments = 0;
-    for (const trigram of orderedTrigrams) {
-      if (rotationsUsed >= params.rotations) {
-        break;
-      }
-      analysed += 1;
-      const entry = pendingMap.get(trigram);
-      const result = {
-        trigram,
-        userType: entry?.userType ?? getUserTypeForTrigram(trigram),
-        rotation: passNumber,
-        assigned: false,
-        normal: null,
-        good: null,
-        reason: ''
-      };
-
-      if (!entry || (!entry.normale.length && !entry.bonne.length)) {
-        result.reason = 'Aucune demande éligible.';
-        skips += 1;
-        assignments.push(result);
-        continue;
-      }
-
-      const tempOccupied = new Set();
-      const normalCandidate = findNextAvailableRequest(
-        entry.normale,
-        trigram,
-        assignedSlots,
-        occupiedSlots,
-        tempOccupied,
-        { usedGroups: usedGroupKeys, guardType: 'normale' }
-      );
-      if (normalCandidate?.slotKey) {
-        tempOccupied.add(normalCandidate.slotKey);
-      }
-      const goodCandidate = findNextAvailableRequest(
-        entry.bonne,
-        trigram,
-        assignedSlots,
-        occupiedSlots,
-        tempOccupied,
-        { usedGroups: usedGroupKeys, guardType: 'bonne' }
-      );
-
-      if (normalCandidate && goodCandidate) {
-        const normalRequest = normalCandidate.request;
-        const goodRequest = goodCandidate.request;
-        const normalDay = getRequestDayKey(normalRequest);
-        const goodDay = getRequestDayKey(goodRequest);
-        let pairConflict = false;
-        if (normalDay && goodDay && normalDay === goodDay) {
-          if (normalRequest.columnNumber === goodRequest.columnNumber) {
-            pairConflict = true;
-          } else {
-            const normalRange = getColumnRange(normalRequest.columnNumber);
-            const goodRange = getColumnRange(goodRequest.columnNumber);
-            if (normalRange && goodRange && rangesOverlap(normalRange, goodRange)) {
-              pairConflict = true;
-            }
-          }
-        }
-
-        if (!pairConflict) {
-          rotationsUsed += 1;
-          result.rotation = rotationsUsed;
-          result.assigned = true;
-          result.normal = normalRequest;
-          result.good = goodRequest;
-          assignments.push(result);
-          passAssignments += 1;
-          normals += 1;
-          good += 1;
-
-          const registerGroupSelection = (guardType, candidate) => {
-            if (!candidate?.request) {
-              return;
-            }
-            const candidateGroupKey = candidate.groupKey ?? getRequestGroupKey(candidate.request);
-            if (!candidateGroupKey) {
-              return;
-            }
-            const stateKey = buildGroupStateKey(trigram, guardType, candidateGroupKey);
-            if (stateKey) {
-              usedGroupKeys.add(stateKey);
-            }
-            const listKey = guardType === 'bonne' ? 'bonne' : 'normale';
-            entry[listKey] = entry[listKey].filter((item) => getRequestGroupKey(item) !== candidateGroupKey);
-          };
-
-          entry.normale = entry.normale.filter((item) => item.id !== normalRequest.id);
-          entry.bonne = entry.bonne.filter((item) => item.id !== goodRequest.id);
-
-          registerGroupSelection('normale', normalCandidate);
-          registerGroupSelection('bonne', goodCandidate);
-
-          const assignedList = assignedSlots.get(trigram) ?? [];
-          if (normalDay) {
-            assignedList.push({
-              dayKey: normalDay,
-              columnNumber: normalRequest.columnNumber,
-              range: getColumnRange(normalRequest.columnNumber)
-            });
-          }
-          if (goodDay) {
-            assignedList.push({
-              dayKey: goodDay,
-              columnNumber: goodRequest.columnNumber,
-              range: getColumnRange(goodRequest.columnNumber)
-            });
-          }
-          assignedSlots.set(trigram, assignedList);
-
-          if (normalCandidate.slotKey) {
-            occupiedSlots.add(normalCandidate.slotKey);
-          }
-          if (goodCandidate.slotKey) {
-            occupiedSlots.add(goodCandidate.slotKey);
-          }
-          if (rotationsUsed >= params.rotations) {
-            break;
-          }
-          continue;
-        }
-        result.reason = 'Conflit horaire entre les gardes proposées.';
-      } else if (!normalCandidate && !goodCandidate) {
-        if (!entry.normale.length && !entry.bonne.length) {
-          result.reason = 'Aucune demande éligible.';
-        } else if (!entry.normale.length) {
-          result.reason = 'Aucune garde normale disponible.';
-        } else if (!entry.bonne.length) {
-          result.reason = 'Aucune bonne garde disponible.';
-        } else {
-          result.reason = 'Aucune garde compatible disponible.';
-        }
-      } else if (!normalCandidate) {
-        result.reason = 'Aucune garde normale disponible.';
-      } else {
-        result.reason = 'Aucune bonne garde disponible.';
-      }
-
-      skips += 1;
-      assignments.push(result);
-    }
-    if (passAssignments === 0) {
-      break;
-    }
-  }
-
-  return {
-    assignments,
-    summary: {
-      analysed,
-      normals,
-      good,
-      skips,
-      rotationsUsed,
-      maxRotations: params.rotations
-    }
-  };
-};
-
-const runAutoAssignment = (params) => {
-  if (params.algorithm === 'simple') {
-    return runSimpleAutoAssignment(params);
-  }
-  throw new Error('Algorithme non pris en charge.');
-};
-
-const prepareAutoAssignmentWorkspace = async () => {
-  const supabase = await ensureSupabase();
-  if (!supabase) {
-    return { success: false, message: 'Connexion à Supabase requise.' };
-  }
-  if (!state.planningReference || !state.activeTourId) {
-    return { success: false, message: 'Référence de planning introuvable.' };
-  }
-
-  const { error: cleanupError } = await supabase
-    .from(AUTO_ASSIGNMENT_WORK_TABLE)
-    .delete()
-    .eq('planning_reference', state.planningReference)
-    .eq('tour_number', state.activeTourId);
-  if (cleanupError) {
-    console.error(cleanupError);
-    return { success: false, message: 'Impossible de réinitialiser la table de travail.' };
-  }
-
-  const { data, error } = await supabase
-    .from(CHOICES_TABLE)
-    .select(
-      'id, user_id, trigram, user_type, day, column_number, column_label, planning_day_label, slot_type_code, guard_nature, activity_type, choice_index, choice_rank, etat, is_active, planning_reference, tour_number, created_at'
-    )
-    .eq('planning_reference', state.planningReference)
-    .eq('tour_number', state.activeTourId)
-    .eq('etat', 'en attente');
-
-  if (error) {
-    console.error(error);
-    return { success: false, message: 'Impossible de préparer les choix en attente.' };
-  }
-
-  const entries = (data ?? [])
-    .filter((record) => record && record.is_active !== false)
-    .map((record) => {
-      const consolidatedIndex = computeConsolidatedIndex(record.choice_index, record.choice_rank);
-      const rootChoiceIndex = getRootChoiceIndex(record.choice_index);
-      const choiceIndexValue = getRootChoiceIndex(record.choice_index);
-      const choiceRankValue = Number.parseInt(record.choice_rank, 10);
-      const priorityValue = Number.parseInt(record.choice_rank, 10);
-      return {
-        choice_id: record.id,
-        planning_reference: record.planning_reference ?? state.planningReference,
-        planning_version: record.planning_reference ?? state.planningReference,
-        tour_number: record.tour_number ?? state.activeTourId,
-        trigram: normalizeTrigram(record.trigram ?? ''),
-        user_id: record.user_id ?? null,
-        user_type: normalizeUserTypeFilter(record.user_type ?? '') || null,
-        day: record.day ?? null,
-        column_number: record.column_number ?? null,
-        column_label: record.column_label ?? null,
-        planning_day_label: record.planning_day_label ?? null,
-        slot_type_code: record.slot_type_code ?? null,
-        guard_nature: record.guard_nature ?? null,
-        activity_type: record.activity_type ?? null,
-        choice_index: Number.isFinite(choiceIndexValue) ? choiceIndexValue : null,
-        root_choice_index: rootChoiceIndex,
-        choice_rank: Number.isFinite(choiceRankValue) ? choiceRankValue : null,
-        consolidated_index: consolidatedIndex,
-        priority: Number.isFinite(priorityValue) ? priorityValue : null,
-        status: record.etat ?? 'en attente',
-        is_active: record.is_active ?? null,
-        created_at: record.created_at ?? new Date().toISOString(),
-        metadata: {
-          planning_day_label: record.planning_day_label ?? null,
-          slot_type_code: record.slot_type_code ?? null
-        }
-      };
-    });
-
-  const chunkSize = 100;
-  for (let index = 0; index < entries.length; index += chunkSize) {
-    const chunk = entries.slice(index, index + chunkSize);
-    if (!chunk.length) {
-      continue;
-    }
-    const { error: insertError } = await supabase.from(AUTO_ASSIGNMENT_WORK_TABLE).insert(chunk);
-    if (insertError) {
-      console.error(insertError);
-      return { success: false, message: 'Impossible de sauvegarder la table de travail.' };
-    }
-  }
-
-  return { success: true };
-};
-
-const formatAutoAssignmentGuard = (request) => {
-  if (!request) {
-    return '—';
-  }
-  const parts = [];
-  parts.push(formatDate(request.day));
-  const label =
-    request.columnLabel ||
-    request.planningDayLabel ||
-    request.slotTypeCode ||
-    (request.columnNumber != null ? `Colonne ${request.columnNumber}` : null);
-  if (label) {
-    parts.push(label);
-  }
-  return parts.join(' • ');
-};
-
-const formatAutoAssignmentSummary = (summary) => {
-  if (!summary) {
-    return '';
-  }
-  const analysedLabel = `${summary.analysed ?? 0} médecin${summary.analysed === 1 ? '' : 's'} analysé${summary.analysed === 1 ? '' : 's'}`;
-  const normalsLabel = `${summary.normals ?? 0} normale${summary.normals === 1 ? '' : 's'}`;
-  const goodLabel = `${summary.good ?? 0} bonne${summary.good === 1 ? '' : 's'}`;
-  const skipsLabel = `${summary.skips ?? 0} skip${summary.skips === 1 ? '' : 's'}`;
-  const rotationsLabel = `${summary.rotationsUsed ?? 0}/${summary.maxRotations ?? 0}`;
-  return `Terminé — ${analysedLabel} • ${normalsLabel} • ${goodLabel} • ${skipsLabel} • Rotations utilisées : ${rotationsLabel}.`;
-};
-
-const renderAutoAssignmentResults = (result) => {
-  state.autoAssignment.lastResult = result ?? null;
-  if (!elements.autoResultsSection || !elements.autoResultsBody) {
-    return;
-  }
-  if (!result) {
-    elements.autoResultsSection.classList.add('hidden');
-    if (elements.autoSummary) {
-      elements.autoSummary.textContent = '';
-    }
-    return;
-  }
-
-  elements.autoResultsSection.classList.remove('hidden');
-  elements.autoResultsBody.innerHTML = '';
-  const rows = result.assignments ?? [];
-  if (!rows.length) {
-    const row = document.createElement('tr');
-    const cell = document.createElement('td');
-    cell.colSpan = 5;
-    cell.textContent = 'Aucune donnée à afficher.';
-    cell.className = 'requests-empty-cell';
-    row.appendChild(cell);
-    elements.autoResultsBody.appendChild(row);
-  } else {
-    rows.forEach((item) => {
-      const row = document.createElement('tr');
-      const rotationCell = document.createElement('td');
-      rotationCell.textContent = String(item.rotation ?? '—');
-      row.appendChild(rotationCell);
-
-      const doctorCell = document.createElement('td');
-      const trigram = normalizeTrigram(item.trigram ?? '');
-      let userTypeLabel = '';
-      if (item.userType === 'medecin') {
-        userTypeLabel = ' (Médecin)';
-      } else if (item.userType === 'remplacant') {
-        userTypeLabel = ' (Remplaçant)';
-      }
-      doctorCell.textContent = trigram ? `${trigram}${userTypeLabel}` : `—${userTypeLabel}`;
-      row.appendChild(doctorCell);
-
-      const normalCell = document.createElement('td');
-      normalCell.textContent = formatAutoAssignmentGuard(item.normal);
-      row.appendChild(normalCell);
-
-      const goodCell = document.createElement('td');
-      goodCell.textContent = formatAutoAssignmentGuard(item.good);
-      row.appendChild(goodCell);
-
-      const statusCell = document.createElement('td');
-      if (item.assigned) {
-        const badge = document.createElement('span');
-        badge.className = 'badge badge-success';
-        badge.textContent = 'Attribué';
-        statusCell.appendChild(badge);
-      } else {
-        const badge = document.createElement('span');
-        badge.className = 'badge badge-warning';
-        badge.textContent = item.reason || 'Non attribué';
-        statusCell.appendChild(badge);
-      }
-      row.appendChild(statusCell);
-
-      elements.autoResultsBody.appendChild(row);
-    });
-  }
-
-  if (elements.autoSummary) {
-    elements.autoSummary.textContent = formatAutoAssignmentSummary(result.summary);
-  }
-};
-
-const updateUndoButtonState = () => {
-  if (!elements.autoUndoButton) {
-    return;
-  }
-  const shouldDisable = state.autoAssignment.isRunning || state.autoAssignment.lastRunId == null;
-  elements.autoUndoButton.disabled = shouldDisable;
-};
-
-const fetchLastAutoAssignmentRun = async () => {
-  const supabase = await ensureSupabase();
-  if (!supabase || !state.planningReference || !state.activeTourId) {
-    state.autoAssignment.lastRunId = null;
-    updateUndoButtonState();
-    return;
-  }
-  const { data, error } = await supabase
-    .from(AUTO_ASSIGNMENT_RUNS_TABLE)
-    .select('id')
-    .eq('planning_reference', state.planningReference)
-    .eq('tour_number', state.activeTourId)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (error) {
-    console.error(error);
-    state.autoAssignment.lastRunId = null;
-  } else {
-    state.autoAssignment.lastRunId = data?.id ?? null;
-  }
-  updateUndoButtonState();
-};
-
-const cleanupAutoAssignmentWorkspaceAfterAcceptance = async ({
-  supabase,
-  accepted,
-  alternativeIds = [],
-  additionalAlternatives = [],
-  competingIds = []
-}) => {
-  if (!supabase || !state.planningReference || !state.activeTourId) {
-    return;
-  }
-
-  const idsToRemove = new Set();
-  if (accepted?.id) {
-    idsToRemove.add(accepted.id);
-  }
-  (alternativeIds ?? []).forEach((id) => idsToRemove.add(id));
-  (additionalAlternatives ?? []).forEach((record) => {
-    if (record?.id) {
-      idsToRemove.add(record.id);
-    }
-  });
-  (competingIds ?? []).forEach((id) => idsToRemove.add(id));
-
-  if (idsToRemove.size) {
-    const { error: deleteByIdError } = await supabase
-      .from(AUTO_ASSIGNMENT_WORK_TABLE)
-      .delete()
-      .eq('planning_reference', state.planningReference)
-      .eq('tour_number', state.activeTourId)
-      .in('choice_id', Array.from(idsToRemove));
-    if (deleteByIdError) {
-      console.error(deleteByIdError);
-    }
-  }
-
-  const trigram = typeof accepted?.trigram === 'string' ? accepted.trigram.trim().toUpperCase() : null;
-  const rootChoiceIndex = getRootChoiceIndex(accepted?.choiceIndex ?? accepted?.choice_index);
-  if (trigram && rootChoiceIndex != null) {
-    const { error: deleteByRootError } = await supabase
-      .from(AUTO_ASSIGNMENT_WORK_TABLE)
-      .delete()
-      .eq('planning_reference', state.planningReference)
-      .eq('tour_number', state.activeTourId)
-      .eq('trigram', trigram)
-      .eq('root_choice_index', rootChoiceIndex);
-    if (deleteByRootError) {
-      console.error(deleteByRootError);
-    }
-  }
-};
-
-const applyAutomaticAcceptance = async (request, { guardType }) => {
-  const supabase = await ensureSupabase();
-  if (!supabase) {
-    return { success: false, message: 'Connexion à Supabase requise.' };
-  }
-  if (!request?.id) {
-    return { success: false, message: 'Demande introuvable.' };
-  }
-
-  const stored = state.requests.find((item) => item.id === request.id) ?? request;
-  const competing = await fetchCompetingRequests(stored);
-
-  const alternativeIds = collectAlternativeIds(competing, stored);
-  const competingIds = competing
-    .filter((item) => item.trigram !== stored.trigram)
-    .map((item) => item.id);
-  const primaryRefused = competing.filter(
-    (item) => item.trigram !== stored.trigram && item.choice_rank === 1 && item.id !== stored.id
-  );
-
-  const idsToFetch = Array.from(new Set([stored.id, ...alternativeIds, ...competingIds]));
-  const stateById = new Map();
-  if (idsToFetch.length) {
-    const { data: states, error } = await supabase
-      .from(CHOICES_TABLE)
-      .select('id, etat, is_active, choice_rank, choice_order')
-      .in('id', idsToFetch);
-    if (error) {
-      console.error(error);
-      return { success: false, message: "Impossible de récupérer l'état des demandes." };
-    }
-    (states ?? []).forEach((record) => {
-      stateById.set(record.id, record);
-    });
-  }
-
-  const operations = [];
-  const updates = [];
-  const targetState = stateById.get(stored.id) ?? {
-    etat: stored.status ?? 'en attente',
-    is_active: stored.isActive ?? true,
-    choice_rank: stored.choiceRank ?? 1,
-    choice_order: stored.choiceOrder ?? stored.choice_order ?? null
-  };
-  const parsedTargetRank = parseNumeric(targetState.choice_rank);
-  const parsedStoredRank = parseNumeric(stored.choiceRank ?? stored.choice_rank);
-  const selectedRankThreshold = parsedTargetRank ?? parsedStoredRank ?? 1;
-
-  const selectedForAlternatives = {
-    ...stored,
-    choiceRank: selectedRankThreshold
-  };
-
-  const normalizedAlternativeIds = collectAlternativeIds(competing, selectedForAlternatives);
-  const alternativeIdSet = new Set([...alternativeIds, ...normalizedAlternativeIds]);
-
-  const additionalAlternatives = await findAlternativesToDeactivate({
-    supabase,
-    trigram: stored.trigram,
-    choiceIndex: stored.choiceIndex,
-    selectedId: stored.id,
-    selectedRank: selectedRankThreshold,
-    excludedIds: alternativeIds
-  });
-
-  additionalAlternatives.forEach((record) => {
-    if (record?.id) {
-      alternativeIdSet.add(record.id);
-    }
-  });
-
-  const storedChoiceOrder = parseNumeric(
-    targetState.choice_order ?? stored.choiceOrder ?? stored.choice_order
-  );
-
-  const choiceOrderAlternatives = await findChoiceOrderAlternatives({
-    supabase,
-    trigram: stored.trigram,
-    choiceOrder: storedChoiceOrder,
-    selectedId: stored.id,
-    excludedIds: Array.from(alternativeIdSet)
-  });
-
-  const additionalAlternativeRecords = [...additionalAlternatives];
-  choiceOrderAlternatives.forEach((record) => {
-    if (record?.id && !alternativeIdSet.has(record.id)) {
-      alternativeIdSet.add(record.id);
-      additionalAlternativeRecords.push(record);
-    }
-  });
-
-  alternativeIds.length = 0;
-  alternativeIdSet.forEach((id) => alternativeIds.push(id));
-
-  const missingStateIds = alternativeIds.filter((id) => !stateById.has(id));
-  if (missingStateIds.length) {
-    const { data: extraStates, error: extraStatesError } = await supabase
-      .from(CHOICES_TABLE)
-      .select('id, etat, is_active, choice_rank, choice_order')
-      .in('id', missingStateIds);
-    if (extraStatesError) {
-      console.error(extraStatesError);
-      return { success: false, message: "Impossible de récupérer l'état des alternatives." };
-    }
-    (extraStates ?? []).forEach((record) => {
-      stateById.set(record.id, record);
-    });
-  }
-
-  if (targetState.etat !== 'validé' || targetState.is_active !== true) {
-    updates.push(async () => {
-      const { error } = await supabase
-        .from(CHOICES_TABLE)
-        .update({ etat: 'validé', is_active: true })
-        .eq('id', stored.id);
-      if (error) {
-        throw error;
-      }
-    });
-    operations.push({
-      choiceId: stored.id,
-      action: 'accept',
-      previous: {
-        etat: targetState.etat ?? null,
-        is_active: targetState.is_active ?? null,
-        choice_rank: targetState.choice_rank ?? null
-      },
-      next: {
-        etat: 'validé',
-        is_active: true,
-        choice_rank: targetState.choice_rank ?? stored.choiceRank ?? 1
-      },
-      reason: `Attribution automatique (${guardType ?? 'garde'})`
-    });
-  }
-
-  alternativeIds.forEach((id) => {
-    const state = stateById.get(id);
-    const shouldUpdate = !state || state.etat !== 'refusé' || state.is_active !== false;
-    if (!shouldUpdate) {
-      return;
-    }
-    updates.push(async () => {
-      const { error } = await supabase
-        .from(CHOICES_TABLE)
-        .update({ etat: 'refusé', is_active: false })
-        .eq('id', id);
-      if (error) {
-        throw error;
-      }
-    });
-    operations.push({
-      choiceId: id,
-      action: 'refuse_alternative',
-      previous: {
-        etat: state?.etat ?? null,
-        is_active: state?.is_active ?? null,
-        choice_rank: state?.choice_rank ?? null
-      },
-      next: {
-        etat: 'refusé',
-        is_active: false,
-        choice_rank: state?.choice_rank ?? null
-      },
-      reason: 'Alternative refusée automatiquement'
-    });
-  });
-
-  additionalAlternativeRecords.forEach((record) => {
-    updates.push(async () => {
-      const { error } = await supabase
-        .from(CHOICES_TABLE)
-        .update({ etat: 'refusé', is_active: false })
-        .eq('id', record.id);
-      if (error) {
-        throw error;
-      }
-    });
-    operations.push({
-      choiceId: record.id,
-      action: 'refuse_alternative',
-      previous: {
-        etat: record.etat ?? null,
-        is_active: record.is_active ?? null,
-        choice_rank: record.choice_rank ?? null
-      },
-      next: {
-        etat: 'refusé',
-        is_active: false,
-        choice_rank: record.choice_rank ?? null
-      },
-      reason: 'Alternative retirée automatiquement'
-    });
-  });
-
-  competingIds.forEach((id) => {
-    const state = stateById.get(id);
-    if (!state || state.etat !== 'en attente') {
-      return;
-    }
-    updates.push(async () => {
-      const { error } = await supabase
-        .from(CHOICES_TABLE)
-        .update({ etat: 'refusé' })
-        .eq('id', id)
-        .eq('etat', 'en attente');
-      if (error) {
-        throw error;
-      }
-    });
-    operations.push({
-      choiceId: id,
-      action: 'refuse',
-      previous: {
-        etat: state.etat ?? null,
-        is_active: state.is_active ?? null,
-        choice_rank: state.choice_rank ?? null
-      },
-      next: {
-        etat: 'refusé',
-        is_active: state.is_active ?? null,
-        choice_rank: state.choice_rank ?? null
-      },
-      reason: `Conflit avec ${stored.trigram}`
-    });
-  });
-
-  try {
-    for (const operation of updates) {
-      await operation();
-    }
-  } catch (error) {
-    console.error(error);
-    return { success: false, message: "Impossible d'appliquer une attribution automatique." };
-  }
-
-  await recordAudit({
-    action: 'accept',
-    choiceId: stored.id,
-    targetTrigram: stored.trigram,
-    targetDay: stored.day,
-    targetColumnNumber: stored.columnNumber,
-    reason: 'Attribution automatique',
-    metadata: { guardType }
-  });
-
-  for (const competitorId of competingIds) {
-    const competitor = competing.find((item) => item.id === competitorId);
-    if (competitor) {
-      await recordAudit({
-        action: 'refuse',
-        choiceId: competitor.id,
-        targetTrigram: competitor.trigram,
-        targetDay: competitor.day,
-        targetColumnNumber: competitor.column_number,
-        reason: `Attribué automatiquement à ${stored.trigram}`
-      });
-    }
-  }
-
-  for (const competitor of primaryRefused) {
-    const promotion = await promoteAlternative(competitor.trigram, competitor.choice_index);
-    if (promotion) {
-      operations.push({
-        choiceId: promotion.choiceId,
-        action: promotion.action,
-        previous: promotion.previous,
-        next: promotion.next,
-        reason: 'Promotion automatique après refus'
-      });
-    }
-  }
-
-  await cleanupAutoAssignmentWorkspaceAfterAcceptance({
-    supabase,
-    accepted: stored,
-    alternativeIds,
-    additionalAlternatives: additionalAlternativeRecords,
-    competingIds
-  });
-
-  return { success: true, operations };
-};
-
-const recordAutoAssignmentRun = async ({ params, result, operations }) => {
-  const supabase = await ensureSupabase();
-  if (!supabase) {
-    return null;
-  }
-  const actor = await ensureActor();
-  const payload = {
-    actor_id: actor?.id ?? null,
-    actor_trigram: actor?.trigram ?? null,
-    actor_username: actor?.username ?? null,
-    planning_reference: state.planningReference,
-    tour_number: state.activeTourId,
-    rotations_used: result?.summary?.rotationsUsed ?? 0,
-    parameters: {
-      ...params,
-      populations: params.populations,
-      order: params.order
-    },
-    summary: {
-      ...result?.summary,
-      assignments: (result?.assignments ?? []).map((item) => ({
-        trigram: normalizeTrigram(item.trigram ?? ''),
-        userType: item.userType ?? '',
-        rotation: item.rotation ?? null,
-        assigned: item.assigned ?? false,
-        reason: item.reason ?? null,
-        normalChoiceId: item.normal?.id ?? null,
-        goodChoiceId: item.good?.id ?? null
-      }))
-    }
-  };
-
-  const { data, error } = await supabase
-    .from(AUTO_ASSIGNMENT_RUNS_TABLE)
-    .insert(payload)
-    .select('id')
-    .single();
-  if (error) {
-    console.error(error);
-    return null;
-  }
-  const runId = data?.id ?? null;
-  if (!runId) {
-    return null;
-  }
-
-  if (operations?.length) {
-    const entriesPayload = operations.map((operation) => ({
-      run_id: runId,
-      choice_id: operation.choiceId,
-      action: operation.action,
-      previous_state: operation.previous ?? {},
-      next_state: operation.next ?? {},
-      reason: operation.reason ?? null
-    }));
-    const { error: entriesError } = await supabase
-      .from(AUTO_ASSIGNMENT_RUN_ENTRIES_TABLE)
-      .insert(entriesPayload);
-    if (entriesError) {
-      console.error(entriesError);
-    }
-  }
-
-  state.autoAssignment.lastRunId = runId;
-  updateUndoButtonState();
-  return runId;
-};
-
-const applyAutoAssignmentResult = async (result, params) => {
-  const assignments = (result.assignments ?? []).filter((item) => item.assigned && item.normal && item.good);
-  if (!assignments.length) {
-    return { success: false, message: 'Aucune attribution à appliquer.' };
-  }
-  const collectedOperations = [];
-  for (const assignment of assignments) {
-    const normalOutcome = await applyAutomaticAcceptance(assignment.normal, { guardType: 'normale' });
-    if (!normalOutcome.success) {
-      return normalOutcome;
-    }
-    collectedOperations.push(...(normalOutcome.operations ?? []));
-    const goodOutcome = await applyAutomaticAcceptance(assignment.good, { guardType: 'bonne' });
-    if (!goodOutcome.success) {
-      return goodOutcome;
-    }
-    collectedOperations.push(...(goodOutcome.operations ?? []));
-  }
-
-  const runId = await recordAutoAssignmentRun({ params, result, operations: collectedOperations });
-  return { success: true, runId };
-};
-
-const undoLastAutoAssignment = async () => {
-  const supabase = await ensureSupabase();
-  if (!supabase) {
-    setAutoAssignmentFeedback('Connexion à Supabase requise.');
-    return;
-  }
-  if (!state.planningReference || !state.activeTourId) {
-    setAutoAssignmentFeedback("Aucun lot à annuler.");
-    return;
-  }
-
-  setAutoAssignmentRunning(true);
-  try {
-    const { data: run, error } = await supabase
-      .from(AUTO_ASSIGNMENT_RUNS_TABLE)
-      .select('id')
-      .eq('planning_reference', state.planningReference)
-      .eq('tour_number', state.activeTourId)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (error || !run?.id) {
-      setAutoAssignmentFeedback("Aucun lot d'attribution automatique à annuler.");
-      return;
-    }
-
-    const runId = run.id;
-    const { data: entries, error: entriesError } = await supabase
-      .from(AUTO_ASSIGNMENT_RUN_ENTRIES_TABLE)
-      .select('choice_id, previous_state')
-      .eq('run_id', runId);
-    if (entriesError) {
-      console.error(entriesError);
-      setAutoAssignmentFeedback("Impossible de récupérer le détail du lot.");
-      return;
-    }
-
-    for (const entry of entries ?? []) {
-      const previous = entry.previous_state ?? {};
-      const updatePayload = {};
-      if (Object.prototype.hasOwnProperty.call(previous, 'etat')) {
-        updatePayload.etat = previous.etat;
-      }
-      if (Object.prototype.hasOwnProperty.call(previous, 'is_active')) {
-        updatePayload.is_active = previous.is_active;
-      }
-      if (Object.prototype.hasOwnProperty.call(previous, 'choice_rank')) {
-        updatePayload.choice_rank = previous.choice_rank;
-      }
-      if (Object.keys(updatePayload).length) {
-        const { error: updateError } = await supabase
-          .from(CHOICES_TABLE)
-          .update(updatePayload)
-          .eq('id', entry.choice_id);
-        if (updateError) {
-          console.error(updateError);
-          setAutoAssignmentFeedback("Impossible d'annuler le lot en entier.");
-          return;
-        }
-      }
-    }
-
-    await supabase.from(AUTO_ASSIGNMENT_RUN_ENTRIES_TABLE).delete().eq('run_id', runId);
-    await supabase.from(AUTO_ASSIGNMENT_RUNS_TABLE).delete().eq('id', runId);
-    state.autoAssignment.lastRunId = null;
-    updateUndoButtonState();
-    await loadRequests();
-    const workspaceReset = await prepareAutoAssignmentWorkspace();
-    if (!workspaceReset.success) {
-      console.warn('Préparation de la table de travail échouée après annulation.', workspaceReset.message);
-    }
-    await fetchLastAutoAssignmentRun();
-    setAutoAssignmentFeedback('Dernière attribution automatique annulée.');
-  } catch (error) {
-    console.error(error);
-    setAutoAssignmentFeedback("Une erreur est survenue lors de l'annulation.");
-  } finally {
-    setAutoAssignmentRunning(false);
-  }
-};
-
-const executeAutoAssignment = async ({ apply }) => {
-  const params = getAutoAssignmentParameters();
-  const validation = validateAutoAssignmentParameters(params);
-  if (!validation.isValid) {
-    setAutoAssignmentFeedback(validation.errors.join(' '));
-    return;
-  }
-  setAutoAssignmentRunning(true);
-  setAutoAssignmentFeedback(apply ? 'Attribution automatique en cours…' : 'Prévisualisation en cours…');
-  try {
-    await loadRequests();
-    const preparation = await prepareAutoAssignmentWorkspace();
-    if (!preparation.success) {
-      setAutoAssignmentFeedback(preparation.message ?? "Impossible de préparer l'attribution automatique.");
-      return;
-    }
-    const result = runAutoAssignment(params);
-    renderAutoAssignmentResults(result);
-    if (apply) {
-      const applyOutcome = await applyAutoAssignmentResult(result, params);
-      if (!applyOutcome.success) {
-        setAutoAssignmentFeedback(applyOutcome.message ?? "Impossible d'appliquer l'attribution automatique.");
-        return;
-      }
-      await loadRequests();
-      await fetchLastAutoAssignmentRun();
-    }
-    setAutoAssignmentFeedback(formatAutoAssignmentSummary(result.summary));
-  } catch (error) {
-    console.error('Erreur lors de l\'attribution automatique', error);
-    setAutoAssignmentFeedback("Une erreur est survenue lors de l'attribution automatique.");
-  } finally {
-    setAutoAssignmentRunning(false);
-  }
-};
-
-const handleAutoAssignmentAction = (event) => {
-  const button = event.target.closest('[data-auto-action]');
-  if (!button || state.autoAssignment.isRunning) {
-    return;
-  }
-  const action = button.dataset.autoAction;
-  if (action === 'preview') {
-    executeAutoAssignment({ apply: false });
-  } else if (action === 'apply') {
-    executeAutoAssignment({ apply: true });
-  } else if (action === 'undo') {
-    undoLastAutoAssignment();
-  }
-};
 
 const attachEventListeners = () => {
   if (elements.logoutBtn) {
@@ -2754,9 +2137,9 @@ const attachEventListeners = () => {
       }, 0);
     });
   }
-  if (elements.autoForm) {
-    elements.autoForm.addEventListener('change', handleAutoAssignmentFormChange);
-    elements.autoForm.addEventListener('click', handleAutoAssignmentAction);
+  if (elements.semiForm) {
+    elements.semiForm.addEventListener('change', handleSemiAssignmentFormChange);
+    elements.semiForm.addEventListener('click', handleSemiAssignmentAction);
   }
 };
 
@@ -2780,9 +2163,9 @@ const initialize = async () => {
   await loadAdministrativeSettings();
   await loadPlanningColumns();
   await loadRequests();
-  await loadAutoAssignmentDirectory();
-  await fetchLastAutoAssignmentRun();
-  updateUndoButtonState();
+  await loadSemiAssignmentDirectory();
+  updateSemiAssignmentActiveTour();
+  updateSemiAssignmentTrigramOptions();
 };
 
 initialize().catch((error) => {
