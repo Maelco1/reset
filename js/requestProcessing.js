@@ -205,6 +205,33 @@ const parseNumeric = (value) => {
   return Number.isNaN(parsed) ? null : parsed;
 };
 
+const NEARLY_EQUAL_EPSILON = 1e-6;
+
+const areNearlyEqual = (a, b, epsilon = NEARLY_EQUAL_EPSILON) => {
+  if (!Number.isFinite(a) || !Number.isFinite(b)) {
+    return a === b;
+  }
+  return Math.abs(a - b) <= epsilon;
+};
+
+const getChoiceIndexParts = (rawValue) => {
+  const numeric = parseNumeric(rawValue);
+  if (!Number.isFinite(numeric)) {
+    return {
+      numeric: null,
+      primary: Number.POSITIVE_INFINITY,
+      secondary: Number.POSITIVE_INFINITY
+    };
+  }
+  const primary = Math.trunc(numeric);
+  const secondary = Math.abs(numeric - primary);
+  return {
+    numeric,
+    primary,
+    secondary
+  };
+};
+
 const haveMatchingChoiceIndex = (candidate, selectedIndex) => {
   if (selectedIndex == null) {
     return false;
@@ -221,12 +248,36 @@ const haveMatchingChoiceOrder = (candidate, selectedOrder) => {
   return candidateOrder != null && candidateOrder === selectedOrder;
 };
 
+const hasHigherSecondaryIndexWithinPrimary = (candidate, selectedIndex) => {
+  if (selectedIndex == null) {
+    return false;
+  }
+  const candidateParts = getChoiceIndexParts(candidate.choice_index ?? candidate.choiceIndex);
+  const selectedParts = getChoiceIndexParts(selectedIndex);
+  if (!Number.isFinite(candidateParts.primary) || !Number.isFinite(selectedParts.primary)) {
+    return false;
+  }
+  if (candidateParts.primary !== selectedParts.primary) {
+    return false;
+  }
+  if (!Number.isFinite(candidateParts.secondary) || !Number.isFinite(selectedParts.secondary)) {
+    return false;
+  }
+  if (areNearlyEqual(candidateParts.secondary, selectedParts.secondary)) {
+    return false;
+  }
+  return candidateParts.secondary > selectedParts.secondary;
+};
+
 const getAlternativeRelation = (candidate, selectedRank, selectedIndex, selectedOrder) => {
   if (haveMatchingChoiceOrder(candidate, selectedOrder)) {
     return 'order';
   }
   if (haveMatchingChoiceIndex(candidate, selectedIndex)) {
     return 'index';
+  }
+  if (hasHigherSecondaryIndexWithinPrimary(candidate, selectedIndex)) {
+    return 'secondary';
   }
   const candidateRank = parseNumeric(candidate.choice_rank ?? candidate.choiceRank);
   if (candidateRank == null) {
@@ -2465,8 +2516,8 @@ const findNextAvailableRequest = (
     if (!item) {
       return;
     }
-    const indexValue = parseNumeric(item.choice_index ?? item.choiceIndex);
-    const primaryIndex = Number.isFinite(indexValue) ? indexValue : Number.POSITIVE_INFINITY;
+    const { primary } = getChoiceIndexParts(item.choice_index ?? item.choiceIndex);
+    const primaryIndex = Number.isFinite(primary) ? primary : Number.POSITIVE_INFINITY;
     if (!groups.has(primaryIndex)) {
       groups.set(primaryIndex, []);
     }
@@ -2495,7 +2546,38 @@ const findNextAvailableRequest = (
     if (!normalizedCandidates.length) {
       continue;
     }
-    const groupHasAvailableState = normalizedCandidates.some((candidate) => {
+    let filteredCandidates = normalizedCandidates;
+    if (Number.isFinite(primaryIndex)) {
+      let bestSecondary = Number.POSITIVE_INFINITY;
+      normalizedCandidates.forEach((candidate) => {
+        const { primary, secondary } = getChoiceIndexParts(candidate.choice_index ?? candidate.choiceIndex);
+        if (!Number.isFinite(primary) || primary !== primaryIndex) {
+          return;
+        }
+        if (!Number.isFinite(secondary)) {
+          return;
+        }
+        if (secondary < bestSecondary) {
+          bestSecondary = secondary;
+        }
+      });
+      if (Number.isFinite(bestSecondary) && bestSecondary !== Number.POSITIVE_INFINITY) {
+        filteredCandidates = normalizedCandidates.filter((candidate) => {
+          const { primary, secondary } = getChoiceIndexParts(candidate.choice_index ?? candidate.choiceIndex);
+          if (!Number.isFinite(primary) || primary !== primaryIndex) {
+            return false;
+          }
+          if (!Number.isFinite(secondary)) {
+            return false;
+          }
+          return areNearlyEqual(secondary, bestSecondary);
+        });
+      }
+    }
+    if (!filteredCandidates.length) {
+      continue;
+    }
+    const groupHasAvailableState = filteredCandidates.some((candidate) => {
       const key = getRequestGroupKey(candidate);
       const stateKey = buildGroupStateKey(trigram, guardType, key);
       return !stateKey || !usedGroups?.has(stateKey);
@@ -2503,7 +2585,7 @@ const findNextAvailableRequest = (
     if (!groupHasAvailableState) {
       continue;
     }
-    for (const candidate of normalizedCandidates) {
+    for (const candidate of filteredCandidates) {
       const groupKey = getRequestGroupKey(candidate);
       const stateKey = buildGroupStateKey(trigram, guardType, groupKey);
       if (stateKey && usedGroups?.has(stateKey)) {
