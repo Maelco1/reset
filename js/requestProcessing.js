@@ -1763,87 +1763,77 @@ const computeSemiAssignmentSteps = (params) => {
   let normals = 0;
   let good = 0;
 
+  const applySelection = (trigram, guardType, entry, counts, candidate, rotation) => {
+    if (!candidate?.request) {
+      return false;
+    }
+    const impacts = buildSemiAssignmentImpacts(candidate.request, guardType);
+    steps.push({
+      trigram,
+      userType: entry?.userType ?? getUserTypeForTrigram(trigram),
+      rotation,
+      guardType,
+      request: candidate.request,
+      status: 'pending',
+      impacts
+    });
+    const listKey = guardType === 'bonne' ? 'bonne' : 'normale';
+    entry[listKey] = entry[listKey].filter((item) => item.id !== candidate.request.id);
+    const groupKey = candidate.groupKey ?? getRequestGroupKey(candidate.request);
+    if (groupKey) {
+      const stateKey = buildGroupStateKey(trigram, guardType, groupKey);
+      if (stateKey) {
+        usedGroupKeys.add(stateKey);
+      }
+      entry[listKey] = entry[listKey].filter((item) => getRequestGroupKey(item) !== groupKey);
+    }
+    if (candidate.slotKey) {
+      occupiedSlots.add(candidate.slotKey);
+    }
+    if (guardType === 'bonne') {
+      counts.good += 1;
+      good += 1;
+    } else {
+      counts.normal += 1;
+      normals += 1;
+    }
+    return true;
+  };
+
+  const attemptAssignment = (trigram, guardType, rotation) => {
+    const entry = pendingMap.get(trigram);
+    if (!entry) {
+      return false;
+    }
+    const counts = simulatedCounts.get(trigram) ?? { normal: 0, good: 0 };
+    simulatedCounts.set(trigram, counts);
+    const listKey = guardType === 'bonne' ? 'bonne' : 'normale';
+    const candidate = findNextAvailableRequest(
+      entry[listKey],
+      trigram,
+      assignedSlots,
+      occupiedSlots,
+      undefined,
+      { usedGroups: usedGroupKeys, guardType }
+    );
+    return applySelection(trigram, guardType, entry, counts, candidate, rotation);
+  };
+
   for (let rotation = 1; rotation <= params.rotations; rotation += 1) {
     for (const trigram of orderedTrigrams) {
       analysed += 1;
-      const entry = pendingMap.get(trigram);
-      if (!entry) {
+      attemptAssignment(trigram, 'normale', rotation);
+    }
+    for (const trigram of orderedTrigrams) {
+      const counts = simulatedCounts.get(trigram);
+      if (!counts) {
         continue;
       }
-      const counts = simulatedCounts.get(trigram) ?? { normal: 0, good: 0 };
-      simulatedCounts.set(trigram, counts);
-      const extraOccupied = new Set();
-
-      const selectCandidate = (listKey, guardType) => {
-        const candidate = findNextAvailableRequest(
-          entry[listKey],
-          trigram,
-          assignedSlots,
-          occupiedSlots,
-          extraOccupied,
-          { usedGroups: usedGroupKeys, guardType }
-        );
-        if (candidate?.slotKey) {
-          extraOccupied.add(candidate.slotKey);
-        }
-        return candidate;
-      };
-
-      const registerSelection = (guardType, candidate) => {
-        if (!candidate?.request) {
-          return;
-        }
-        const listKey = guardType === 'bonne' ? 'bonne' : 'normale';
-        entry[listKey] = entry[listKey].filter((item) => item.id !== candidate.request.id);
-        const groupKey = candidate.groupKey ?? getRequestGroupKey(candidate.request);
-        if (groupKey) {
-          const stateKey = buildGroupStateKey(trigram, guardType, groupKey);
-          if (stateKey) {
-            usedGroupKeys.add(stateKey);
-          }
-          entry[listKey] = entry[listKey].filter((item) => getRequestGroupKey(item) !== groupKey);
-        }
-        if (candidate.slotKey) {
-          occupiedSlots.add(candidate.slotKey);
-        }
-      };
-
-      const addStep = (guardType, candidate) => {
-        if (!candidate?.request) {
-          return;
-        }
-        const impacts = buildSemiAssignmentImpacts(candidate.request, guardType);
-        steps.push({
-          trigram,
-          userType: entry?.userType ?? getUserTypeForTrigram(trigram),
-          rotation,
-          guardType,
-          request: candidate.request,
-          status: 'pending',
-          impacts
-        });
-        registerSelection(guardType, candidate);
-        if (guardType === 'bonne') {
-          counts.good += 1;
-          good += 1;
-        } else {
-          counts.normal += 1;
-          normals += 1;
-        }
-      };
-
-      const normalCandidate = selectCandidate('normale', 'normale');
-      if (normalCandidate) {
-        addStep('normale', normalCandidate);
-      }
-
-      const grantedBlocks = params.normalThreshold > 0 ? Math.floor(counts.normal / params.normalThreshold) : 0;
+      const grantedBlocks =
+        params.normalThreshold > 0 ? Math.floor(counts.normal / params.normalThreshold) : 0;
       const allowedGood = grantedBlocks * params.goodQuota;
       if (params.goodQuota > 0 && allowedGood > counts.good) {
-        const goodCandidate = selectCandidate('bonne', 'bonne');
-        if (goodCandidate) {
-          addStep('bonne', goodCandidate);
-        }
+        attemptAssignment(trigram, 'bonne', rotation);
       }
     }
   }
@@ -2341,38 +2331,75 @@ const findNextAvailableRequest = (
     return null;
   }
   const { usedGroups = null, guardType = '' } = options;
-  for (let index = 0; index < list.length; index += 1) {
-    const candidate = list[index];
-    if (!candidate) {
+  const groups = new Map();
+  list.forEach((item) => {
+    if (!item) {
+      return;
+    }
+    const indexValue = parseNumeric(item.choice_index ?? item.choiceIndex);
+    const primaryIndex = Number.isFinite(indexValue) ? indexValue : Number.POSITIVE_INFINITY;
+    if (!groups.has(primaryIndex)) {
+      groups.set(primaryIndex, []);
+    }
+    groups.get(primaryIndex).push(item);
+  });
+  const sortedPrimaryIndexes = Array.from(groups.keys()).sort((a, b) => {
+    if (a === b) {
+      return 0;
+    }
+    if (a === Number.POSITIVE_INFINITY) {
+      return 1;
+    }
+    if (b === Number.POSITIVE_INFINITY) {
+      return -1;
+    }
+    return a - b;
+  });
+  for (const primaryIndex of sortedPrimaryIndexes) {
+    const candidates = groups.get(primaryIndex) ?? [];
+    if (!candidates.length) {
       continue;
     }
-    if (candidate.status && candidate.status !== 'en attente') {
+    const normalizedCandidates = candidates
+      .filter((candidate) => candidate && (!candidate.status || candidate.status === 'en attente'))
+      .sort(compareRequestsByPriority);
+    if (!normalizedCandidates.length) {
       continue;
     }
-    const groupKey = getRequestGroupKey(candidate);
-    const stateKey = buildGroupStateKey(trigram, guardType, groupKey);
-    if (stateKey && usedGroups?.has(stateKey)) {
+    const groupHasAvailableState = normalizedCandidates.some((candidate) => {
+      const key = getRequestGroupKey(candidate);
+      const stateKey = buildGroupStateKey(trigram, guardType, key);
+      return !stateKey || !usedGroups?.has(stateKey);
+    });
+    if (!groupHasAvailableState) {
       continue;
     }
-    const slotKey = getSlotKey(candidate);
-    if (!slotKey) {
-      continue;
+    for (const candidate of normalizedCandidates) {
+      const groupKey = getRequestGroupKey(candidate);
+      const stateKey = buildGroupStateKey(trigram, guardType, groupKey);
+      if (stateKey && usedGroups?.has(stateKey)) {
+        continue;
+      }
+      const slotKey = getSlotKey(candidate);
+      if (!slotKey) {
+        continue;
+      }
+      if (occupiedSlots.has(slotKey) || extraOccupied.has(slotKey)) {
+        continue;
+      }
+      if (hasConflictWithAssignedSlots(trigram, candidate, assignedSlots)) {
+        continue;
+      }
+      if (hasConflictForDoctor(candidate)) {
+        continue;
+      }
+      return {
+        request: candidate,
+        slotKey,
+        groupKey
+      };
     }
-    if (occupiedSlots.has(slotKey) || extraOccupied.has(slotKey)) {
-      continue;
-    }
-    if (hasConflictWithAssignedSlots(trigram, candidate, assignedSlots)) {
-      continue;
-    }
-    if (hasConflictForDoctor(candidate)) {
-      continue;
-    }
-    return {
-      request: candidate,
-      index,
-      slotKey,
-      groupKey
-    };
+    break;
   }
   return null;
 };
