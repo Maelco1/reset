@@ -486,10 +486,35 @@ main {
   vertical-align: top;
 }
 
+.semi-assignment-step-label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.semi-assignment-step-details {
+  display: block;
+  font-size: 0.8125rem;
+  color: #475569;
+}
+
 .semi-assignment-impacts {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.semi-assignment-impact-group + .semi-assignment-impact-group {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(15, 23, 42, 0.12);
+}
+
+.semi-assignment-impact-title {
+  margin: 0 0 4px;
+  font-weight: 600;
+  font-size: 0.8125rem;
+  color: #0f172a;
 }
 
 .semi-assignment-mini {

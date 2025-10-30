@@ -1968,31 +1968,12 @@ const createSemiAssignmentMiniSlot = (item) => {
   return slot;
 };
 
-const createSemiAssignmentPreview = (step) => {
-  const container = document.createElement('div');
-  container.className = 'semi-assignment-impacts';
-  if (!step) {
-    const empty = document.createElement('p');
-    empty.className = 'semi-assignment-mini-empty';
-    empty.textContent = 'Aucun impact identifié.';
-    container.appendChild(empty);
-    return container;
+const appendSemiAssignmentMiniContent = (target, items) => {
+  const list = (items ?? []).filter(Boolean);
+  if (!list.length) {
+    return false;
   }
-  const impacts = step.impacts ?? buildSemiAssignmentImpacts(step.request, step.guardType);
-  if (step && !step.impacts) {
-    step.impacts = impacts;
-  }
-  const assigned = impacts?.assigned ?? [];
-  const alternatives = impacts?.alternatives ?? [];
-  const items = [...assigned, ...alternatives].filter(Boolean);
-  if (!items.length) {
-    const empty = document.createElement('p');
-    empty.className = 'semi-assignment-mini-empty';
-    empty.textContent = 'Aucun impact identifié.';
-    container.appendChild(empty);
-    return container;
-  }
-  const positioned = items.filter((item) => item.dayKey && Number.isFinite(item.columnNumber));
+  const positioned = list.filter((item) => item.dayKey && Number.isFinite(item.columnNumber));
   if (positioned.length) {
     const columnNumbers = Array.from(new Set(positioned.map((item) => item.columnNumber))).sort((a, b) => a - b);
     const dayEntries = new Map();
@@ -2051,9 +2032,9 @@ const createSemiAssignmentPreview = (step) => {
       tbody.appendChild(row);
     });
     table.appendChild(tbody);
-    container.appendChild(table);
+    target.appendChild(table);
   }
-  const otherItems = items.filter((item) => !item.dayKey || !Number.isFinite(item.columnNumber));
+  const otherItems = list.filter((item) => !item.dayKey || !Number.isFinite(item.columnNumber));
   if (otherItems.length) {
     const chips = document.createElement('div');
     chips.className = 'semi-assignment-mini-meta';
@@ -2067,8 +2048,62 @@ const createSemiAssignmentPreview = (step) => {
       chip.title = item.summary || '';
       chips.appendChild(chip);
     });
-    container.appendChild(chips);
+    target.appendChild(chips);
   }
+  return true;
+};
+
+const createSemiAssignmentImpactGroup = (title, items, emptyMessage, modifier) => {
+  const group = document.createElement('div');
+  group.className = 'semi-assignment-impact-group';
+  if (modifier) {
+    group.classList.add(`semi-assignment-impact-group--${modifier}`);
+  }
+  const heading = document.createElement('p');
+  heading.className = 'semi-assignment-impact-title';
+  heading.textContent = title;
+  group.appendChild(heading);
+  const hasContent = appendSemiAssignmentMiniContent(group, items);
+  if (!hasContent) {
+    const empty = document.createElement('p');
+    empty.className = 'semi-assignment-mini-empty';
+    empty.textContent = emptyMessage;
+    group.appendChild(empty);
+  }
+  return group;
+};
+
+const createSemiAssignmentPreview = (step) => {
+  const container = document.createElement('div');
+  container.className = 'semi-assignment-impacts';
+  if (!step) {
+    const empty = document.createElement('p');
+    empty.className = 'semi-assignment-mini-empty';
+    empty.textContent = 'Aucun impact identifié.';
+    container.appendChild(empty);
+    return container;
+  }
+  const impacts = step.impacts ?? (step.request ? buildSemiAssignmentImpacts(step.request, step.guardType) : null);
+  if (step && !step.impacts && impacts) {
+    step.impacts = impacts;
+  }
+  const assigned = impacts?.assigned ?? [];
+  const alternatives = impacts?.alternatives ?? [];
+  container.appendChild(
+    createSemiAssignmentImpactGroup(
+      'Attribution proposée',
+      assigned,
+      'Aucune attribution proposée pour cette étape.'
+    )
+  );
+  container.appendChild(
+    createSemiAssignmentImpactGroup(
+      'Alternatives supprimées',
+      alternatives,
+      'Aucune alternative supprimée pour cette étape.',
+      'alternatives'
+    )
+  );
   return container;
 };
 
@@ -2093,6 +2128,41 @@ const renderSemiAssignmentState = () => {
     if (index === currentIndex) {
       row.classList.add('is-active');
     }
+
+    let impacts = step.impacts ?? null;
+    if (!impacts && step.request) {
+      impacts = buildSemiAssignmentImpacts(step.request, step.guardType);
+      step.impacts = impacts;
+    }
+    const assignedCount = (impacts?.assigned ?? []).filter(Boolean).length;
+    const alternativesCount = (impacts?.alternatives ?? []).filter(Boolean).length;
+
+    const stepCell = document.createElement('td');
+    stepCell.className = 'semi-assignment-step';
+    const stepLabel = document.createElement('span');
+    stepLabel.className = 'semi-assignment-step-label';
+    stepLabel.textContent = `Étape ${index + 1}`;
+    stepCell.appendChild(stepLabel);
+    const stepDetails = document.createElement('span');
+    stepDetails.className = 'semi-assignment-step-details';
+    const detailParts = [];
+    const guardLabel = CHOICE_SERIES_LABELS.get(step.guardType) ?? step.guardType ?? '';
+    if (guardLabel) {
+      detailParts.push(`Type : ${guardLabel}`);
+    }
+    const assignmentLabel = assignedCount
+      ? `${assignedCount} attribution${assignedCount > 1 ? 's' : ''} proposée${assignedCount > 1 ? 's' : ''}`
+      : 'Aucune attribution proposée';
+    detailParts.push(assignmentLabel);
+    const alternativesLabel = alternativesCount
+      ? `${alternativesCount} alternative${alternativesCount > 1 ? 's' : ''} supprimée${
+          alternativesCount > 1 ? 's' : ''
+        }`
+      : 'Aucune alternative supprimée';
+    detailParts.push(alternativesLabel);
+    stepDetails.textContent = detailParts.join(' • ');
+    stepCell.appendChild(stepDetails);
+    row.appendChild(stepCell);
 
     const rotationCell = document.createElement('td');
     rotationCell.textContent = String(step.rotation ?? '—');
