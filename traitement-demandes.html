@@ -39,38 +39,9 @@
           </nav>
         </header>
 
-        <nav
-          id="request-mode-tabs"
-          class="request-tabs request-mode-tabs"
-          role="tablist"
-          aria-label="Mode de traitement"
-        >
-          <button
-            type="button"
-            class="request-tab"
-            data-mode="requests"
-            role="tab"
-            aria-controls="requests-panel"
-            aria-selected="true"
-          >
-            Demandes
-          </button>
-          <button
-            type="button"
-            class="request-tab"
-            data-mode="semi"
-            role="tab"
-            aria-controls="semi-assignment-panel"
-            aria-selected="false"
-          >
-            Attribution semi-automatique
-          </button>
-        </nav>
-
         <section
           id="requests-panel"
           class="request-panel"
-          data-mode-panel="requests"
           aria-label="Filtres et onglets"
         >
           <nav
@@ -152,7 +123,7 @@
           </form>
         </section>
 
-        <section class="requests-table-section" aria-labelledby="requests-table-title" data-mode-panel="requests">
+        <section class="requests-table-section" aria-labelledby="requests-table-title">
           <div class="section-header">
             <h2 id="requests-table-title">Demandes</h2>
             <p id="request-feedback" role="status"></p>
@@ -180,146 +151,7 @@
           </div>
         </section>
 
-        <section
-          id="semi-assignment-panel"
-          class="semi-assignment-panel hidden"
-          data-mode-panel="semi"
-          aria-labelledby="semi-assignment-title"
-        >
-          <div class="section-header">
-            <h2 id="semi-assignment-title">Attribution semi-automatique</h2>
-            <p id="semi-assignment-feedback" role="status"></p>
-          </div>
-
-          <div class="semi-assignment-meta" aria-live="polite">
-            <span class="semi-assignment-meta-label">Tour actif</span>
-            <span id="semi-assignment-active-tour" class="semi-assignment-meta-value">—</span>
-          </div>
-
-          <form id="semi-assignment-form" class="semi-assignment-form" novalidate>
-            <div class="semi-assignment-grid">
-              <fieldset class="semi-assignment-fieldset">
-                <legend>Population concernée</legend>
-                <label class="semi-assignment-option">
-                  <input type="checkbox" name="population" value="medecin" checked />
-                  Médecins titulaires
-                </label>
-                <label class="semi-assignment-option">
-                  <input type="checkbox" name="population" value="remplacant" checked />
-                  Remplaçants
-                </label>
-              </fieldset>
-
-              <fieldset class="semi-assignment-fieldset">
-                <legend>Ordre d'attribution</legend>
-                <label class="semi-assignment-option">
-                  <input type="radio" name="order" value="asc" checked />
-                  A → Z
-                </label>
-                <label class="semi-assignment-option">
-                  <input type="radio" name="order" value="desc" />
-                  Z → A
-                </label>
-              </fieldset>
-
-              <div class="semi-assignment-field">
-                <label for="semi-assignment-start">Trigramme de départ</label>
-                <input
-                  id="semi-assignment-start"
-                  name="startTrigram"
-                  type="text"
-                  inputmode="text"
-                  autocomplete="off"
-                  list="semi-assignment-trigram-options"
-                  required
-                />
-                <datalist id="semi-assignment-trigram-options"></datalist>
-              </div>
-
-              <div class="semi-assignment-field">
-                <label for="semi-assignment-rotations">Nombre de rotations</label>
-                <input
-                  id="semi-assignment-rotations"
-                  name="rotations"
-                  type="number"
-                  min="1"
-                  step="1"
-                  value="1"
-                  required
-                />
-              </div>
-
-              <div class="semi-assignment-field">
-                <label for="semi-assignment-normal-threshold">Gardes normales par palier (X)</label>
-                <input
-                  id="semi-assignment-normal-threshold"
-                  name="normalThreshold"
-                  type="number"
-                  min="1"
-                  step="1"
-                  value="2"
-                  required
-                />
-              </div>
-
-              <div class="semi-assignment-field">
-                <label for="semi-assignment-good-quota">Bonnes gardes accordées (Y)</label>
-                <input
-                  id="semi-assignment-good-quota"
-                  name="goodQuota"
-                  type="number"
-                  min="0"
-                  step="1"
-                  value="1"
-                  required
-                />
-              </div>
-
-              <div class="semi-assignment-field">
-                <label class="semi-assignment-option">
-                  <input type="checkbox" name="stepValidation" value="on" checked />
-                  Validation pas-à-pas obligatoire
-                </label>
-              </div>
-            </div>
-
-            <div class="semi-assignment-actions">
-              <button type="button" data-semi-action="prepare" class="subtle-button">Préparer la séquence</button>
-              <button type="button" data-semi-action="previous" class="subtle-button">Étape précédente</button>
-              <button type="button" data-semi-action="next">Étape suivante</button>
-              <button type="button" data-semi-action="accept" class="primary">Valider l'étape</button>
-              <button type="button" data-semi-action="skip" class="danger-link">Ignorer l'étape</button>
-            </div>
-          </form>
-
-          <section
-            id="semi-assignment-results"
-            class="semi-assignment-results hidden"
-            aria-labelledby="semi-assignment-results-title"
-          >
-            <div class="section-header">
-              <h3 id="semi-assignment-results-title">Proposition en cours</h3>
-              <p id="semi-assignment-summary"></p>
-            </div>
-
-            <div class="table-container">
-              <table class="table semi-assignment-table">
-                <thead>
-                  <tr>
-                    <th scope="col">Étape</th>
-                    <th scope="col">Rotation</th>
-                    <th scope="col">Médecin</th>
-                    <th scope="col">Type de garde</th>
-                    <th scope="col">Créneau</th>
-                    <th scope="col">Impacts</th>
-                    <th scope="col">Statut</th>
-                  </tr>
-                </thead>
-                <tbody id="semi-assignment-results-body"></tbody>
-              </table>
-            </div>
-          </section>
-        </section>
+        
       </section>
     </main>
 
