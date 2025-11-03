@@ -596,6 +596,7 @@ export function initializePlanningChoices({ userRole }) {
       roleLabel.textContent = '';
       roleLabel.removeAttribute('title');
       roleLabel.removeAttribute('aria-label');
+      roleLabel.removeAttribute('data-choice-nature');
       roleLabel.classList.add('is-empty');
     }
     if (srLabel) {
@@ -641,6 +642,7 @@ export function initializePlanningChoices({ userRole }) {
       roleLabel.textContent = '';
       roleLabel.removeAttribute('title');
       roleLabel.removeAttribute('aria-label');
+      roleLabel.removeAttribute('data-choice-nature');
       roleLabel.classList.add('is-empty');
     }
     const srParts = [];
@@ -1031,6 +1033,7 @@ export function initializePlanningChoices({ userRole }) {
         roleLabel.textContent = '';
         roleLabel.removeAttribute('title');
         roleLabel.removeAttribute('aria-label');
+        roleLabel.removeAttribute('data-choice-nature');
         roleLabel.classList.add('is-empty');
       }
       if (srLabel) {
@@ -1086,20 +1089,23 @@ export function initializePlanningChoices({ userRole }) {
       }
       if (roleLabel) {
         const bullet = selection.isPrimary ? '●' : '○';
-        const abbreviatedNature = selection.nature === 'bonne' ? 'B' : 'N';
         const fullNature = selection.nature === 'bonne' ? 'Bonne' : 'Normale';
-        roleLabel.textContent = `${bullet} ${abbreviatedNature}`;
-        roleLabel.title = `${bullet} ${fullNature}`;
-        roleLabel.setAttribute('aria-label', `${bullet} ${fullNature}`);
+        const parsedRank = Number.parseInt(selection.choiceRank, 10);
+        const alternativeRank = Number.isFinite(parsedRank) ? Math.max(1, parsedRank - 1) : 1;
+        const roleDescription = selection.isPrimary ? 'Principal' : `Alternative ${alternativeRank}`;
+        roleLabel.textContent = bullet;
+        roleLabel.title = `${fullNature} — ${roleDescription}`;
+        roleLabel.setAttribute('aria-label', `${fullNature} — ${roleDescription}`);
+        roleLabel.dataset.choiceNature = selection.nature;
         roleLabel.classList.remove('is-empty');
       }
       if (srLabel) {
-        const roleDescription = selection.isPrimary
+        const srRoleDescription = selection.isPrimary
           ? 'principal'
-          : `alternative ${selection.choiceRank - 1}`;
+          : `alternative ${alternativeRank}`;
         srLabel.textContent = selection.summary
-          ? `${selection.summary} · Choix ${choiceLabel} (${roleDescription})`
-          : `Choix ${choiceLabel} (${roleDescription})`;
+          ? `${selection.summary} · Choix ${choiceLabel} (${srRoleDescription})`
+          : `Choix ${choiceLabel} (${srRoleDescription})`;
       }
       button.dataset.choiceOrder = choiceLabel;
       button.dataset.choiceType = selection.nature;
@@ -1171,6 +1177,11 @@ export function initializePlanningChoices({ userRole }) {
           item.dataset.choiceRank = String(selection.choiceRank ?? 1);
           item.dataset.choiceRole = selection.isPrimary ? 'principal' : 'alternative';
           item.dataset.summaryNature = selection.nature;
+          const bullet = selection.isPrimary ? '●' : '○';
+          const natureLabel = selection.nature === 'bonne' ? 'Bonne' : 'Normale';
+          const parsedRank = Number.parseInt(selection.choiceRank, 10);
+          const alternativeRank = Number.isFinite(parsedRank) ? Math.max(1, parsedRank - 1) : 1;
+          const roleDescription = selection.isPrimary ? 'Principal' : `Alternative ${alternativeRank}`;
           item.innerHTML = `
             <div class="summary-item-order">${selection.choiceLabel ?? selection.order}</div>
             <div class="summary-item-body">
@@ -1178,10 +1189,7 @@ export function initializePlanningChoices({ userRole }) {
                 <span class="summary-item-choice">${
                   selection.isPrimary
                     ? `Choix ${selection.choiceIndex} — Principal`
-                    : `Choix ${selection.choiceIndex} — Alternative ${Math.max(
-                        1,
-                        selection.choiceRank - 1
-                      )}`
+                    : `Choix ${selection.choiceIndex} — Alternative ${alternativeRank}`
                 }</span>
                 <span class="summary-item-date">${formatSummaryLabel(selection)}</span>
                 <span class="summary-item-details">Col. ${selection.columnPosition} · ${
@@ -1190,9 +1198,10 @@ export function initializePlanningChoices({ userRole }) {
                 <span class="summary-item-tags">
                   <span
                     class="badge ${selection.nature === 'bonne' ? 'badge-success' : 'badge-warning'}"
-                    title="${(selection.isPrimary ? '●' : '○') + ' ' + (selection.nature === 'bonne' ? 'Bonne' : 'Normale')}"
-                    aria-label="${(selection.isPrimary ? '●' : '○') + ' ' + (selection.nature === 'bonne' ? 'Bonne' : 'Normale')}"
-                  >${(selection.isPrimary ? '●' : '○') + ' ' + (selection.nature === 'bonne' ? 'B' : 'N')}</span>
+                    data-choice-nature="${selection.nature}"
+                    title="${bullet} ${natureLabel}"
+                    aria-label="${natureLabel} — ${roleDescription}"
+                  >${bullet}</span>
                   <span class="badge">${selection.activityType}</span>
                 </span>
               </div>
