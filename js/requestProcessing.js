@@ -8,15 +8,13 @@ import {
 } from './supabaseClient.js';
 
 const PLANNING_TOURS = [
-  { id: 1 },
-  { id: 2 },
-  { id: 3 },
-  { id: 4 },
-  { id: 5 },
-  { id: 6 }
+  { id: 1, table: 'planning_columns' },
+  { id: 2, table: 'planning_columns_tour2' },
+  { id: 3, table: 'planning_columns_tour3' },
+  { id: 4, table: 'planning_columns_tour4' },
+  { id: 5, table: 'planning_columns_tour5' },
+  { id: 6, table: 'planning_columns_tour6' }
 ];
-
-const PLANNING_COLUMNS_TABLE = 'planning_columns';
 
 const STATUS_TABS = [
   { id: 'pending', label: 'En attente', statuses: ['en attente'] },
@@ -57,11 +55,6 @@ const TYPE_LABELS = new Map([
   ['visite', 'Visite'],
   ['consultation', 'Consultation'],
   ['téléconsultation', 'Téléconsultation']
-]);
-
-const CHOICE_SERIES_LABELS = new Map([
-  ['normale', 'Gardes normales'],
-  ['bonne', 'Bonnes gardes']
 ]);
 
 const ADMIN_SETTINGS_TABLE = 'parametres_administratifs';
@@ -131,25 +124,6 @@ const normalizeUserTypeFilter = (value) => {
   return USER_TYPE_FILTERS.has(lowered) ? lowered : '';
 };
 
-const normalizeTrigram = (value) => {
-  if (typeof value !== 'string') {
-    return '';
-  }
-  return value
-    .toString()
-    .trim()
-    .slice(0, 3)
-    .toUpperCase();
-};
-
-const normalizeGuardNature = (value) => {
-  if (typeof value !== 'string') {
-    return 'normale';
-  }
-  const normalized = value.toString().trim().toLowerCase();
-  return normalized === 'bonne' ? 'bonne' : 'normale';
-};
-
 const sanitizeActiveTour = (value) => {
   if (value == null || value === '') {
     return null;
@@ -167,142 +141,7 @@ const sanitizeActiveTour = (value) => {
 const getTourConfig = (tourId = state.activeTourId) =>
   PLANNING_TOURS.find((tour) => tour.id === tourId) ?? PLANNING_TOURS[0];
 
-const parseNumeric = (value) => {
-  if (value == null || value === '') {
-    return null;
-  }
-  const parsed = Number.parseFloat(value);
-  return Number.isNaN(parsed) ? null : parsed;
-};
-
-const NEARLY_EQUAL_EPSILON = 1e-6;
-
-const areNearlyEqual = (a, b, epsilon = NEARLY_EQUAL_EPSILON) => {
-  if (!Number.isFinite(a) || !Number.isFinite(b)) {
-    return a === b;
-  }
-  return Math.abs(a - b) <= epsilon;
-};
-
-const getChoiceIndexParts = (rawValue) => {
-  const numeric = parseNumeric(rawValue);
-  if (!Number.isFinite(numeric)) {
-    return {
-      numeric: null,
-      primary: Number.POSITIVE_INFINITY,
-      secondary: Number.POSITIVE_INFINITY
-    };
-  }
-  const primary = Math.trunc(numeric);
-  const secondary = Math.abs(numeric - primary);
-  return {
-    numeric,
-    primary,
-    secondary
-  };
-};
-
-const haveMatchingChoiceIndex = (candidate, selectedIndex) => {
-  if (selectedIndex == null) {
-    return false;
-  }
-  const candidateIndex = parseNumeric(candidate.choice_index ?? candidate.choiceIndex);
-  return candidateIndex != null && candidateIndex === selectedIndex;
-};
-
-const haveMatchingChoiceOrder = (candidate, selectedOrder) => {
-  if (selectedOrder == null) {
-    return false;
-  }
-  const candidateOrder = parseNumeric(candidate.choice_order ?? candidate.choiceOrder);
-  return candidateOrder != null && candidateOrder === selectedOrder;
-};
-
-const hasHigherSecondaryIndexWithinPrimary = (candidate, selectedIndex) => {
-  if (selectedIndex == null) {
-    return false;
-  }
-  const candidateParts = getChoiceIndexParts(candidate.choice_index ?? candidate.choiceIndex);
-  const selectedParts = getChoiceIndexParts(selectedIndex);
-  if (!Number.isFinite(candidateParts.primary) || !Number.isFinite(selectedParts.primary)) {
-    return false;
-  }
-  if (candidateParts.primary !== selectedParts.primary) {
-    return false;
-  }
-  if (!Number.isFinite(candidateParts.secondary) || !Number.isFinite(selectedParts.secondary)) {
-    return false;
-  }
-  if (areNearlyEqual(candidateParts.secondary, selectedParts.secondary)) {
-    return false;
-  }
-  return candidateParts.secondary > selectedParts.secondary;
-};
-
-const getAlternativeRelation = (candidate, selectedRank, selectedIndex, selectedOrder) => {
-  if (haveMatchingChoiceOrder(candidate, selectedOrder)) {
-    return 'order';
-  }
-  if (haveMatchingChoiceIndex(candidate, selectedIndex)) {
-    return 'index';
-  }
-  if (hasHigherSecondaryIndexWithinPrimary(candidate, selectedIndex)) {
-    return 'secondary';
-  }
-  const candidateRank = parseNumeric(candidate.choice_rank ?? candidate.choiceRank);
-  if (candidateRank == null) {
-    return 'rank';
-  }
-  const threshold = selectedRank ?? 1;
-  return candidateRank > threshold ? 'rank' : null;
-};
-
-const shouldTreatAsAlternative = (candidate, selectedRank, selectedIndex, selectedOrder) =>
-  getAlternativeRelation(candidate, selectedRank, selectedIndex, selectedOrder) != null;
-
-// Remplacer la fonction existante
-function getRequestGroupKey(request) {
-  // On privilégie l'INDEX PRINCIPAL (partie entière de 1.x) pour regrouper les alternatives
-  const indexRaw = request?.choiceIndex ?? request?.choice_index;
-  const indexNum = parseNumeric(indexRaw);
-  if (Number.isFinite(indexNum)) {
-    // Math.trunc() garantit que 1.0, 1.2, 1.9 => groupe "1"
-    return `index:${Math.trunc(indexNum)}`;
-  }
-
-  // Si pas d'index, on retombe sur l'ordre
-  const orderRaw = request?.choiceOrder ?? request?.choice_order;
-  const orderNum = parseNumeric(orderRaw);
-  if (Number.isFinite(orderNum)) {
-    return `order:${orderNum}`;
-  }
-
-  // Fallback stable pour éviter des regroupements incohérents
-  const id = request?.id ?? request?.request_id ?? JSON.stringify(request);
-  return `misc:${String(id)}`;
-}
-
-const buildGroupStateKey = (trigram, guardType, groupKey) => {
-  if (!groupKey) {
-    return null;
-  }
-  const normalizedTrigram = normalizeTrigram(trigram ?? '');
-  const normalizedGuard = guardType === 'bonne' ? 'bonne' : 'normale';
-  return `${normalizedTrigram}:${normalizedGuard}:${groupKey}`;
-};
-
-const collectAlternativeIds = (competing, request) => {
-  const selectedRank = parseNumeric(request.choiceRank ?? request.choice_rank);
-  const selectedIndex = parseNumeric(request.choiceIndex ?? request.choice_index);
-  const selectedOrder = parseNumeric(request.choiceOrder ?? request.choice_order);
-  const selectedNature = normalizeGuardNature(request.guardNature ?? request.guard_nature);
-  const alternatives = competing
-    .filter((item) => item.trigram === request.trigram && item.id !== request.id)
-    .filter((item) => normalizeGuardNature(item.guard_nature ?? item.guardNature) === selectedNature)
-    .filter((item) => shouldTreatAsAlternative(item, selectedRank, selectedIndex, selectedOrder))
-    .map((item) => item.id);
-  return Array.from(new Set(alternatives));
-};
+const getPlanningTableName = (tourId = state.activeTourId) => getTourConfig(tourId).table;
 
 const toMonthPart = (month) => String(month + 1).padStart(2, '0');
 
@@ -358,57 +197,6 @@ const rangesOverlap = (a, b) => {
 };
 
 const getColumnInfo = (columnNumber) => state.columns.get(columnNumber) ?? null;
-
-const getSlotKey = (request) => {
-  if (!request) {
-    return null;
-  }
-  const dayKey = getRequestDayKey(request);
-  if (!dayKey || request.columnNumber == null) {
-    return null;
-  }
-  return `${dayKey}#${request.columnNumber}`;
-};
-
-const getColumnRange = (columnNumber) => {
-  const column = getColumnInfo(columnNumber);
-  if (!column) {
-    return null;
-  }
-  const start = column.start_time ?? column.startTime ?? null;
-  const end = column.end_time ?? column.endTime ?? null;
-  if (!start && !end) {
-    return null;
-  }
-  return { start, end };
-};
-
-const hasConflictWithAssignedSlots = (trigram, request, assignedMap) => {
-  if (!trigram || !request) {
-    return false;
-  }
-  const dayKey = getRequestDayKey(request);
-  if (!dayKey) {
-    return false;
-  }
-  const existing = assignedMap.get(trigram) ?? [];
-  if (!existing.length) {
-    return false;
-  }
-  const targetRange = getColumnRange(request.columnNumber);
-  return existing.some((slot) => {
-    if (slot.dayKey !== dayKey) {
-      return false;
-    }
-    if (slot.columnNumber === request.columnNumber) {
-      return true;
-    }
-    if (!targetRange || !slot.range) {
-      return false;
-    }
-    return rangesOverlap(targetRange, slot.range);
-  });
-};
 
 const formatHours = (columnNumber) => {
   const column = getColumnInfo(columnNumber);
@@ -470,23 +258,6 @@ const formatPriority = (request) => {
     return String(index);
   }
   return `${index}.${rank}`;
-};
-
-const computeConsolidatedIndex = (choiceIndex, choiceRank) => {
-  const numericIndex = Number.parseInt(choiceIndex, 10);
-  const numericRank = Number.parseInt(choiceRank, 10);
-  if (!Number.isFinite(numericIndex)) {
-    return null;
-  }
-  if (!Number.isFinite(numericRank) || numericRank <= 1) {
-    return String(numericIndex);
-  }
-  return `${numericIndex}.${numericRank}`;
-};
-
-const getRootChoiceIndex = (choiceIndex) => {
-  const numericIndex = Number.parseInt(choiceIndex, 10);
-  return Number.isFinite(numericIndex) ? numericIndex : null;
 };
 
 const getStatusConfig = (status) => STATUS_LABELS.get(status) ?? { label: status ?? '—', className: 'badge' };
@@ -585,25 +356,22 @@ const getFilteredRequests = (statuses) => {
   });
 };
 
-const compareRequestsByPriority = (a, b) => {
-  const indexA = Number.isFinite(a?.choiceIndex) ? a.choiceIndex : Number.POSITIVE_INFINITY;
-  const indexB = Number.isFinite(b?.choiceIndex) ? b.choiceIndex : Number.POSITIVE_INFINITY;
-  if (indexA !== indexB) {
-    return indexA - indexB;
-  }
-  const rankA = Number.isFinite(a?.choiceRank) ? a.choiceRank : Number.MAX_SAFE_INTEGER;
-  const rankB = Number.isFinite(b?.choiceRank) ? b.choiceRank : Number.MAX_SAFE_INTEGER;
-  if (rankA !== rankB) {
-    return rankA - rankB;
-  }
-  const timeA = a?.createdAt?.getTime?.() ?? new Date(a?.createdAt ?? 0).getTime();
-  const timeB = b?.createdAt?.getTime?.() ?? new Date(b?.createdAt ?? 0).getTime();
-  return timeA - timeB;
-};
-
-const sortRequests = (list) => [...list].sort(compareRequestsByPriority);
-
-const sortRequestsByPreference = (list) => [...list].sort(compareRequestsByPriority);
+const sortRequests = (list) =>
+  [...list].sort((a, b) => {
+    const indexA = Number.isFinite(a.choiceIndex) ? a.choiceIndex : Number.NEGATIVE_INFINITY;
+    const indexB = Number.isFinite(b.choiceIndex) ? b.choiceIndex : Number.NEGATIVE_INFINITY;
+    if (indexA !== indexB) {
+      return indexB - indexA;
+    }
+    const rankA = Number.isFinite(a.choiceRank) ? a.choiceRank : Number.MAX_SAFE_INTEGER;
+    const rankB = Number.isFinite(b.choiceRank) ? b.choiceRank : Number.MAX_SAFE_INTEGER;
+    if (rankA !== rankB) {
+      return rankA - rankB;
+    }
+    const timeA = a.createdAt?.getTime?.() ?? new Date(a.createdAt ?? 0).getTime();
+    const timeB = b.createdAt?.getTime?.() ?? new Date(b.createdAt ?? 0).getTime();
+    return timeA - timeB;
+  });
 
 const renderRequests = () => {
   if (!elements.tableBody) {
@@ -766,10 +534,10 @@ const loadPlanningColumns = async () => {
   if (!supabase) {
     return;
   }
+  const tableName = getPlanningTableName();
   const { data, error } = await supabase
-    .from(PLANNING_COLUMNS_TABLE)
-    .select('tour_number, position, label, type_category, start_time, end_time')
-    .eq('tour_number', state.activeTourId);
+    .from(tableName)
+    .select('position, label, type_category, start_time, end_time');
   if (error) {
     console.error(error);
     return;
@@ -782,7 +550,6 @@ const mapRequestRecord = (record) => {
   const columnNumberValue = Number.parseInt(record.column_number ?? record.columnNumber ?? '', 10);
   const choiceIndexValue = Number.parseFloat(record.choice_index ?? record.choiceIndex ?? '');
   const choiceRankValue = Number.parseFloat(record.choice_rank ?? record.choiceRank ?? '');
-  const choiceOrderValue = Number.parseInt(record.choice_order ?? record.choiceOrder ?? '', 10);
   return {
     id: record.id,
     trigram: (record.trigram ?? '').toUpperCase(),
@@ -792,11 +559,10 @@ const mapRequestRecord = (record) => {
     columnLabel: record.column_label ?? null,
     planningDayLabel: record.planning_day_label ?? null,
     slotTypeCode: record.slot_type_code ?? null,
-    guardNature: normalizeGuardNature(record.guard_nature),
+    guardNature: record.guard_nature ?? 'normale',
     activityType: (record.activity_type ?? 'visite').toLowerCase(),
     choiceIndex: Number.isNaN(choiceIndexValue) ? null : choiceIndexValue,
     choiceRank: Number.isNaN(choiceRankValue) ? null : choiceRankValue,
-    choiceOrder: Number.isNaN(choiceOrderValue) ? null : choiceOrderValue,
     createdAt,
     status: (record.etat ?? 'en attente').toLowerCase(),
     isActive: record.is_active,
@@ -816,7 +582,7 @@ const loadRequests = async () => {
   const query = supabase
     .from(CHOICES_TABLE)
     .select(
-      'id, trigram, user_type, day, column_number, column_label, planning_day_label, slot_type_code, guard_nature, activity_type, choice_index, choice_rank, choice_order, created_at, etat, is_active, planning_reference, tour_number'
+      'id, trigram, user_type, day, column_number, column_label, planning_day_label, slot_type_code, guard_nature, activity_type, choice_index, choice_rank, created_at, etat, is_active, planning_reference, tour_number'
     );
   if (state.planningReference) {
     query.eq('planning_reference', state.planningReference);
@@ -825,7 +591,7 @@ const loadRequests = async () => {
     query.eq('tour_number', state.activeTourId);
   }
   query
-    .order('choice_index', { ascending: true })
+    .order('choice_index', { ascending: false })
     .order('choice_rank', { ascending: true })
     .order('created_at', { ascending: true });
   const { data, error } = await query;
@@ -882,92 +648,46 @@ const recordAudit = async ({
   }
 };
 
-const findAlternativesToDeactivate = async ({
-  supabase,
-  trigram,
-  choiceIndex,
-  guardNature,
-  selectedId,
-  selectedRank,
-  excludedIds = []
-}) => {
-  if (!supabase || !state.planningReference || !state.activeTourId) {
-    return [];
+const promoteAlternative = async (trigram, choiceIndex) => {
+  const supabase = await ensureSupabase();
+  if (!supabase) {
+    return;
   }
-  const normalizedTrigram = typeof trigram === 'string' ? trigram.trim().toUpperCase() : '';
-  const parsedChoiceIndex = Number.parseFloat(choiceIndex);
-  const numericChoiceIndex = Number.isNaN(parsedChoiceIndex) ? Number.NaN : parsedChoiceIndex;
-  if (!normalizedTrigram || Number.isNaN(numericChoiceIndex)) {
-    return [];
-  }
-  const normalizedNature = normalizeGuardNature(guardNature);
-
-  const { data, error } = await supabase
+  const { data: alternative, error } = await supabase
     .from(CHOICES_TABLE)
-    .select('id, etat, is_active, choice_rank, day, column_number, guard_nature')
+    .select('id, choice_rank, day, column_number')
     .eq('planning_reference', state.planningReference)
     .eq('tour_number', state.activeTourId)
-    .eq('trigram', normalizedTrigram)
-    .eq('choice_index', numericChoiceIndex)
-    .eq('guard_nature', normalizedNature)
-    .neq('id', selectedId);
+    .eq('trigram', trigram)
+    .eq('choice_index', choiceIndex)
+    .eq('etat', 'en attente')
+    .gt('choice_rank', 1)
+    .order('choice_rank', { ascending: true })
+    .limit(1)
+    .maybeSingle();
   if (error) {
     console.error(error);
-    return [];
+    return;
   }
-
-  const excluded = new Set((excludedIds ?? []).map((value) => Number(value)));
-  const parsedRank = Number.parseFloat(selectedRank);
-  const rankThreshold = Number.isNaN(parsedRank) ? 1 : parsedRank;
-  return (data ?? []).filter((record) => {
-    if (!record || excluded.has(Number(record.id))) {
-      return false;
-    }
-    const rankValue = Number.parseFloat(record.choice_rank);
-    if (!Number.isNaN(rankValue) && rankValue <= rankThreshold) {
-      return false;
-    }
-    if (record.etat === 'refusé' && record.is_active === false) {
-      return false;
-    }
-    return true;
+  if (!alternative) {
+    return;
+  }
+  const { error: updateError } = await supabase
+    .from(CHOICES_TABLE)
+    .update({ choice_rank: 1 })
+    .eq('id', alternative.id);
+  if (updateError) {
+    console.error(updateError);
+    return;
+  }
+  await recordAudit({
+    action: 'auto_promote',
+    choiceId: alternative.id,
+    targetTrigram: trigram,
+    targetDay: alternative.day,
+    targetColumnNumber: alternative.column_number,
+    reason: "Promotion automatique de l'alternative"
   });
-};
-
-const findChoiceOrderAlternatives = async ({
-  supabase,
-  trigram,
-  choiceOrder,
-  guardNature,
-  selectedId,
-  excludedIds = []
-}) => {
-  if (!supabase || !state.planningReference || !state.activeTourId) {
-    return [];
-  }
-  const normalizedTrigram = typeof trigram === 'string' ? trigram.trim().toUpperCase() : '';
-  const parsedChoiceOrder = Number.parseInt(choiceOrder, 10);
-  if (!normalizedTrigram || !Number.isFinite(parsedChoiceOrder)) {
-    return [];
-  }
-
-  const excluded = new Set((excludedIds ?? []).map((value) => Number(value)));
-  const normalizedNature = normalizeGuardNature(guardNature);
-  const { data, error } = await supabase
-    .from(CHOICES_TABLE)
-    .select('id, etat, is_active, choice_rank, day, column_number, choice_order, guard_nature')
-    .eq('planning_reference', state.planningReference)
-    .eq('tour_number', state.activeTourId)
-    .eq('trigram', normalizedTrigram)
-    .eq('choice_order', parsedChoiceOrder)
-    .eq('guard_nature', normalizedNature)
-    .neq('id', selectedId);
-  if (error) {
-    console.error(error);
-    return [];
-  }
-
-  return (data ?? []).filter((record) => record && !excluded.has(Number(record.id)));
 };
 
 const fetchCompetingRequests = async (request) => {
@@ -977,7 +697,7 @@ const fetchCompetingRequests = async (request) => {
   }
   const { data, error } = await supabase
     .from(CHOICES_TABLE)
-    .select('id, trigram, choice_index, choice_rank, etat, day, column_number, is_active, guard_nature')
+    .select('id, trigram, choice_index, choice_rank, etat, day, column_number')
     .eq('planning_reference', request.planningReference)
     .eq('tour_number', request.tourNumber)
     .eq('day', request.day)
@@ -1047,46 +767,16 @@ const acceptRequest = async (requestId) => {
 
   const competing = await fetchCompetingRequests(request);
 
-  const alternativeIds = collectAlternativeIds(competing, request);
-
-  const parsedRequestRank = parseNumeric(request.choiceRank ?? request.choice_rank);
-  const choiceRankThreshold = parsedRequestRank ?? 1;
-  const additionalAlternatives = await findAlternativesToDeactivate({
-    supabase,
-    trigram: request.trigram,
-    choiceIndex: request.choiceIndex,
-    guardNature: request.guardNature,
-    selectedId: request.id,
-    selectedRank: choiceRankThreshold,
-    excludedIds: alternativeIds
-  });
-  const alternativeIdSet = new Set(alternativeIds);
-  additionalAlternatives.forEach((record) => {
-    if (record?.id) {
-      alternativeIdSet.add(record.id);
-    }
-  });
-  const orderAlternatives = await findChoiceOrderAlternatives({
-    supabase,
-    trigram: request.trigram,
-    choiceOrder: request.choiceOrder,
-    guardNature: request.guardNature,
-    selectedId: request.id,
-    excludedIds: Array.from(alternativeIdSet)
-  });
-  orderAlternatives.forEach((record) => {
-    if (record?.id && !alternativeIdSet.has(record.id)) {
-      alternativeIdSet.add(record.id);
-      additionalAlternatives.push(record);
-    }
-  });
-  alternativeIds.length = 0;
-  alternativeIdSet.forEach((id) => {
-    alternativeIds.push(id);
-  });
+  const alternativeIds = competing
+    .filter((item) => item.trigram === request.trigram && item.id !== request.id && item.choice_rank > 1)
+    .map((item) => item.id);
   const competingIds = competing
     .filter((item) => item.trigram !== request.trigram)
     .map((item) => item.id);
+  const primaryRefused = competing.filter(
+    (item) => item.trigram !== request.trigram && item.choice_rank === 1 && item.id !== request.id
+  );
+
   const updates = [];
 
   updates.push(
@@ -1100,7 +790,7 @@ const acceptRequest = async (requestId) => {
     updates.push(
       supabase
         .from(CHOICES_TABLE)
-        .update({ etat: 'refusé', is_active: false })
+        .update({ is_active: false })
         .in('id', alternativeIds)
     );
   }
@@ -1147,6 +837,10 @@ const acceptRequest = async (requestId) => {
     }
   }
 
+  for (const competitor of primaryRefused) {
+    await promoteAlternative(competitor.trigram, competitor.choice_index);
+  }
+
   await loadRequests();
   setFeedback('Demande acceptée et planning mis à jour.');
 };
@@ -1187,6 +881,10 @@ const refuseRequest = async (requestId) => {
     targetColumnNumber: request.columnNumber,
     reason: reason && reason.trim() ? reason.trim() : null
   });
+
+  if (request.choiceRank === 1) {
+    await promoteAlternative(request.trigram, request.choiceIndex);
+  }
 
   await loadRequests();
   setFeedback('Demande refusée.');
