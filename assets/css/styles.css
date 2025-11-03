@@ -1074,27 +1074,27 @@ main > section:first-of-type {
 
 .planning-host { display: grid; gap: 20px; }
 
-.summary-card { display: grid; gap: 16px; background: rgba(255, 255, 255, 0.82); border-radius: var(--radius); padding: 24px; box-shadow: var(--shadow); }
+.summary-card { display: grid; gap: 12px; background: rgba(255, 255, 255, 0.82); border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow); }
 .summary-header { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; }
 .summary-header h3 { margin: 0; }
 .summary-header p { margin: 0; color: rgba(44, 62, 80, 0.65); }
 .summary-columns {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 16px;
+  gap: 12px;
   align-items: flex-start;
 }
-.summary-column { display: grid; gap: 12px; }
+.summary-column { display: grid; gap: 10px; }
 .summary-column-title {
   margin: 0;
   font-size: 1rem;
   font-weight: 600;
   color: var(--primary);
 }
-.summary-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.summary-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
 .summary-empty {
   margin: 0;
-  padding: 18px 16px;
+  padding: 14px 12px;
   border-radius: 12px;
   border: 1px dashed rgba(148, 163, 184, 0.6);
   background: rgba(148, 163, 184, 0.12);
@@ -1111,9 +1111,9 @@ main > section:first-of-type {
   display: grid;
   grid-template-columns: auto 1fr;
   align-items: stretch;
-  gap: 16px;
-  padding: 16px;
-  border-radius: 14px;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 12px;
   background: var(--summary-background);
   border: 1px solid var(--summary-border);
   border-left: 6px solid var(--summary-accent);
@@ -1123,10 +1123,10 @@ main > section:first-of-type {
 .summary-item::before {
   content: '';
   position: absolute;
-  top: 10px;
-  left: 24px;
-  width: 10px;
-  height: 10px;
+  top: 8px;
+  left: 20px;
+  width: 8px;
+  height: 8px;
   border-radius: 999px;
   background: var(--summary-accent);
   box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.65);
@@ -1149,16 +1149,16 @@ main > section:first-of-type {
 }
 .summary-item:hover { transform: translateY(-1px); box-shadow: 0 12px 24px rgba(15, 23, 42, 0.12); }
 .summary-item--alternative {
-  margin-left: 28px;
-  padding-left: 20px;
+  margin-left: 20px;
+  padding-left: 16px;
 }
 .summary-item--alternative::after {
   content: '';
   position: absolute;
-  top: -12px;
-  left: -16px;
-  width: 24px;
-  height: calc(100% + 24px);
+  top: -10px;
+  left: -12px;
+  width: 20px;
+  height: calc(100% + 20px);
   border-left: 2px dashed rgba(148, 163, 184, 0.35);
   border-bottom: 2px dashed rgba(148, 163, 184, 0.35);
   border-radius: 0 0 0 16px;
@@ -1166,9 +1166,9 @@ main > section:first-of-type {
 }
 .summary-item.is-dragging { opacity: 0.65; box-shadow: 0 8px 18px rgba(37, 99, 235, 0.25); }
 .summary-item-order {
-  min-width: 48px;
-  height: 40px;
-  padding: 0 12px;
+  min-width: 40px;
+  height: 32px;
+  padding: 0 10px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1179,8 +1179,8 @@ main > section:first-of-type {
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.03em;
 }
-.summary-item-body { display: grid; gap: 8px; }
-.summary-item-main { display: grid; gap: 6px; }
+.summary-item-body { display: grid; gap: 6px; }
+.summary-item-main { display: grid; gap: 4px; }
 .summary-item-choice {
   font-size: 0.75rem;
   font-weight: 700;
@@ -1192,19 +1192,19 @@ main > section:first-of-type {
 .summary-item--bonne .summary-item-choice { color: #15803d; }
 .summary-item-date { font-weight: 600; color: var(--primary); }
 .summary-item-details { color: rgba(44, 62, 80, 0.7); font-size: 0.85rem; }
-.summary-item-tags { display: flex; flex-wrap: wrap; gap: 8px; }
+.summary-item-tags { display: flex; flex-wrap: wrap; gap: 6px; }
 .summary-item-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
   align-items: center;
-  margin-top: 4px;
+  margin-top: 2px;
 }
 .summary-item-action {
   border: none;
   background: rgba(37, 99, 235, 0.1);
   color: var(--accent);
-  padding: 6px 14px;
+  padding: 4px 12px;
   border-radius: 999px;
   font-size: 0.85rem;
   cursor: pointer;
@@ -1236,8 +1236,8 @@ main > section:first-of-type {
 }
 .summary-item--alternative .summary-item-body {
   background: rgba(255, 255, 255, 0.85);
-  padding: 12px;
-  border-radius: 12px;
+  padding: 10px;
+  border-radius: 10px;
   box-shadow: inset 0 1px 0 rgba(148, 163, 184, 0.08);
 }
 
