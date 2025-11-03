@@ -117,8 +117,8 @@ const ACTIVITY_TYPES = new Map([
   ['Téléconsultation', 'téléconsultation']
 ]);
 
-const MAX_PLANNING_CELL_WIDTH = 96;
-const MAX_PLANNING_CELL_HEIGHT = 64;
+const MAX_PLANNING_CELL_WIDTH = 132;
+const MAX_PLANNING_CELL_HEIGHT = 88;
 
 const USER_TYPE_LABELS = new Set(['medecin', 'remplacant']);
 const CHOICE_SERIES = ['normale', 'bonne'];
