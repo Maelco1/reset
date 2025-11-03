@@ -879,6 +879,7 @@ main > section:first-of-type {
 .planning-table tbody td {
   width: var(--planning-cell-width, auto);
   min-width: var(--planning-cell-width, auto);
+  height: var(--planning-cell-height, auto);
 }
 .planning-day-col {
   width: 160px; min-width: 160px;
@@ -929,7 +930,8 @@ main > section:first-of-type {
   gap: 2px;
   width: var(--planning-cell-width, auto); min-width: var(--planning-cell-width, auto);
   height: var(--planning-cell-height, auto); min-height: var(--planning-cell-height, auto);
-  margin: 0 auto; padding: 4px 4px 6px;
+  flex: 1 1 auto;
+  margin: 0; padding: 4px 4px 6px;
   border-radius: 10px; border: 1px solid rgba(15, 23, 42, .18);
   background: var(--slot-color, #3498db); color: var(--slot-text-color, #f8fafc);
   text-align: center;
@@ -947,14 +949,28 @@ main > section:first-of-type {
 .planning-slot-title { font-size: .6rem; font-weight: 600; white-space: normal; word-break: break-word; overflow-wrap: anywhere; }
 .planning-slot-meta { font-size: .55rem; letter-spacing: .08em; opacity: .85; }
 
-.planning-summary-cell { padding: 0; border: none; background: var(--slot-column-background, transparent); text-align: center; }
+.planning-summary-cell {
+  display: flex;
+  align-items: stretch;
+  justify-content: flex-start;
+  padding: 0;
+  border: none;
+  background: var(--slot-column-background, transparent);
+  text-align: center;
+}
 
 /* Boutons de sélection (ouverture/fermeture) */
 .planning-slot-toggle {
   position: relative;
-  display: grid; justify-items: center; align-content: center; gap: 4px;
-  width: 100%; min-width: 0;
-  height: 100%; min-height: 100%;
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 4px;
+  width: 100%;
+  min-width: 0;
+  flex: 1 1 auto;
+  height: var(--planning-cell-height, auto);
+  min-height: var(--planning-cell-height, auto);
   margin: 0; padding: 8px 8px 10px;
   border-radius: 0; border: 1px solid rgba(148,163,184,.4);
   background: var(--slot-color, #ffffff); color: var(--slot-text-color, #1f2937);
