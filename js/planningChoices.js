@@ -84,15 +84,13 @@ const TYPE_CATEGORY_MAP = new Map([
 ]);
 
 const PLANNING_TOURS = [
-  { id: 1, label: 'Tour 1' },
-  { id: 2, label: 'Tour 2' },
-  { id: 3, label: 'Tour 3' },
-  { id: 4, label: 'Tour 4' },
-  { id: 5, label: 'Tour 5' },
-  { id: 6, label: 'Tour 6' }
+  { id: 1, label: 'Tour 1', table: 'planning_columns' },
+  { id: 2, label: 'Tour 2', table: 'planning_columns_tour2' },
+  { id: 3, label: 'Tour 3', table: 'planning_columns_tour3' },
+  { id: 4, label: 'Tour 4', table: 'planning_columns_tour4' },
+  { id: 5, label: 'Tour 5', table: 'planning_columns_tour5' },
+  { id: 6, label: 'Tour 6', table: 'planning_columns_tour6' }
 ];
-
-const PLANNING_COLUMNS_TABLE = 'planning_columns';
 
 const ADMIN_SETTINGS_TABLE = 'parametres_administratifs';
 const WEEKDAY_LABELS = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
@@ -116,9 +114,6 @@ const ACTIVITY_TYPES = new Map([
   ['Consultation', 'consultation'],
   ['Téléconsultation', 'téléconsultation']
 ]);
-
-const MAX_PLANNING_CELL_WIDTH = 132;
-const MAX_PLANNING_CELL_HEIGHT = 88;
 
 const USER_TYPE_LABELS = new Set(['medecin', 'remplacant']);
 const CHOICE_SERIES = ['normale', 'bonne'];
@@ -240,12 +235,11 @@ const getSlotTimeRange = (slot) => {
   return '';
 };
 
-const getDefaultSlot = (position, tourNumber = 1) => {
+const getDefaultSlot = (position) => {
   const defaults = COLUMN_DEFAULTS.find((item) => item.position === position);
   const typeCode = defaults?.typeCode ?? `COL${String(position).padStart(2, '0')}`;
   const category = inferTypeCategory(typeCode);
   return {
-    tour_number: tourNumber,
     position,
     label: typeCode,
     type_code: typeCode,
@@ -399,6 +393,8 @@ const buildSlotTitle = (slot, dayLabel, isHoliday, holidayName, isOpen, quality)
 const getTourConfig = (tourId) =>
   PLANNING_TOURS.find((tour) => tour.id === tourId) ?? PLANNING_TOURS[0];
 
+const getPlanningTableName = (tourId) => getTourConfig(tourId).table;
+
 const sanitizeActiveTour = (value) => {
   if (value == null || value === '') {
     return null;
@@ -413,28 +409,25 @@ const sanitizeActiveTour = (value) => {
   return numeric;
 };
 
-const ensurePlanningColumns = async (supabase, slots, tourId) => {
+const ensurePlanningColumns = async (supabase, slots, tableName) => {
   const missing = [];
   for (let position = 1; position <= 46; position += 1) {
     if (!slots.some((slot) => slot.position === position)) {
-      missing.push(getDefaultSlot(position, tourId));
+      missing.push(getDefaultSlot(position));
     }
   }
   if (missing.length === 0) {
     return slots;
   }
-  const { error } = await supabase
-    .from(PLANNING_COLUMNS_TABLE)
-    .upsert(missing, { onConflict: 'tour_number,position' });
+  const { error } = await supabase.from(tableName).upsert(missing, { onConflict: 'position' });
   if (error) {
     console.error(error);
     return slots;
   }
   const { data, error: reloadError } = await supabase
-    .from(PLANNING_COLUMNS_TABLE)
+    .from(tableName)
     .select(
       `id,
-        tour_number,
         position,
         label,
         type_code,
@@ -452,7 +445,6 @@ const ensurePlanningColumns = async (supabase, slots, tourId) => {
         open_bonne_saturday,
         open_bonne_sunday`
     )
-    .eq('tour_number', tourId)
     .order('position');
   if (reloadError) {
     console.error(reloadError);
@@ -594,9 +586,6 @@ export function initializePlanningChoices({ userRole }) {
     }
     if (roleLabel) {
       roleLabel.textContent = '';
-      roleLabel.removeAttribute('title');
-      roleLabel.removeAttribute('aria-label');
-      roleLabel.removeAttribute('data-choice-nature');
       roleLabel.classList.add('is-empty');
     }
     if (srLabel) {
@@ -640,9 +629,6 @@ export function initializePlanningChoices({ userRole }) {
     }
     if (roleLabel) {
       roleLabel.textContent = '';
-      roleLabel.removeAttribute('title');
-      roleLabel.removeAttribute('aria-label');
-      roleLabel.removeAttribute('data-choice-nature');
       roleLabel.classList.add('is-empty');
     }
     const srParts = [];
@@ -814,46 +800,30 @@ export function initializePlanningChoices({ userRole }) {
     });
 
     const groupedSelections = createEmptyChoiceGroups();
-    const usedChoiceIndices = new Map();
 
     CHOICE_SERIES.forEach((nature) => {
-      const natureGroups = provisionalGroups[nature] ?? new Map();
-      const orderedGroups = Array.from(natureGroups.entries())
-        .map(([choiceIndex, selections]) => {
-          const sanitizedIndex = sanitizeChoiceIndex(choiceIndex);
-          const sortedSelections = selections
-            .slice()
-            .sort(
-              (a, b) =>
-                (a.order ?? Number.MAX_SAFE_INTEGER) - (b.order ?? Number.MAX_SAFE_INTEGER)
-            );
-          const order = Math.min(
-            ...sortedSelections.map((selection) => selection.order ?? Number.MAX_SAFE_INTEGER)
-          );
-          return {
-            choiceIndex: sanitizedIndex,
-            selections: sortedSelections,
-            order
-          };
-        })
+      const orderedGroups = Array.from(provisionalGroups[nature].entries())
+        .map(([choiceIndex, selections]) => ({
+          choiceIndex,
+          selections,
+          order: Math.min(
+            ...selections.map((selection) => selection.order ?? Number.MAX_SAFE_INTEGER)
+          )
+        }))
         .sort((a, b) => a.order - b.order || a.choiceIndex - b.choiceIndex);
 
-      const usedIndices = new Set();
-
-      orderedGroups.forEach((group) => {
-        usedIndices.add(group.choiceIndex);
+      orderedGroups.forEach((group, groupPosition) => {
+        const normalizedIndex = CHOICE_INDEX_MIN + groupPosition;
         group.selections.forEach((selection, position) => {
-          selection.choiceIndex = group.choiceIndex;
+          selection.choiceIndex = normalizedIndex;
           selection.choiceRank = position + 1;
           selection.isPrimary = position === 0;
           selection.choiceLabel = selection.isPrimary
             ? String(selection.choiceIndex)
             : `${selection.choiceIndex}.${selection.choiceRank}`;
         });
-        groupedSelections[nature].set(group.choiceIndex, group.selections);
+        groupedSelections[nature].set(normalizedIndex, group.selections);
       });
-
-      usedChoiceIndices.set(nature, usedIndices);
     });
 
     state.groupedSelections = groupedSelections;
@@ -863,14 +833,11 @@ export function initializePlanningChoices({ userRole }) {
       if (!series) {
         return;
       }
-      const used = usedChoiceIndices.get(nature) ?? new Set();
-      let nextIndex = CHOICE_INDEX_MIN;
-      while (used.has(nextIndex) && nextIndex <= CHOICE_INDEX_MAX) {
-        nextIndex += 1;
-      }
-      if (nextIndex > CHOICE_INDEX_MAX) {
-        nextIndex = CHOICE_INDEX_MAX;
-      }
+      const nextIndex = clamp(
+        CHOICE_INDEX_MIN + groupedSelections[nature].size,
+        CHOICE_INDEX_MIN,
+        CHOICE_INDEX_MAX
+      );
       series.activeIndex = nextIndex;
     });
 
@@ -1050,9 +1017,6 @@ export function initializePlanningChoices({ userRole }) {
       }
       if (roleLabel) {
         roleLabel.textContent = '';
-        roleLabel.removeAttribute('title');
-        roleLabel.removeAttribute('aria-label');
-        roleLabel.removeAttribute('data-choice-nature');
         roleLabel.classList.add('is-empty');
       }
       if (srLabel) {
@@ -1108,23 +1072,17 @@ export function initializePlanningChoices({ userRole }) {
       }
       if (roleLabel) {
         const bullet = selection.isPrimary ? '●' : '○';
-        const fullNature = selection.nature === 'bonne' ? 'Bonne' : 'Normale';
-        const parsedRank = Number.parseInt(selection.choiceRank, 10);
-        const alternativeRank = Number.isFinite(parsedRank) ? Math.max(1, parsedRank - 1) : 1;
-        const roleDescription = selection.isPrimary ? 'Principal' : `Alternative ${alternativeRank}`;
-        roleLabel.textContent = bullet;
-        roleLabel.title = `${fullNature} — ${roleDescription}`;
-        roleLabel.setAttribute('aria-label', `${fullNature} — ${roleDescription}`);
-        roleLabel.dataset.choiceNature = selection.nature;
+        const natureLabel = selection.nature === 'bonne' ? 'Bonne' : 'Normale';
+        roleLabel.textContent = `${bullet} ${natureLabel}`;
         roleLabel.classList.remove('is-empty');
       }
       if (srLabel) {
-        const srRoleDescription = selection.isPrimary
+        const roleDescription = selection.isPrimary
           ? 'principal'
-          : `alternative ${alternativeRank}`;
+          : `alternative ${selection.choiceRank - 1}`;
         srLabel.textContent = selection.summary
-          ? `${selection.summary} · Choix ${choiceLabel} (${srRoleDescription})`
-          : `Choix ${choiceLabel} (${srRoleDescription})`;
+          ? `${selection.summary} · Choix ${choiceLabel} (${roleDescription})`
+          : `Choix ${choiceLabel} (${roleDescription})`;
       }
       button.dataset.choiceOrder = choiceLabel;
       button.dataset.choiceType = selection.nature;
@@ -1196,11 +1154,6 @@ export function initializePlanningChoices({ userRole }) {
           item.dataset.choiceRank = String(selection.choiceRank ?? 1);
           item.dataset.choiceRole = selection.isPrimary ? 'principal' : 'alternative';
           item.dataset.summaryNature = selection.nature;
-          const bullet = selection.isPrimary ? '●' : '○';
-          const natureLabel = selection.nature === 'bonne' ? 'Bonne' : 'Normale';
-          const parsedRank = Number.parseInt(selection.choiceRank, 10);
-          const alternativeRank = Number.isFinite(parsedRank) ? Math.max(1, parsedRank - 1) : 1;
-          const roleDescription = selection.isPrimary ? 'Principal' : `Alternative ${alternativeRank}`;
           item.innerHTML = `
             <div class="summary-item-order">${selection.choiceLabel ?? selection.order}</div>
             <div class="summary-item-body">
@@ -1208,19 +1161,19 @@ export function initializePlanningChoices({ userRole }) {
                 <span class="summary-item-choice">${
                   selection.isPrimary
                     ? `Choix ${selection.choiceIndex} — Principal`
-                    : `Choix ${selection.choiceIndex} — Alternative ${alternativeRank}`
+                    : `Choix ${selection.choiceIndex} — Alternative ${Math.max(
+                        1,
+                        selection.choiceRank - 1
+                      )}`
                 }</span>
                 <span class="summary-item-date">${formatSummaryLabel(selection)}</span>
                 <span class="summary-item-details">Col. ${selection.columnPosition} · ${
             selection.columnLabel || selection.slotTypeCode || 'Créneau'
           }</span>
                 <span class="summary-item-tags">
-                  <span
-                    class="badge ${selection.nature === 'bonne' ? 'badge-success' : 'badge-warning'}"
-                    data-choice-nature="${selection.nature}"
-                    title="${bullet} ${natureLabel}"
-                    aria-label="${natureLabel} — ${roleDescription}"
-                  >${bullet}</span>
+                  <span class="badge ${
+                    selection.nature === 'bonne' ? 'badge-success' : 'badge-warning'
+                  }">${(selection.isPrimary ? '●' : '○') + ' ' + (selection.nature === 'bonne' ? 'Bonne' : 'Normale')}</span>
                   <span class="badge">${selection.activityType}</span>
                 </span>
               </div>
@@ -1318,6 +1271,50 @@ export function initializePlanningChoices({ userRole }) {
     });
     if (newSelections.length === state.selections.length) {
       state.selections = newSelections;
+
+      const domItems = Array.from(list.querySelectorAll('.summary-item[data-slot-key]'))
+        .map((element) => ({
+          element,
+          selection: state.selectionMap.get(element.dataset.slotKey),
+          role: element.dataset.choiceRole === 'alternative' ? 'alternative' : 'principal'
+        }))
+        .filter(
+          (entry) =>
+            entry.selection && sanitizeChoiceNature(entry.selection.nature) === sanitizedNature
+        );
+
+      const groups = [];
+      let currentGroup = null;
+      let currentGroupHasPrincipal = false;
+      domItems.forEach(({ selection, role }) => {
+        const isPrincipal = role === 'principal';
+        if (!currentGroup) {
+          currentGroup = [];
+          currentGroupHasPrincipal = isPrincipal;
+          groups.push(currentGroup);
+        } else if (isPrincipal && currentGroupHasPrincipal) {
+          currentGroup = [];
+          currentGroupHasPrincipal = true;
+          groups.push(currentGroup);
+        } else if (isPrincipal) {
+          currentGroupHasPrincipal = true;
+        }
+        currentGroup.push(selection);
+      });
+
+      let nextIndex = CHOICE_INDEX_MIN;
+      groups.forEach((group) => {
+        group.forEach((selection, position) => {
+          selection.choiceIndex = nextIndex;
+          selection.choiceRank = position + 1;
+          selection.isPrimary = position === 0;
+          selection.choiceLabel = selection.isPrimary
+            ? String(selection.choiceIndex)
+            : `${selection.choiceIndex}.${selection.choiceRank}`;
+        });
+        nextIndex += 1;
+      });
+
       invalidateGroupedSelections();
       refreshSelections();
     }
@@ -1409,30 +1406,17 @@ export function initializePlanningChoices({ userRole }) {
       let maxWidth = 0;
       let maxHeight = 0;
       widthElements.forEach((element) => {
-        if (!element.isConnected) {
-          return;
-        }
-        element.style.removeProperty('width');
-        element.style.removeProperty('height');
         const rect = element.getBoundingClientRect();
         maxWidth = Math.max(maxWidth, rect.width);
       });
       heightElements.forEach((element) => {
-        if (!element.isConnected) {
-          return;
-        }
-        element.style.removeProperty('height');
         const rect = element.getBoundingClientRect();
         maxHeight = Math.max(maxHeight, rect.height);
       });
-      if (maxWidth > 0) {
-        const clampedWidth = Math.min(Math.ceil(maxWidth), MAX_PLANNING_CELL_WIDTH);
-        planningTables.style.setProperty('--planning-cell-width', `${clampedWidth}px`);
-      }
-      if (maxHeight > 0) {
-        const clampedHeight = Math.min(Math.ceil(maxHeight), MAX_PLANNING_CELL_HEIGHT);
-        planningTables.style.setProperty('--planning-cell-height', `${clampedHeight}px`);
-      }
+      const clampedWidth = clamp(Math.ceil(maxWidth) + 8, 120, 160);
+      const clampedHeight = clamp(Math.ceil(maxHeight) + 12, 80, 140);
+      planningTables.style.setProperty('--planning-cell-width', `${clampedWidth}px`);
+      planningTables.style.setProperty('--planning-cell-height', `${clampedHeight}px`);
     });
   };
 
@@ -1761,12 +1745,11 @@ export function initializePlanningChoices({ userRole }) {
       return;
     }
     setPlanningFeedback('Chargement des colonnes…');
-    const tourId = state.selectedTourId;
+    const tableName = getPlanningTableName(state.selectedTourId);
     const { data, error } = await supabase
-      .from(PLANNING_COLUMNS_TABLE)
+      .from(tableName)
       .select(
         `id,
-          tour_number,
           position,
           label,
           type_code,
@@ -1784,7 +1767,6 @@ export function initializePlanningChoices({ userRole }) {
           open_bonne_saturday,
           open_bonne_sunday`
       )
-      .eq('tour_number', tourId)
       .order('position');
     if (error) {
       console.error(error);
@@ -1793,7 +1775,7 @@ export function initializePlanningChoices({ userRole }) {
       return;
     }
     let slots = data ?? [];
-    slots = await ensurePlanningColumns(supabase, slots, tourId);
+    slots = await ensurePlanningColumns(supabase, slots, tableName);
     state.planningSlots = sortSlotsByPosition(slots).map((slot) => ({
       ...slot,
       color: normalizeColor(slot.color),
