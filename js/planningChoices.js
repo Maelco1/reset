@@ -117,6 +117,9 @@ const ACTIVITY_TYPES = new Map([
   ['Téléconsultation', 'téléconsultation']
 ]);
 
+const MAX_PLANNING_CELL_WIDTH = 132;
+const MAX_PLANNING_CELL_HEIGHT = 88;
+
 const USER_TYPE_LABELS = new Set(['medecin', 'remplacant']);
 const CHOICE_SERIES = ['normale', 'bonne'];
 const CHOICE_SERIES_LABELS = new Map([
@@ -591,6 +594,8 @@ export function initializePlanningChoices({ userRole }) {
     }
     if (roleLabel) {
       roleLabel.textContent = '';
+      roleLabel.removeAttribute('title');
+      roleLabel.removeAttribute('aria-label');
       roleLabel.classList.add('is-empty');
     }
     if (srLabel) {
@@ -634,6 +639,8 @@ export function initializePlanningChoices({ userRole }) {
     }
     if (roleLabel) {
       roleLabel.textContent = '';
+      roleLabel.removeAttribute('title');
+      roleLabel.removeAttribute('aria-label');
       roleLabel.classList.add('is-empty');
     }
     const srParts = [];
@@ -1022,6 +1029,8 @@ export function initializePlanningChoices({ userRole }) {
       }
       if (roleLabel) {
         roleLabel.textContent = '';
+        roleLabel.removeAttribute('title');
+        roleLabel.removeAttribute('aria-label');
         roleLabel.classList.add('is-empty');
       }
       if (srLabel) {
@@ -1077,8 +1086,11 @@ export function initializePlanningChoices({ userRole }) {
       }
       if (roleLabel) {
         const bullet = selection.isPrimary ? '●' : '○';
-        const natureLabel = selection.nature === 'bonne' ? 'Bonne' : 'Normale';
-        roleLabel.textContent = `${bullet} ${natureLabel}`;
+        const abbreviatedNature = selection.nature === 'bonne' ? 'B' : 'N';
+        const fullNature = selection.nature === 'bonne' ? 'Bonne' : 'Normale';
+        roleLabel.textContent = `${bullet} ${abbreviatedNature}`;
+        roleLabel.title = `${bullet} ${fullNature}`;
+        roleLabel.setAttribute('aria-label', `${bullet} ${fullNature}`);
         roleLabel.classList.remove('is-empty');
       }
       if (srLabel) {
@@ -1176,9 +1188,11 @@ export function initializePlanningChoices({ userRole }) {
             selection.columnLabel || selection.slotTypeCode || 'Créneau'
           }</span>
                 <span class="summary-item-tags">
-                  <span class="badge ${
-                    selection.nature === 'bonne' ? 'badge-success' : 'badge-warning'
-                  }">${(selection.isPrimary ? '●' : '○') + ' ' + (selection.nature === 'bonne' ? 'Bonne' : 'Normale')}</span>
+                  <span
+                    class="badge ${selection.nature === 'bonne' ? 'badge-success' : 'badge-warning'}"
+                    title="${(selection.isPrimary ? '●' : '○') + ' ' + (selection.nature === 'bonne' ? 'Bonne' : 'Normale')}"
+                    aria-label="${(selection.isPrimary ? '●' : '○') + ' ' + (selection.nature === 'bonne' ? 'Bonne' : 'Normale')}"
+                  >${(selection.isPrimary ? '●' : '○') + ' ' + (selection.nature === 'bonne' ? 'B' : 'N')}</span>
                   <span class="badge">${selection.activityType}</span>
                 </span>
               </div>
@@ -1411,17 +1425,30 @@ export function initializePlanningChoices({ userRole }) {
       let maxWidth = 0;
       let maxHeight = 0;
       widthElements.forEach((element) => {
+        if (!element.isConnected) {
+          return;
+        }
+        element.style.removeProperty('width');
+        element.style.removeProperty('height');
         const rect = element.getBoundingClientRect();
         maxWidth = Math.max(maxWidth, rect.width);
       });
       heightElements.forEach((element) => {
+        if (!element.isConnected) {
+          return;
+        }
+        element.style.removeProperty('height');
         const rect = element.getBoundingClientRect();
         maxHeight = Math.max(maxHeight, rect.height);
       });
-      const clampedWidth = clamp(Math.ceil(maxWidth) + 8, 120, 160);
-      const clampedHeight = clamp(Math.ceil(maxHeight) + 12, 80, 140);
-      planningTables.style.setProperty('--planning-cell-width', `${clampedWidth}px`);
-      planningTables.style.setProperty('--planning-cell-height', `${clampedHeight}px`);
+      if (maxWidth > 0) {
+        const clampedWidth = Math.min(Math.ceil(maxWidth), MAX_PLANNING_CELL_WIDTH);
+        planningTables.style.setProperty('--planning-cell-width', `${clampedWidth}px`);
+      }
+      if (maxHeight > 0) {
+        const clampedHeight = Math.min(Math.ceil(maxHeight), MAX_PLANNING_CELL_HEIGHT);
+        planningTables.style.setProperty('--planning-cell-height', `${clampedHeight}px`);
+      }
     });
   };
 
