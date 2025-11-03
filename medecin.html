@@ -25,100 +25,48 @@
       </section>
     </div>
     <main>
-      <section class="card planning-entry">
-        <header class="planning-entry-header">
+      <section class="card">
+        <header>
           <div>
             <h1>Espace Médecin</h1>
-            <p>Priorisez vos gardes en trois étapes.</p>
+            <p>Déclarez vos gardes et disponibilités.</p>
           </div>
           <nav>
             <button id="disconnect" class="secondary" type="button">Changer d'instance</button>
             <button id="logout" class="secondary" type="button">Se déconnecter</button>
           </nav>
         </header>
+        <section>
+          <h2>Nouvelle garde</h2>
+          <form id="guard-form">
+            <label for="guard-date">Date</label>
+            <input id="guard-date" name="date" type="date" required />
 
-        <nav class="stepper" aria-label="Progression des étapes">
-          <button type="button" class="stepper-step is-active" data-step="1">
-            <span class="stepper-index">1</span>
-            <span class="stepper-label">Gardes normales</span>
-          </button>
-          <button type="button" class="stepper-step" data-step="2">
-            <span class="stepper-index">2</span>
-            <span class="stepper-label">Bonnes gardes</span>
-          </button>
-          <button type="button" class="stepper-step" data-step="3">
-            <span class="stepper-index">3</span>
-            <span class="stepper-label">Récapitulatif</span>
-          </button>
-        </nav>
+            <label for="guard-type">Type de garde</label>
+            <select id="guard-type" name="type" required>
+              <option value="Jour">Jour</option>
+              <option value="Nuit">Nuit</option>
+              <option value="Week-end">Week-end</option>
+            </select>
 
-        <section class="step-pane is-active" data-step-pane="1">
-          <header class="step-pane-header">
-            <h2>Étape 1 — Gardes normales</h2>
-            <p>Sélectionnez vos créneaux prioritaires. Seules les cases ouvertes en garde normale sont cliquables.</p>
-          </header>
-          <div class="planning-host" data-step-host="1">
-            <section class="planning-section planning-step-section" data-planning-section>
-              <div class="planning-surface">
-                <div class="section-header planning-section-header">
-                  <h3 id="planning-title">Planning des gardes</h3>
-                  <p id="planning-feedback" role="status"></p>
-                </div>
-                <div class="planning-layout">
-                  <div class="planning-board" id="planning-board" role="region" aria-labelledby="planning-title">
-                    <div class="planning-tables" id="planning-tables" aria-live="polite"></div>
-                  </div>
-                </div>
-              </div>
-            </section>
-          </div>
-          <footer class="step-pane-footer">
-            <button type="button" class="step-nav" data-action="next">Étape suivante</button>
-          </footer>
+            <label for="guard-notes">Notes</label>
+            <textarea id="guard-notes" name="notes" rows="3" placeholder="Informations complémentaires"></textarea>
+
+            <button type="submit">Enregistrer la garde</button>
+            <p id="guard-feedback" role="status"></p>
+          </form>
         </section>
-
-        <section class="step-pane" data-step-pane="2">
-          <header class="step-pane-header">
-            <h2>Étape 2 — Bonnes gardes</h2>
-            <p>Ajoutez des créneaux en bonne garde. Seules les cases ouvertes en bonne garde sont cliquables.</p>
-          </header>
-          <div class="planning-host" data-step-host="2"></div>
-          <footer class="step-pane-footer">
-            <div class="step-actions">
-              <button type="button" class="step-nav secondary" data-action="previous">Étape précédente</button>
-              <button type="button" class="step-nav" data-action="next">Étape suivante</button>
-            </div>
-          </footer>
-        </section>
-
-        <section class="step-pane" data-step-pane="3">
-          <header class="step-pane-header">
-            <h2>Étape 3 — Récapitulatif</h2>
-            <p>Réordonnez vos choix puis enregistrez-les dans la base de données.</p>
-          </header>
-          <div class="summary-card" aria-live="polite">
-            <div class="summary-header">
-              <h3>Vos créneaux sélectionnés</h3>
-              <p id="summary-feedback"></p>
-            </div>
-            <div class="summary-columns">
-              <section class="summary-column">
-                <h4 class="summary-column-title">Gardes normales</h4>
-                <ul class="summary-list" data-summary-nature="normale"></ul>
-              </section>
-              <section class="summary-column">
-                <h4 class="summary-column-title">Bonnes gardes</h4>
-                <ul class="summary-list" data-summary-nature="bonne"></ul>
-              </section>
-            </div>
+        <section>
+          <h2>Mes gardes</h2>
+          <div class="card">
+            <table class="table">
+              <thead>
+                <tr id="guards-header-row"></tr>
+              </thead>
+              <tbody id="guards-body"></tbody>
+            </table>
+            <p id="guards-feedback" role="status"></p>
           </div>
-          <footer class="step-pane-footer">
-            <div class="step-actions">
-              <button type="button" class="step-nav secondary" data-action="previous">Étape précédente</button>
-              <button type="button" id="save-choices" class="step-nav">Enregistrer</button>
-            </div>
-            <p id="save-feedback" role="status"></p>
-          </footer>
         </section>
       </section>
     </main>
@@ -127,9 +75,10 @@
         initializeConnectionModal,
         requireRole,
         getCurrentUser,
-        setCurrentUser
+        setCurrentUser,
+        getSupabaseClient,
+        onSupabaseReady
       } from './js/supabaseClient.js';
-      import { initializePlanningChoices } from './js/planningChoices.js';
 
       const user = getCurrentUser();
       if (!user) {
@@ -144,7 +93,209 @@
         window.location.replace('index.html');
       });
 
-      initializePlanningChoices({ userRole: 'medecin' });
+      const form = document.querySelector('#guard-form');
+      const feedback = document.querySelector('#guard-feedback');
+      const tableBody = document.querySelector('#guards-body');
+      const tableHeaderRow = document.querySelector('#guards-header-row');
+      const listFeedback = document.querySelector('#guards-feedback');
+      let channel;
+
+      const formatDate = (value) => new Intl.DateTimeFormat('fr-FR').format(new Date(value));
+
+      const DEFAULT_GUARD_TYPES = ['Jour', 'Nuit', 'Week-end'];
+
+      const sortGuardTypes = (types) =>
+        [...types].sort((a, b) => {
+          const indexA = DEFAULT_GUARD_TYPES.indexOf(a);
+          const indexB = DEFAULT_GUARD_TYPES.indexOf(b);
+          if (indexA === -1 && indexB === -1) {
+            return a.localeCompare(b);
+          }
+          if (indexA === -1) {
+            return 1;
+          }
+          if (indexB === -1) {
+            return -1;
+          }
+          return indexA - indexB;
+        });
+
+      const updateGuardHeader = (types) => {
+        if (!tableHeaderRow) {
+          return;
+        }
+        tableHeaderRow.innerHTML = '';
+        const dateHeader = document.createElement('th');
+        dateHeader.scope = 'col';
+        dateHeader.textContent = 'Date';
+        tableHeaderRow.appendChild(dateHeader);
+        types.forEach((type) => {
+          const th = document.createElement('th');
+          th.scope = 'col';
+          th.textContent = type;
+          tableHeaderRow.appendChild(th);
+        });
+      };
+
+      updateGuardHeader(DEFAULT_GUARD_TYPES);
+
+      const renderGuards = (guards) => {
+        tableBody.innerHTML = '';
+        const typeSet = new Set(DEFAULT_GUARD_TYPES);
+        guards.forEach((guard) => {
+          if (guard.type) {
+            typeSet.add(guard.type);
+          }
+        });
+        const orderedTypes = sortGuardTypes(typeSet);
+        updateGuardHeader(orderedTypes);
+
+        if (!guards.length) {
+          const row = document.createElement('tr');
+          const cell = document.createElement('td');
+          cell.colSpan = orderedTypes.length + 1;
+          cell.className = 'guards-empty-cell';
+          cell.textContent = 'Aucune garde enregistrée.';
+          row.appendChild(cell);
+          tableBody.appendChild(row);
+          return;
+        }
+
+        const groupedByDate = new Map();
+        guards.forEach((guard) => {
+          const key = guard.date;
+          if (!groupedByDate.has(key)) {
+            groupedByDate.set(key, new Map());
+          }
+          groupedByDate.get(key).set(guard.type, guard);
+        });
+
+        const sortedDates = [...groupedByDate.keys()].sort((a, b) => new Date(a) - new Date(b));
+
+        sortedDates.forEach((dateKey) => {
+          const row = document.createElement('tr');
+          const dateHeader = document.createElement('th');
+          dateHeader.scope = 'row';
+          dateHeader.textContent = formatDate(dateKey);
+          row.appendChild(dateHeader);
+
+          const guardsByType = groupedByDate.get(dateKey);
+          orderedTypes.forEach((type) => {
+            const cell = document.createElement('td');
+            const entry = guardsByType.get(type);
+            if (entry) {
+              const wrapper = document.createElement('div');
+              wrapper.className = 'guard-cell';
+
+              const badge = document.createElement('span');
+              badge.className = 'badge';
+              badge.textContent = entry.type;
+              wrapper.appendChild(badge);
+
+              const note = document.createElement('p');
+              note.className = 'guard-note';
+              note.textContent = entry.notes?.trim() || '—';
+              wrapper.appendChild(note);
+
+              const actions = document.createElement('div');
+              actions.className = 'table-actions';
+              const deleteButton = document.createElement('button');
+              deleteButton.type = 'button';
+              deleteButton.className = 'danger';
+              deleteButton.dataset.action = 'delete';
+              deleteButton.dataset.id = entry.id;
+              deleteButton.textContent = 'Supprimer';
+              actions.appendChild(deleteButton);
+              wrapper.appendChild(actions);
+
+              cell.appendChild(wrapper);
+            } else {
+              cell.className = 'guard-empty-cell';
+              cell.textContent = '';
+            }
+            row.appendChild(cell);
+          });
+
+          tableBody.appendChild(row);
+        });
+      };
+
+      const loadGuards = async () => {
+        await onSupabaseReady();
+        const supabase = getSupabaseClient();
+        const { data, error } = await supabase
+          .from('doctor_entries')
+          .select('id, date, type, notes')
+          .eq('user_id', user.id)
+          .order('date', { ascending: true });
+        if (error) {
+          console.error(error);
+          listFeedback.textContent = 'Impossible de récupérer vos gardes.';
+          return;
+        }
+        listFeedback.textContent = `${data.length} garde(s).`;
+        renderGuards(data);
+      };
+
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        await onSupabaseReady();
+        const supabase = getSupabaseClient();
+        const formData = new FormData(form);
+        const payload = {
+          user_id: user.id,
+          date: formData.get('date'),
+          type: formData.get('type'),
+          notes: formData.get('notes')?.trim() || null
+        };
+
+        const { error } = await supabase.from('doctor_entries').insert(payload);
+        if (error) {
+          console.error(error);
+          feedback.textContent = "Impossible d'enregistrer la garde.";
+          return;
+        }
+
+        feedback.textContent = 'Garde enregistrée !';
+        form.reset();
+      });
+
+      tableBody.addEventListener('click', async (event) => {
+        const button = event.target.closest('button');
+        if (!button) {
+          return;
+        }
+        if (button.dataset.action === 'delete') {
+          if (!confirm('Supprimer cette garde ?')) {
+            return;
+          }
+          await onSupabaseReady();
+          const supabase = getSupabaseClient();
+          const { error } = await supabase.from('doctor_entries').delete().eq('id', button.dataset.id);
+          if (error) {
+            console.error(error);
+            alert('Impossible de supprimer la garde.');
+          }
+        }
+      });
+
+      const subscribe = async () => {
+        await onSupabaseReady();
+        const supabase = getSupabaseClient();
+        channel = supabase
+          .channel('doctor-entries')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'doctor_entries', filter: `user_id=eq.${user.id}` }, () => {
+            loadGuards();
+          })
+          .subscribe();
+      };
+
+      loadGuards();
+      subscribe();
+
+      window.addEventListener('beforeunload', () => {
+        channel?.unsubscribe();
+      });
     </script>
   </body>
 </html>
