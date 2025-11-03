@@ -64,6 +64,23 @@
                   <h3 id="planning-title">Planning des gardes</h3>
                   <p id="planning-feedback" role="status"></p>
                 </div>
+                <div class="planning-controls planning-zoom-controls" aria-label="Paramètres d'affichage du planning">
+                  <div class="planning-control planning-zoom-control">
+                    <span class="planning-control-label">Zoom</span>
+                    <div class="planning-zoom-input">
+                      <input
+                        type="range"
+                        min="70"
+                        max="140"
+                        value="100"
+                        step="5"
+                        data-planning-zoom-input
+                        aria-label="Zoom du planning"
+                      />
+                      <span class="planning-control-value planning-zoom-value" data-planning-zoom-value>100%</span>
+                    </div>
+                  </div>
+                </div>
                 <div class="planning-layout">
                   <div class="planning-board" id="planning-board" role="region" aria-labelledby="planning-title">
                     <div class="planning-tables" id="planning-tables" aria-live="polite"></div>

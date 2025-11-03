@@ -72,6 +72,22 @@
                 <span id="planning-month-2-display" class="planning-control-value">—</span>
               </div>
 
+              <div class="planning-control planning-zoom-control">
+                <span class="planning-control-label">Zoom</span>
+                <div class="planning-zoom-input">
+                  <input
+                    type="range"
+                    min="70"
+                    max="140"
+                    value="100"
+                    step="5"
+                    data-planning-zoom-input
+                    aria-label="Zoom du planning"
+                  />
+                  <span class="planning-control-value planning-zoom-value" data-planning-zoom-value>100%</span>
+                </div>
+              </div>
+
               <div class="planning-control planning-vision-control">
                 <span class="planning-control-label">Vision</span>
                 <div class="planning-vision-group" role="group" aria-label="Vision du planning">
@@ -584,6 +600,9 @@
 
       const MAX_PLANNING_CELL_WIDTH = 132;
       const MAX_PLANNING_CELL_HEIGHT = 88;
+      const PLANNING_ZOOM_MIN = 70;
+      const PLANNING_ZOOM_MAX = 140;
+      const PLANNING_ZOOM_DEFAULT = 100;
 
       const currentUser = getCurrentUser();
       if (!currentUser) {
@@ -629,12 +648,64 @@
       const planningConfigContainer = document.querySelector('#planning-config');
       const planningTables = document.querySelector('#planning-tables');
       const planningFeedback = document.querySelector('#planning-feedback');
+      const planningZoomInput = document.querySelector('[data-planning-zoom-input]');
+      const planningZoomValue = document.querySelector('[data-planning-zoom-value]');
       const planningVisionNormale = document.querySelector('#planning-vision-normale');
       const planningVisionBonne = document.querySelector('#planning-vision-bonne');
       const planningVisionButtons = {
         normale: planningVisionNormale,
         bonne: planningVisionBonne
       };
+
+      const updatePlanningZoomDisplay = () => {
+        if (planningZoomValue) {
+          planningZoomValue.textContent = `${planningZoom}%`;
+        }
+      };
+
+      const applyPlanningZoom = () => {
+        if (!planningTables) {
+          return;
+        }
+        const scale = planningZoom / 100;
+        if (planningBaseCellWidth != null) {
+          const scaledWidth = Math.round(planningBaseCellWidth * scale);
+          planningTables.style.setProperty('--planning-cell-width', `${scaledWidth}px`);
+        } else {
+          planningTables.style.removeProperty('--planning-cell-width');
+        }
+        if (planningBaseCellHeight != null) {
+          const scaledHeight = Math.round(planningBaseCellHeight * scale);
+          planningTables.style.setProperty('--planning-cell-height', `${scaledHeight}px`);
+        } else {
+          planningTables.style.removeProperty('--planning-cell-height');
+        }
+      };
+
+      const setPlanningZoom = (value) => {
+        const numeric = Number.parseInt(value, 10);
+        if (Number.isNaN(numeric)) {
+          return;
+        }
+        const clamped = Math.min(Math.max(numeric, PLANNING_ZOOM_MIN), PLANNING_ZOOM_MAX);
+        if (clamped === planningZoom) {
+          updatePlanningZoomDisplay();
+          return;
+        }
+        planningZoom = clamped;
+        updatePlanningZoomDisplay();
+        applyPlanningZoom();
+      };
+
+      if (planningZoomInput) {
+        planningZoomInput.min = String(PLANNING_ZOOM_MIN);
+        planningZoomInput.max = String(PLANNING_ZOOM_MAX);
+        planningZoomInput.value = String(planningZoom);
+        planningZoomInput.addEventListener('input', (event) => {
+          setPlanningZoom(event.target.value);
+        });
+      }
+      updatePlanningZoomDisplay();
 
       const parseSelectInteger = (element, fallback = null) => {
         if (!element) {
@@ -739,6 +810,9 @@
       let planningCellSizingFrame = null;
       let planningStickyHeaderFrame = null;
       let activePlanningVision = null;
+      let planningBaseCellWidth = null;
+      let planningBaseCellHeight = null;
+      let planningZoom = PLANNING_ZOOM_DEFAULT;
 
       const updatePlanningVisionButtons = () => {
         Object.entries(planningVisionButtons).forEach(([vision, button]) => {
@@ -766,10 +840,22 @@
         subscribeToChoiceChanges();
       };
 
+      const clearPlanningCellDimensions = () => {
+        planningBaseCellWidth = null;
+        planningBaseCellHeight = null;
+        if (!planningTables) {
+          return;
+        }
+        planningTables.style.removeProperty('--planning-cell-width');
+        planningTables.style.removeProperty('--planning-cell-height');
+      };
+
       const measurePlanningCellSize = () => {
         if (!planningTables) {
           return;
         }
+        const previousWidth = planningBaseCellWidth;
+        const previousHeight = planningBaseCellHeight;
         planningTables.style.removeProperty('--planning-cell-width');
         planningTables.style.removeProperty('--planning-cell-height');
         const widthElements = new Set([
@@ -782,6 +868,9 @@
           ...planningTables.querySelectorAll('.planning-slot-button')
         ]);
         if (!widthElements.size && !heightElements.size) {
+          planningBaseCellWidth = previousWidth;
+          planningBaseCellHeight = previousHeight;
+          applyPlanningZoom();
           return;
         }
         let maxWidth = 0;
@@ -805,12 +894,17 @@
         });
         if (maxWidth > 0) {
           const clampedWidth = Math.min(Math.ceil(maxWidth), MAX_PLANNING_CELL_WIDTH);
-          planningTables.style.setProperty('--planning-cell-width', `${clampedWidth}px`);
+          planningBaseCellWidth = clampedWidth;
+        } else {
+          planningBaseCellWidth = previousWidth;
         }
         if (maxHeight > 0) {
           const clampedHeight = Math.min(Math.ceil(maxHeight), MAX_PLANNING_CELL_HEIGHT);
-          planningTables.style.setProperty('--planning-cell-height', `${clampedHeight}px`);
+          planningBaseCellHeight = clampedHeight;
+        } else {
+          planningBaseCellHeight = previousHeight;
         }
+        applyPlanningZoom();
       };
 
       const schedulePlanningCellSize = () => {
@@ -2477,8 +2571,7 @@
         planningTables.dataset.vision = activePlanningVision ?? 'all';
         if (!planningSlots.length) {
           planningTables.innerHTML = '<p class="empty-planning">Chargement du planning…</p>';
-          planningTables.style.removeProperty('--planning-cell-width');
-          planningTables.style.removeProperty('--planning-cell-height');
+          clearPlanningCellDimensions();
           schedulePlanningStickyHeaders();
           return;
         }
@@ -2728,6 +2821,7 @@
         }
         if (planningTables) {
           planningTables.innerHTML = '<p class="empty-planning">Chargement du planning…</p>';
+          clearPlanningCellDimensions();
         }
         if (planningConfigContainer) {
           planningConfigContainer.innerHTML = '<p class="empty-planning">Chargement des colonnes…</p>';
@@ -2765,6 +2859,7 @@
           }
           if (planningTables) {
             planningTables.innerHTML = '<p class="empty-planning">Impossible de charger le planning.</p>';
+            clearPlanningCellDimensions();
           }
           if (planningConfigContainer) {
             planningConfigContainer.innerHTML = '<p class="empty-planning">Impossible de charger les colonnes.</p>';
