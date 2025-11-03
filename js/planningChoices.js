@@ -814,30 +814,46 @@ export function initializePlanningChoices({ userRole }) {
     });
 
     const groupedSelections = createEmptyChoiceGroups();
+    const usedChoiceIndices = new Map();
 
     CHOICE_SERIES.forEach((nature) => {
-      const orderedGroups = Array.from(provisionalGroups[nature].entries())
-        .map(([choiceIndex, selections]) => ({
-          choiceIndex,
-          selections,
-          order: Math.min(
-            ...selections.map((selection) => selection.order ?? Number.MAX_SAFE_INTEGER)
-          )
-        }))
+      const natureGroups = provisionalGroups[nature] ?? new Map();
+      const orderedGroups = Array.from(natureGroups.entries())
+        .map(([choiceIndex, selections]) => {
+          const sanitizedIndex = sanitizeChoiceIndex(choiceIndex);
+          const sortedSelections = selections
+            .slice()
+            .sort(
+              (a, b) =>
+                (a.order ?? Number.MAX_SAFE_INTEGER) - (b.order ?? Number.MAX_SAFE_INTEGER)
+            );
+          const order = Math.min(
+            ...sortedSelections.map((selection) => selection.order ?? Number.MAX_SAFE_INTEGER)
+          );
+          return {
+            choiceIndex: sanitizedIndex,
+            selections: sortedSelections,
+            order
+          };
+        })
         .sort((a, b) => a.order - b.order || a.choiceIndex - b.choiceIndex);
 
-      orderedGroups.forEach((group, groupPosition) => {
-        const normalizedIndex = CHOICE_INDEX_MIN + groupPosition;
+      const usedIndices = new Set();
+
+      orderedGroups.forEach((group) => {
+        usedIndices.add(group.choiceIndex);
         group.selections.forEach((selection, position) => {
-          selection.choiceIndex = normalizedIndex;
+          selection.choiceIndex = group.choiceIndex;
           selection.choiceRank = position + 1;
           selection.isPrimary = position === 0;
           selection.choiceLabel = selection.isPrimary
             ? String(selection.choiceIndex)
             : `${selection.choiceIndex}.${selection.choiceRank}`;
         });
-        groupedSelections[nature].set(normalizedIndex, group.selections);
+        groupedSelections[nature].set(group.choiceIndex, group.selections);
       });
+
+      usedChoiceIndices.set(nature, usedIndices);
     });
 
     state.groupedSelections = groupedSelections;
@@ -847,11 +863,14 @@ export function initializePlanningChoices({ userRole }) {
       if (!series) {
         return;
       }
-      const nextIndex = clamp(
-        CHOICE_INDEX_MIN + groupedSelections[nature].size,
-        CHOICE_INDEX_MIN,
-        CHOICE_INDEX_MAX
-      );
+      const used = usedChoiceIndices.get(nature) ?? new Set();
+      let nextIndex = CHOICE_INDEX_MIN;
+      while (used.has(nextIndex) && nextIndex <= CHOICE_INDEX_MAX) {
+        nextIndex += 1;
+      }
+      if (nextIndex > CHOICE_INDEX_MAX) {
+        nextIndex = CHOICE_INDEX_MAX;
+      }
       series.activeIndex = nextIndex;
     });
 
@@ -1299,50 +1318,6 @@ export function initializePlanningChoices({ userRole }) {
     });
     if (newSelections.length === state.selections.length) {
       state.selections = newSelections;
-
-      const domItems = Array.from(list.querySelectorAll('.summary-item[data-slot-key]'))
-        .map((element) => ({
-          element,
-          selection: state.selectionMap.get(element.dataset.slotKey),
-          role: element.dataset.choiceRole === 'alternative' ? 'alternative' : 'principal'
-        }))
-        .filter(
-          (entry) =>
-            entry.selection && sanitizeChoiceNature(entry.selection.nature) === sanitizedNature
-        );
-
-      const groups = [];
-      let currentGroup = null;
-      let currentGroupHasPrincipal = false;
-      domItems.forEach(({ selection, role }) => {
-        const isPrincipal = role === 'principal';
-        if (!currentGroup) {
-          currentGroup = [];
-          currentGroupHasPrincipal = isPrincipal;
-          groups.push(currentGroup);
-        } else if (isPrincipal && currentGroupHasPrincipal) {
-          currentGroup = [];
-          currentGroupHasPrincipal = true;
-          groups.push(currentGroup);
-        } else if (isPrincipal) {
-          currentGroupHasPrincipal = true;
-        }
-        currentGroup.push(selection);
-      });
-
-      let nextIndex = CHOICE_INDEX_MIN;
-      groups.forEach((group) => {
-        group.forEach((selection, position) => {
-          selection.choiceIndex = nextIndex;
-          selection.choiceRank = position + 1;
-          selection.isPrimary = position === 0;
-          selection.choiceLabel = selection.isPrimary
-            ? String(selection.choiceIndex)
-            : `${selection.choiceIndex}.${selection.choiceRank}`;
-        });
-        nextIndex += 1;
-      });
-
       invalidateGroupedSelections();
       refreshSelections();
     }
