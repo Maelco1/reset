@@ -131,9 +131,6 @@ const CHOICE_INDEX_MIN = 1;
 const CHOICE_INDEX_MAX = 20;
 
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
-const PLANNING_ZOOM_MIN = 70;
-const PLANNING_ZOOM_MAX = 140;
-const PLANNING_ZOOM_DEFAULT = 100;
 
 const sanitizeColor = (value) => {
   if (typeof value !== 'string') {
@@ -515,8 +512,6 @@ export function initializePlanningChoices({ userRole }) {
   const planningTables = document.querySelector('#planning-tables');
   const planningFeedback = document.querySelector('#planning-feedback');
   const planningBoard = document.querySelector('#planning-board');
-  const planningZoomInput = planningSection?.querySelector('[data-planning-zoom-input]') ?? null;
-  const planningZoomValue = planningSection?.querySelector('[data-planning-zoom-value]') ?? null;
   const stepper = document.querySelector('.stepper');
   const stepperButtons = stepper ? Array.from(stepper.querySelectorAll('.stepper-step')) : [];
   const stepPanes = Array.from(document.querySelectorAll('[data-step-pane]'));
@@ -560,9 +555,6 @@ export function initializePlanningChoices({ userRole }) {
     }),
     holidaysByYear: new Map(),
     planningCellSizingFrame: null,
-    planningCellWidth: null,
-    planningCellHeight: null,
-    planningZoom: PLANNING_ZOOM_DEFAULT,
     stickyHeaderFrame: null,
     userProfile: null,
     isSaving: false,
@@ -710,66 +702,6 @@ export function initializePlanningChoices({ userRole }) {
       planningFeedback.textContent = message ?? '';
     }
   };
-
-  const updatePlanningZoomDisplay = () => {
-    if (planningZoomValue) {
-      planningZoomValue.textContent = `${state.planningZoom}%`;
-    }
-  };
-
-  const applyPlanningZoom = () => {
-    if (!planningTables) {
-      return;
-    }
-    const scale = state.planningZoom / 100;
-    if (state.planningCellWidth != null) {
-      const scaledWidth = Math.round(state.planningCellWidth * scale);
-      planningTables.style.setProperty('--planning-cell-width', `${scaledWidth}px`);
-    } else {
-      planningTables.style.removeProperty('--planning-cell-width');
-    }
-    if (state.planningCellHeight != null) {
-      const scaledHeight = Math.round(state.planningCellHeight * scale);
-      planningTables.style.setProperty('--planning-cell-height', `${scaledHeight}px`);
-    } else {
-      planningTables.style.removeProperty('--planning-cell-height');
-    }
-  };
-
-  const clearPlanningCellDimensions = () => {
-    state.planningCellWidth = null;
-    state.planningCellHeight = null;
-    if (!planningTables) {
-      return;
-    }
-    planningTables.style.removeProperty('--planning-cell-width');
-    planningTables.style.removeProperty('--planning-cell-height');
-  };
-
-  const setPlanningZoom = (value) => {
-    const numeric = Number.parseInt(value, 10);
-    if (Number.isNaN(numeric)) {
-      return;
-    }
-    const clampedZoom = clamp(numeric, PLANNING_ZOOM_MIN, PLANNING_ZOOM_MAX);
-    if (state.planningZoom === clampedZoom) {
-      updatePlanningZoomDisplay();
-      return;
-    }
-    state.planningZoom = clampedZoom;
-    updatePlanningZoomDisplay();
-    applyPlanningZoom();
-  };
-
-  if (planningZoomInput) {
-    planningZoomInput.min = String(PLANNING_ZOOM_MIN);
-    planningZoomInput.max = String(PLANNING_ZOOM_MAX);
-    planningZoomInput.value = String(state.planningZoom);
-    planningZoomInput.addEventListener('input', (event) => {
-      setPlanningZoom(event.target.value);
-    });
-  }
-  updatePlanningZoomDisplay();
 
   const invalidateGroupedSelections = () => {
     state.groupedSelections = null;
@@ -1462,8 +1394,6 @@ export function initializePlanningChoices({ userRole }) {
       if (!planningTables) {
         return;
       }
-      const previousWidth = state.planningCellWidth;
-      const previousHeight = state.planningCellHeight;
       planningTables.style.removeProperty('--planning-cell-width');
       planningTables.style.removeProperty('--planning-cell-height');
       const widthElements = new Set([
@@ -1476,9 +1406,6 @@ export function initializePlanningChoices({ userRole }) {
         ...planningTables.querySelectorAll('.planning-slot-button')
       ]);
       if (!widthElements.size && !heightElements.size) {
-        state.planningCellWidth = previousWidth;
-        state.planningCellHeight = previousHeight;
-        applyPlanningZoom();
         return;
       }
       let maxWidth = 0;
@@ -1491,17 +1418,10 @@ export function initializePlanningChoices({ userRole }) {
         const rect = element.getBoundingClientRect();
         maxHeight = Math.max(maxHeight, rect.height);
       });
-      if (maxWidth > 0) {
-        state.planningCellWidth = clamp(Math.ceil(maxWidth) + 8, 120, 160);
-      } else {
-        state.planningCellWidth = previousWidth;
-      }
-      if (maxHeight > 0) {
-        state.planningCellHeight = clamp(Math.ceil(maxHeight) + 12, 80, 140);
-      } else {
-        state.planningCellHeight = previousHeight;
-      }
-      applyPlanningZoom();
+      const clampedWidth = clamp(Math.ceil(maxWidth) + 8, 120, 160);
+      const clampedHeight = clamp(Math.ceil(maxHeight) + 12, 80, 140);
+      planningTables.style.setProperty('--planning-cell-width', `${clampedWidth}px`);
+      planningTables.style.setProperty('--planning-cell-height', `${clampedHeight}px`);
     });
   };
 
@@ -1798,7 +1718,6 @@ export function initializePlanningChoices({ userRole }) {
     state.slotButtons.clear();
     if (!state.planningSlots.length) {
       planningTables.innerHTML = '<p class="empty-planning">Chargement du planning…</p>';
-      clearPlanningCellDimensions();
       return;
     }
     const months = [state.planningMonthOne, state.planningMonthTwo];
@@ -1860,7 +1779,6 @@ export function initializePlanningChoices({ userRole }) {
       console.error(error);
       setPlanningFeedback('Impossible de charger les colonnes.');
       planningTables.innerHTML = '<p class="empty-planning">Erreur de chargement.</p>';
-      clearPlanningCellDimensions();
       return;
     }
     let slots = data ?? [];

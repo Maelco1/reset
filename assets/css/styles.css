@@ -570,21 +570,6 @@ main {
   font-weight: 500;
   color: rgba(44, 62, 80, 0.85);
 }
-.planning-zoom-input {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.planning-zoom-input input[type='range'] {
-  flex: 1 1 auto;
-  min-width: 120px;
-  accent-color: var(--planning-accent, var(--accent));
-}
-.planning-zoom-value {
-  font-variant-numeric: tabular-nums;
-  min-width: 3ch;
-  text-align: right;
-}
 .planning-vision-control {
   grid-column: 1 / -1;
 }
