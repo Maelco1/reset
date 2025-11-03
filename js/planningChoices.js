@@ -118,7 +118,6 @@ const ACTIVITY_TYPES = new Map([
 ]);
 
 const MAX_PLANNING_CELL_WIDTH = 132;
-const MAX_PLANNING_CELL_HEIGHT = 88;
 
 const USER_TYPE_LABELS = new Set(['medecin', 'remplacant']);
 const CHOICE_SERIES = ['normale', 'bonne'];
@@ -1446,8 +1445,8 @@ export function initializePlanningChoices({ userRole }) {
         planningTables.style.setProperty('--planning-cell-width', `${clampedWidth}px`);
       }
       if (maxHeight > 0) {
-        const clampedHeight = Math.min(Math.ceil(maxHeight), MAX_PLANNING_CELL_HEIGHT);
-        planningTables.style.setProperty('--planning-cell-height', `${clampedHeight}px`);
+        const normalizedHeight = Math.ceil(maxHeight);
+        planningTables.style.setProperty('--planning-cell-height', `${normalizedHeight}px`);
       }
     });
   };
