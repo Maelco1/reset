@@ -121,6 +121,10 @@ const CHOICE_SERIES_LABELS = new Map([
   ['normale', 'Gardes normales'],
   ['bonne', 'Bonnes gardes']
 ]);
+const CHOICE_SERIES_BADGES = new Map([
+  ['normale', 'Normale'],
+  ['bonne', 'Bonne garde']
+]);
 const CHOICE_SERIES_STEPS = new Map([
   ['normale', 1],
   ['bonne', 2]
@@ -907,25 +911,29 @@ export function initializePlanningChoices({ userRole }) {
     series.buttons = new Map();
     const container = document.createElement('section');
     container.className = 'choice-index-panel';
-    container.dataset.choiceNature = nature;
+    const sanitizedNature = sanitizeChoiceNature(nature);
+    container.dataset.choiceNature = sanitizedNature;
 
+    const badgeLabel = CHOICE_SERIES_BADGES.get(sanitizedNature) ?? sanitizedNature;
     const title = document.createElement('h3');
     title.className = 'choice-index-title';
-    title.textContent = `Numérotation des choix — ${CHOICE_SERIES_LABELS.get(nature) ?? nature}`;
+    title.textContent = 'Numérotation des choix';
+    const badge = document.createElement('span');
+    badge.className = 'choice-index-badge';
+    badge.textContent = badgeLabel;
+    title.appendChild(badge);
     container.appendChild(title);
 
     const description = document.createElement('p');
     description.className = 'choice-index-description';
-    description.textContent = "Choisissez le numéro de choix actif puis cliquez sur les créneaux pour l'associer.";
+    description.textContent = `Choisissez le numéro de choix actif pour la vision “${badgeLabel}” puis cliquez sur les créneaux pour l'associer.`;
     container.appendChild(description);
 
     const grid = document.createElement('div');
     grid.className = 'choice-index-grid';
     grid.setAttribute(
       'aria-label',
-      `Sélection du numéro de choix pour ${(
-        CHOICE_SERIES_LABELS.get(nature) ?? nature
-      ).toLowerCase()}`
+      `Sélection du numéro de choix pour la vision ${badgeLabel.toLowerCase()}`
     );
     grid.setAttribute('role', 'group');
 
