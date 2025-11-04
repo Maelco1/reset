@@ -561,7 +561,14 @@ export function initializePlanningChoices({ userRole }) {
     assignments: new Map(),
     assignmentChannel: null,
     assignmentSubscriptionKey: null,
-    assignmentsLoadToken: 0
+    assignmentsLoadToken: 0,
+    nextSelectionOrder: 1,
+    nextGroupOrder: { normale: 1, bonne: 1 },
+    groupIdCounter: 1,
+    indexToGroupId: {
+      normale: new Map(),
+      bonne: new Map()
+    }
   };
 
   const getHolidaysForYear = (year) => {
@@ -797,62 +804,171 @@ export function initializePlanningChoices({ userRole }) {
     }, {});
 
   const computeGroupedSelections = () => {
-    const provisionalGroups = createEmptyChoiceGroups();
-
-    state.selections.forEach((selection, index) => {
-      selection.order = index + 1;
-      const nature = sanitizeChoiceNature(selection.nature);
-      selection.nature = nature;
-      const choiceIndex = selection.choiceIndex
-        ? sanitizeChoiceIndex(selection.choiceIndex)
-        : getActiveChoiceIndex(nature);
-      selection.choiceIndex = choiceIndex;
-      if (!provisionalGroups[nature].has(choiceIndex)) {
-        provisionalGroups[nature].set(choiceIndex, []);
-      }
-      provisionalGroups[nature].get(choiceIndex).push(selection);
-    });
+    if (state.groupedSelections) {
+      return state.groupedSelections;
+    }
 
     const groupedSelections = createEmptyChoiceGroups();
+    const selectionsByNature = CHOICE_SERIES.reduce((acc, seriesNature) => {
+      acc[seriesNature] = [];
+      return acc;
+    }, {});
 
-    CHOICE_SERIES.forEach((nature) => {
-      const orderedGroups = Array.from(provisionalGroups[nature].entries())
-        .map(([choiceIndex, selections]) => ({
-          choiceIndex,
-          selections,
-          order: Math.min(
-            ...selections.map((selection) => selection.order ?? Number.MAX_SAFE_INTEGER)
-          )
-        }))
-        .sort((a, b) => a.order - b.order || a.choiceIndex - b.choiceIndex);
+    state.selections = state.selections.filter((selection) => state.selectionMap.has(selection.slotKey));
 
-      orderedGroups.forEach((group, groupPosition) => {
-        const normalizedIndex = CHOICE_INDEX_MIN + groupPosition;
-        group.selections.forEach((selection, position) => {
-          selection.choiceIndex = normalizedIndex;
-          selection.choiceRank = position + 1;
-          selection.isPrimary = position === 0;
-          selection.choiceLabel = formatChoiceLabel(selection);
-        });
-        groupedSelections[nature].set(normalizedIndex, group.selections);
-      });
+    state.selections.forEach((selection) => {
+      const nature = sanitizeChoiceNature(selection.nature);
+      selection.nature = nature;
+      selectionsByNature[nature].push(selection);
     });
 
-    state.groupedSelections = groupedSelections;
+    let globalOrder = 1;
 
     CHOICE_SERIES.forEach((nature) => {
-      const series = getChoiceSeries(nature);
-      if (!series) {
-        return;
+      if (!(state.indexToGroupId[nature] instanceof Map)) {
+        state.indexToGroupId[nature] = new Map();
+      } else {
+        state.indexToGroupId[nature].clear();
       }
-      const nextIndex = clamp(
-        CHOICE_INDEX_MIN + groupedSelections[nature].size,
-        CHOICE_INDEX_MIN,
-        CHOICE_INDEX_MAX
+
+      const entries = (selectionsByNature[nature] ?? []).slice();
+      entries.sort((a, b) => {
+        const orderA = Number.isFinite(a.groupOrder) ? a.groupOrder : Number.POSITIVE_INFINITY;
+        const orderB = Number.isFinite(b.groupOrder) ? b.groupOrder : Number.POSITIVE_INFINITY;
+        if (orderA !== orderB) {
+          return orderA - orderB;
+        }
+        const primaryWeightA = a.isPrimary ? 0 : 1;
+        const primaryWeightB = b.isPrimary ? 0 : 1;
+        if (primaryWeightA !== primaryWeightB) {
+          return primaryWeightA - primaryWeightB;
+        }
+        const rankA = Number.isFinite(a.choiceRank) ? a.choiceRank : Number.POSITIVE_INFINITY;
+        const rankB = Number.isFinite(b.choiceRank) ? b.choiceRank : Number.POSITIVE_INFINITY;
+        if (rankA !== rankB) {
+          return rankA - rankB;
+        }
+        const createdA = Number.isFinite(a.order) ? a.order : Number.POSITIVE_INFINITY;
+        const createdB = Number.isFinite(b.order) ? b.order : Number.POSITIVE_INFINITY;
+        if (createdA !== createdB) {
+          return createdA - createdB;
+        }
+        return a.slotKey.localeCompare(b.slotKey);
+      });
+
+      const groupMap = new Map();
+      let provisionalNextOrder = state.nextGroupOrder[nature] ?? CHOICE_INDEX_MIN;
+
+      entries.forEach((selection) => {
+        if (!selection.groupId) {
+          selection.groupId = `${nature}-${state.groupIdCounter++}`;
+        }
+        let group = groupMap.get(selection.groupId);
+        if (!group) {
+          const initialOrder = Number.isFinite(selection.groupOrder)
+            ? selection.groupOrder
+            : provisionalNextOrder++;
+          group = { id: selection.groupId, order: initialOrder, selections: [] };
+          groupMap.set(selection.groupId, group);
+        }
+        group.order = Number.isFinite(group.order)
+          ? Math.min(group.order, Number.isFinite(selection.groupOrder) ? selection.groupOrder : group.order)
+          : Number.isFinite(selection.groupOrder)
+            ? selection.groupOrder
+            : group.order;
+        selection.groupOrder = group.order;
+        group.selections.push(selection);
+      });
+
+      const orderedGroups = Array.from(groupMap.values()).sort(
+        (a, b) => a.order - b.order || a.id.localeCompare(b.id)
       );
-      series.activeIndex = nextIndex;
+
+      const natureGroups = new Map();
+      let nextIndex = CHOICE_INDEX_MIN;
+
+      orderedGroups.forEach((group) => {
+        const assignedIndex = clamp(nextIndex, CHOICE_INDEX_MIN, CHOICE_INDEX_MAX);
+        nextIndex = assignedIndex + 1;
+        const sortedGroup = group.selections
+          .slice()
+          .sort((a, b) => {
+            const primaryWeightA = a.isPrimary ? 0 : 1;
+            const primaryWeightB = b.isPrimary ? 0 : 1;
+            if (primaryWeightA !== primaryWeightB) {
+              return primaryWeightA - primaryWeightB;
+            }
+            const rankA = Number.isFinite(a.choiceRank) ? a.choiceRank : Number.POSITIVE_INFINITY;
+            const rankB = Number.isFinite(b.choiceRank) ? b.choiceRank : Number.POSITIVE_INFINITY;
+            if (rankA !== rankB) {
+              return rankA - rankB;
+            }
+            const orderA = Number.isFinite(a.order) ? a.order : Number.POSITIVE_INFINITY;
+            const orderB = Number.isFinite(b.order) ? b.order : Number.POSITIVE_INFINITY;
+            if (orderA !== orderB) {
+              return orderA - orderB;
+            }
+            return a.slotKey.localeCompare(b.slotKey);
+          });
+
+        const primary = sortedGroup[0];
+        if (!primary) {
+          return;
+        }
+        primary.isPrimary = true;
+        const normalizedGroup = [primary, ...sortedGroup.slice(1).map((selection) => {
+          selection.isPrimary = false;
+          return selection;
+        })];
+
+        normalizedGroup.forEach((selection, position) => {
+          selection.choiceIndex = assignedIndex;
+          selection.choiceRank = position + 1;
+          selection.choiceLabel = formatChoiceLabel(selection);
+          selection.groupId = group.id;
+          selection.groupOrder = group.order;
+          selection.order = globalOrder++;
+        });
+
+        natureGroups.set(assignedIndex, normalizedGroup);
+        state.indexToGroupId[nature].set(assignedIndex, group.id);
+      });
+
+      groupedSelections[nature] = natureGroups;
+
+      const highestGroupOrder = orderedGroups.reduce(
+        (max, group) => (Number.isFinite(group.order) ? Math.max(max, group.order) : max),
+        0
+      );
+      state.nextGroupOrder[nature] = Math.max(highestGroupOrder + 1, nextIndex);
+
+      const series = getChoiceSeries(nature);
+      if (series) {
+        const nextActiveIndex = clamp(
+          CHOICE_INDEX_MIN + natureGroups.size,
+          CHOICE_INDEX_MIN,
+          CHOICE_INDEX_MAX
+        );
+        series.activeIndex = nextActiveIndex;
+      }
     });
 
+    const flattened = [];
+    CHOICE_SERIES.forEach((nature) => {
+      const natureGroups = groupedSelections[nature];
+      Array.from(natureGroups.keys())
+        .sort((a, b) => a - b)
+        .forEach((choiceIndex) => {
+          const selections = natureGroups.get(choiceIndex) ?? [];
+          selections.forEach((selection) => {
+            flattened.push(selection);
+          });
+        });
+    });
+
+    state.selections = flattened;
+    state.nextSelectionOrder = state.selections.length + 1;
+    state.groupedSelections = groupedSelections;
     return groupedSelections;
   };
 
@@ -1210,127 +1326,75 @@ export function initializePlanningChoices({ userRole }) {
     updateSummaryFeedback();
   };
 
-  const reorderGroupWithinState = (nature, choiceIndex, orderedGroup) => {
-    const sanitizedNature = sanitizeChoiceNature(nature);
-    const sanitizedIndex = sanitizeChoiceIndex(choiceIndex);
-    const groupKey = `${sanitizedNature}:${sanitizedIndex}`;
-    const currentGroup = state.selections.filter(
-      (selection) =>
-        sanitizeChoiceNature(selection.nature) === sanitizedNature &&
-        sanitizeChoiceIndex(selection.choiceIndex) === sanitizedIndex
-    );
-    if (!currentGroup.length || currentGroup.length !== orderedGroup.length) {
-      return;
-    }
-    const orderedSet = new Set(orderedGroup);
-    if (currentGroup.some((selection) => !orderedSet.has(selection))) {
-      return;
-    }
-    const newSelections = [];
-    let inserted = false;
-    state.selections.forEach((selection) => {
-      const key = `${sanitizeChoiceNature(selection.nature)}:${sanitizeChoiceIndex(selection.choiceIndex)}`;
-      if (key === groupKey) {
-        if (!inserted) {
-          newSelections.push(...orderedGroup);
-          inserted = true;
-        }
-      } else {
-        newSelections.push(selection);
-      }
-    });
-    if (inserted && newSelections.length === state.selections.length) {
-      state.selections = newSelections;
-      invalidateGroupedSelections();
-      refreshSelections();
-    }
-  };
-
   const applySummaryListOrder = (nature) => {
     const sanitizedNature = sanitizeChoiceNature(nature);
     const list = summaryLists.get(sanitizedNature);
     if (!list) {
       return;
     }
-    const orderedKeys = Array.from(list.querySelectorAll('.summary-item[data-slot-key]'))
-      .filter((item) => item.draggable)
-      .map((item) => item.dataset.slotKey)
-      .filter(Boolean);
-    const selectionsForNature = state.selections.filter(
-      (selection) => sanitizeChoiceNature(selection.nature) === sanitizedNature
-    );
-    if (!orderedKeys.length && selectionsForNature.length) {
-      return;
-    }
-    const orderedSelections = orderedKeys
-      .map((key) => state.selectionMap.get(key))
-      .filter(
-        (selection) => selection && sanitizeChoiceNature(selection.nature) === sanitizedNature
-      );
-    selectionsForNature.forEach((selection) => {
-      if (!orderedSelections.includes(selection)) {
-        orderedSelections.push(selection);
-      }
-    });
-    const newSelections = [];
-    CHOICE_SERIES.forEach((natureKey) => {
-      if (natureKey === sanitizedNature) {
-        newSelections.push(...orderedSelections);
-      } else {
-        state.selections.forEach((selection) => {
-          if (sanitizeChoiceNature(selection.nature) === natureKey) {
-            newSelections.push(selection);
-          }
-        });
-      }
-    });
-    if (newSelections.length === state.selections.length) {
-      state.selections = newSelections;
+    const domItems = Array.from(list.querySelectorAll('.summary-item[data-slot-key]'))
+      .map((element) => ({
+        element,
+        selection: state.selectionMap.get(element.dataset.slotKey ?? ''),
+        role: element.dataset.choiceRole === 'alternative' ? 'alternative' : 'principal'
+      }))
+      .filter(({ selection }) => selection && sanitizeChoiceNature(selection.nature) === sanitizedNature);
 
-      const domItems = Array.from(list.querySelectorAll('.summary-item[data-slot-key]'))
-        .map((element) => ({
-          element,
-          selection: state.selectionMap.get(element.dataset.slotKey),
-          role: element.dataset.choiceRole === 'alternative' ? 'alternative' : 'principal'
-        }))
-        .filter(
-          (entry) =>
-            entry.selection && sanitizeChoiceNature(entry.selection.nature) === sanitizedNature
-        );
-
-      const groups = [];
-      let currentGroup = null;
-      let currentGroupHasPrincipal = false;
-      domItems.forEach(({ selection, role }) => {
-        const isPrincipal = role === 'principal';
-        if (!currentGroup) {
-          currentGroup = [];
-          currentGroupHasPrincipal = isPrincipal;
-          groups.push(currentGroup);
-        } else if (isPrincipal && currentGroupHasPrincipal) {
-          currentGroup = [];
-          currentGroupHasPrincipal = true;
-          groups.push(currentGroup);
-        } else if (isPrincipal) {
-          currentGroupHasPrincipal = true;
-        }
-        currentGroup.push(selection);
-      });
-
-      let nextIndex = CHOICE_INDEX_MIN;
-      groups.forEach((group) => {
-        group.forEach((selection, position) => {
-          selection.choiceIndex = nextIndex;
-          selection.choiceRank = position + 1;
-          selection.isPrimary = position === 0;
-          selection.choiceLabel = formatChoiceLabel(selection);
-        });
-        nextIndex += 1;
-      });
-
+    if (!domItems.length) {
+      state.nextGroupOrder[sanitizedNature] = CHOICE_INDEX_MIN;
       invalidateGroupedSelections();
       refreshSelections();
+      return;
     }
+
+    const groups = [];
+    let currentGroup = [];
+    domItems.forEach(({ selection, role }) => {
+      const isPrincipal = role === 'principal';
+      if (isPrincipal || currentGroup.length === 0) {
+        if (currentGroup.length) {
+          groups.push(currentGroup);
+        }
+        currentGroup = [];
+      }
+      currentGroup.push({ selection, role });
+    });
+    if (currentGroup.length) {
+      groups.push(currentGroup);
+    }
+
+    if (!groups.length) {
+      return;
+    }
+
+    let orderCounter = 1;
+    groups.forEach((group, groupIndex) => {
+      const groupOrder = groupIndex + CHOICE_INDEX_MIN;
+      let groupId = group[0]?.selection.groupId;
+      if (!groupId) {
+        groupId = `${sanitizedNature}-${state.groupIdCounter++}`;
+      }
+      let primaryAssigned = false;
+      group.forEach(({ selection, role }, position) => {
+        selection.nature = sanitizedNature;
+        selection.groupId = groupId;
+        selection.groupOrder = groupOrder;
+        selection.order = orderCounter++;
+        if (role === 'principal') {
+          selection.isPrimary = true;
+          primaryAssigned = true;
+        } else {
+          selection.isPrimary = false;
+        }
+      });
+      if (!primaryAssigned && group.length) {
+        group[0].selection.isPrimary = true;
+      }
+    });
+
+    state.nextGroupOrder[sanitizedNature] = groups.length + CHOICE_INDEX_MIN;
+    invalidateGroupedSelections();
+    refreshSelections();
   };
 
   const setSelectionRole = (slotKey, role) => {
@@ -1340,28 +1404,33 @@ export function initializePlanningChoices({ userRole }) {
     }
     const groupedSelections = getGroupedSelections();
     const nature = sanitizeChoiceNature(selection.nature);
-    const choiceIndex = sanitizeChoiceIndex(selection.choiceIndex);
-    const group = groupedSelections[nature]?.get(choiceIndex);
-    if (!group || !group.length) {
+    const natureGroups = groupedSelections[nature] ?? new Map();
+    let targetGroup = null;
+    natureGroups.forEach((items) => {
+      if (items.some((item) => item.slotKey === slotKey)) {
+        targetGroup = items;
+      }
+    });
+    if (!targetGroup || !targetGroup.length) {
       return;
     }
     if (role === 'principal') {
-      if (selection.isPrimary) {
-        return;
-      }
-      const reordered = [selection, ...group.filter((item) => item.slotKey !== slotKey)];
-      reorderGroupWithinState(nature, choiceIndex, reordered);
+      targetGroup.forEach((item) => {
+        item.isPrimary = item.slotKey === slotKey;
+      });
     } else if (role === 'alternative') {
       if (!selection.isPrimary) {
         return;
       }
-      const alternatives = group.filter((item) => item.slotKey !== slotKey);
+      const alternatives = targetGroup.filter((item) => item.slotKey !== slotKey);
       if (!alternatives.length) {
         return;
       }
-      const reordered = [...alternatives, selection];
-      reorderGroupWithinState(nature, choiceIndex, reordered);
+      alternatives[0].isPrimary = true;
+      selection.isPrimary = false;
     }
+    invalidateGroupedSelections();
+    refreshSelections();
   };
 
   const refreshSelections = () => {
@@ -1387,6 +1456,37 @@ export function initializePlanningChoices({ userRole }) {
     if (state.selectionMap.has(selection.slotKey)) {
       removeSelection(selection.slotKey);
     }
+    const nature = sanitizeChoiceNature(selection.nature);
+    selection.nature = nature;
+    const activeIndex = sanitizeChoiceIndex(
+      selection.choiceIndex ?? getActiveChoiceIndex(nature)
+    );
+    selection.choiceIndex = activeIndex;
+
+    const groupedSelections = getGroupedSelections();
+    const natureGroups = groupedSelections[nature] ?? new Map();
+    if (!(state.indexToGroupId[nature] instanceof Map)) {
+      state.indexToGroupId[nature] = new Map();
+    }
+    const indexLookup = state.indexToGroupId[nature];
+    const groupIdFromIndex = indexLookup.get(activeIndex) ?? null;
+
+    if (groupIdFromIndex && natureGroups.has(activeIndex)) {
+      const groupEntries = natureGroups.get(activeIndex) ?? [];
+      const reference = groupEntries[0] ?? null;
+      selection.groupId = groupIdFromIndex;
+      selection.groupOrder = reference?.groupOrder ?? activeIndex;
+      const hasPrimary = groupEntries.some((item) => item.isPrimary);
+      selection.isPrimary = !hasPrimary;
+    } else {
+      selection.groupId = `${nature}-${state.groupIdCounter++}`;
+      const nextOrder = state.nextGroupOrder[nature] ?? CHOICE_INDEX_MIN;
+      selection.groupOrder = nextOrder;
+      state.nextGroupOrder[nature] = nextOrder + 1;
+      selection.isPrimary = true;
+    }
+
+    selection.order = state.nextSelectionOrder++;
     state.selectionMap.set(selection.slotKey, selection);
     state.selections.push(selection);
     invalidateGroupedSelections();
@@ -2092,6 +2192,8 @@ export function initializePlanningChoices({ userRole }) {
           etat: record.etat ?? 'en attente',
           createdAt: record.created_at ?? null
         };
+        selection.groupId = `${selection.nature}-${selection.choiceIndex}`;
+        selection.groupOrder = selection.choiceIndex;
         selection.choiceLabel = formatChoiceLabel(selection);
         return selection;
       })
@@ -2138,6 +2240,7 @@ export function initializePlanningChoices({ userRole }) {
     const trigram = state.userProfile?.trigram ?? '???';
     const userId = state.userProfile?.id ?? null;
     const nowIso = new Date().toISOString();
+    getGroupedSelections();
     const payload = state.selections.map((selection, index) => ({
       user_id: userId,
       trigram,
