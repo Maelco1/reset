@@ -745,6 +745,16 @@ export function initializePlanningChoices({ userRole }) {
     return numeric;
   };
 
+  const formatChoiceLabel = (selection) => {
+    const index = sanitizeChoiceIndex(selection.choiceIndex);
+    const rank = sanitizeChoiceRank(selection.choiceRank);
+    if (selection.isPrimary || rank <= 1) {
+      return String(index);
+    }
+    const alternativeRank = Math.max(1, rank - 1);
+    return `${index}.${alternativeRank}`;
+  };
+
   const getChoiceSeries = (nature) => state.choiceSeries[sanitizeChoiceNature(nature)];
 
   const getActiveChoiceIndex = (nature) => {
@@ -822,9 +832,7 @@ export function initializePlanningChoices({ userRole }) {
           selection.choiceIndex = normalizedIndex;
           selection.choiceRank = position + 1;
           selection.isPrimary = position === 0;
-          selection.choiceLabel = selection.isPrimary
-            ? String(selection.choiceIndex)
-            : `${selection.choiceIndex}.${selection.choiceRank}`;
+          selection.choiceLabel = formatChoiceLabel(selection);
         });
         groupedSelections[nature].set(normalizedIndex, group.selections);
       });
@@ -1316,9 +1324,7 @@ export function initializePlanningChoices({ userRole }) {
           selection.choiceIndex = nextIndex;
           selection.choiceRank = position + 1;
           selection.isPrimary = position === 0;
-          selection.choiceLabel = selection.isPrimary
-            ? String(selection.choiceIndex)
-            : `${selection.choiceIndex}.${selection.choiceRank}`;
+          selection.choiceLabel = formatChoiceLabel(selection);
         });
         nextIndex += 1;
       });
@@ -2084,9 +2090,7 @@ export function initializePlanningChoices({ userRole }) {
           etat: record.etat ?? 'en attente',
           createdAt: record.created_at ?? null
         };
-        selection.choiceLabel = selection.isPrimary
-          ? String(selection.choiceIndex)
-          : `${selection.choiceIndex}.${selection.choiceRank}`;
+        selection.choiceLabel = formatChoiceLabel(selection);
         return selection;
       })
       .filter(Boolean)

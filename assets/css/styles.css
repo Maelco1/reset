@@ -521,20 +521,20 @@ main {
 
 .choice-index-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(52px, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(44px, 1fr));
+  gap: 6px;
 }
 
 .choice-index-button {
   display: grid;
-  gap: 4px;
-  padding: 8px 6px;
-  border-radius: 10px;
+  gap: 3px;
+  padding: 6px 4px;
+  border-radius: 8px;
   border: 1px solid rgba(148, 163, 184, 0.45);
   background: #fff;
   color: var(--primary);
   font-weight: 600;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.015em;
   cursor: pointer;
   transition: transform var(--transition), box-shadow var(--transition), border-color var(--transition), background var(--transition), color var(--transition);
 }
@@ -565,15 +565,15 @@ main {
 }
 
 .choice-index-number {
-  font-size: 1.1rem;
+  font-size: 0.95rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 
 .choice-index-indicator {
-  min-height: 1em;
-  font-size: 0.8rem;
-  letter-spacing: 0.08em;
+  min-height: 0.9em;
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
 }
 .planning-control { display: grid; gap: 6px; }
 .planning-control-label {
