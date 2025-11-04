@@ -1170,17 +1170,16 @@ export function initializePlanningChoices({ userRole }) {
           item.dataset.choiceRank = String(selection.choiceRank ?? 1);
           item.dataset.choiceRole = selection.isPrimary ? 'principal' : 'alternative';
           item.dataset.summaryNature = selection.nature;
+          const choiceLabel = selection.choiceLabel ?? String(selection.choiceIndex ?? CHOICE_INDEX_MIN);
+          const alternativeRank = Math.max(1, (selection.choiceRank ?? 1) - 1);
           item.innerHTML = `
-            <div class="summary-item-order">${selection.choiceLabel ?? selection.order}</div>
+            <div class="summary-item-order">${choiceLabel}</div>
             <div class="summary-item-body">
               <div class="summary-item-main">
                 <span class="summary-item-choice">${
                   selection.isPrimary
-                    ? `Choix ${selection.choiceIndex} — Principal`
-                    : `Choix ${selection.choiceIndex} — Alternative ${Math.max(
-                        1,
-                        selection.choiceRank - 1
-                      )}`
+                    ? `Choix ${choiceLabel} — Principal`
+                    : `Choix ${choiceLabel} — Alternative ${alternativeRank}`
                 }</span>
                 <span class="summary-item-date">${formatSummaryLabel(selection)}</span>
                 <span class="summary-item-details">Col. ${selection.columnPosition} · ${
@@ -1529,6 +1528,9 @@ export function initializePlanningChoices({ userRole }) {
     selection.nature = sanitizeChoiceNature(selection.nature);
     selection.choiceIndex = getActiveChoiceIndex(selection.nature);
     addSelection(selection);
+    const sanitizedIndex = sanitizeChoiceIndex(selection.choiceIndex);
+    const nextIndex = clamp(sanitizedIndex + 1, CHOICE_INDEX_MIN, CHOICE_INDEX_MAX);
+    setActiveChoiceIndex(selection.nature, nextIndex);
   };
   const buildPlanningTable = (year, month) => {
     const monthSection = document.createElement('section');
