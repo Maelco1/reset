@@ -489,6 +489,28 @@ main {
   font-size: 0.95rem;
   font-weight: 600;
   color: var(--primary);
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.choice-index-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: var(--accent);
+  color: #fff;
+}
+
+.choice-index-panel[data-choice-nature='bonne'] .choice-index-badge {
+  background: #16a34a;
 }
 
 .choice-index-description {
