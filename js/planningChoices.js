@@ -1323,15 +1323,23 @@ export function initializePlanningChoices({ userRole }) {
       return;
     }
 
-    const usedIndexes = new Set();
     let orderCounter = 1;
+    let nextChoiceIndex = CHOICE_INDEX_MIN;
 
-    groupOrder.forEach((choiceIndex) => {
-      const entries = groupsByIndex.get(choiceIndex) ?? [];
+    groupOrder.forEach((originalIndex) => {
+      const entries = groupsByIndex.get(originalIndex) ?? [];
       if (!entries.length) {
         return;
       }
-      const groupId = `${sanitizedNature}-${choiceIndex}`;
+
+      const assignedIndex = nextChoiceIndex <= CHOICE_INDEX_MAX
+        ? nextChoiceIndex
+        : sanitizeChoiceIndex(entries[0].selection.choiceIndex);
+      if (nextChoiceIndex <= CHOICE_INDEX_MAX) {
+        nextChoiceIndex += 1;
+      }
+
+      const groupId = `${sanitizedNature}-${assignedIndex}`;
       const primaryEntry =
         entries.find((entry) => entry.role === 'principal') ?? entries[0];
       const alternatives = entries.filter((entry) => entry !== primaryEntry);
@@ -1339,8 +1347,8 @@ export function initializePlanningChoices({ userRole }) {
       const primarySelection = primaryEntry.selection;
       primarySelection.nature = sanitizedNature;
       primarySelection.groupId = groupId;
-      primarySelection.groupOrder = choiceIndex;
-      primarySelection.choiceIndex = choiceIndex;
+      primarySelection.groupOrder = assignedIndex;
+      primarySelection.choiceIndex = assignedIndex;
       primarySelection.isPrimary = true;
       primarySelection.choiceRank = 1;
       primarySelection.choiceLabel = formatChoiceLabel(primarySelection);
@@ -1350,15 +1358,13 @@ export function initializePlanningChoices({ userRole }) {
         const selection = entry.selection;
         selection.nature = sanitizedNature;
         selection.groupId = groupId;
-        selection.groupOrder = choiceIndex;
-        selection.choiceIndex = choiceIndex;
+        selection.groupOrder = assignedIndex;
+        selection.choiceIndex = assignedIndex;
         selection.isPrimary = false;
         selection.choiceRank = position + 2;
         selection.choiceLabel = formatChoiceLabel(selection);
         selection.order = orderCounter++;
       });
-
-      usedIndexes.add(choiceIndex);
     });
 
     invalidateGroupedSelections();
