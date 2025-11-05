@@ -563,8 +563,6 @@ export function initializePlanningChoices({ userRole }) {
     assignmentSubscriptionKey: null,
     assignmentsLoadToken: 0,
     nextSelectionOrder: 1,
-    nextGroupOrder: { normale: 1, bonne: 1 },
-    groupIdCounter: 1,
     indexToGroupId: {
       normale: new Map(),
       bonne: new Map()
@@ -828,76 +826,41 @@ export function initializePlanningChoices({ userRole }) {
       }
 
       const entries = (selectionsByNature[nature] ?? []).slice();
-      entries.sort((a, b) => {
-        const orderA = Number.isFinite(a.groupOrder) ? a.groupOrder : Number.POSITIVE_INFINITY;
-        const orderB = Number.isFinite(b.groupOrder) ? b.groupOrder : Number.POSITIVE_INFINITY;
-        if (orderA !== orderB) {
-          return orderA - orderB;
-        }
-        const primaryWeightA = a.isPrimary ? 0 : 1;
-        const primaryWeightB = b.isPrimary ? 0 : 1;
-        if (primaryWeightA !== primaryWeightB) {
-          return primaryWeightA - primaryWeightB;
-        }
-        const rankA = Number.isFinite(a.choiceRank) ? a.choiceRank : Number.POSITIVE_INFINITY;
-        const rankB = Number.isFinite(b.choiceRank) ? b.choiceRank : Number.POSITIVE_INFINITY;
-        if (rankA !== rankB) {
-          return rankA - rankB;
-        }
-        const createdA = Number.isFinite(a.order) ? a.order : Number.POSITIVE_INFINITY;
-        const createdB = Number.isFinite(b.order) ? b.order : Number.POSITIVE_INFINITY;
-        if (createdA !== createdB) {
-          return createdA - createdB;
-        }
-        return a.slotKey.localeCompare(b.slotKey);
-      });
-
-      const groupMap = new Map();
-      let provisionalNextOrder = state.nextGroupOrder[nature] ?? CHOICE_INDEX_MIN;
+      const groups = new Map();
 
       entries.forEach((selection) => {
-        if (!selection.groupId) {
-          selection.groupId = `${nature}-${state.groupIdCounter++}`;
+        const index = sanitizeChoiceIndex(selection.choiceIndex);
+        selection.choiceIndex = index;
+        const groupId = `${nature}-${index}`;
+        if (!groups.has(index)) {
+          groups.set(index, { id: groupId, selections: [] });
         }
-        let group = groupMap.get(selection.groupId);
-        if (!group) {
-          const initialOrder = Number.isFinite(selection.groupOrder)
-            ? selection.groupOrder
-            : provisionalNextOrder++;
-          group = { id: selection.groupId, order: initialOrder, selections: [] };
-          groupMap.set(selection.groupId, group);
-        }
-        group.order = Number.isFinite(group.order)
-          ? Math.min(group.order, Number.isFinite(selection.groupOrder) ? selection.groupOrder : group.order)
-          : Number.isFinite(selection.groupOrder)
-            ? selection.groupOrder
-            : group.order;
-        selection.groupOrder = group.order;
+        const group = groups.get(index);
+        selection.groupId = group.id;
+        selection.groupOrder = index;
         group.selections.push(selection);
       });
 
-      const orderedGroups = Array.from(groupMap.values()).sort(
-        (a, b) => a.order - b.order || a.id.localeCompare(b.id)
-      );
-
+      const sortedIndexes = Array.from(groups.keys()).sort((a, b) => a - b);
       const natureGroups = new Map();
-      let nextIndex = CHOICE_INDEX_MIN;
 
-      orderedGroups.forEach((group) => {
-        const assignedIndex = clamp(nextIndex, CHOICE_INDEX_MIN, CHOICE_INDEX_MAX);
-        nextIndex = assignedIndex + 1;
-        const sortedGroup = group.selections
+      sortedIndexes.forEach((choiceIndex) => {
+        const group = groups.get(choiceIndex);
+        if (!group) {
+          return;
+        }
+        const orderedSelections = group.selections
           .slice()
           .sort((a, b) => {
-            const primaryWeightA = a.isPrimary ? 0 : 1;
-            const primaryWeightB = b.isPrimary ? 0 : 1;
-            if (primaryWeightA !== primaryWeightB) {
-              return primaryWeightA - primaryWeightB;
-            }
             const rankA = Number.isFinite(a.choiceRank) ? a.choiceRank : Number.POSITIVE_INFINITY;
             const rankB = Number.isFinite(b.choiceRank) ? b.choiceRank : Number.POSITIVE_INFINITY;
             if (rankA !== rankB) {
               return rankA - rankB;
+            }
+            const primaryWeightA = a.isPrimary ? 0 : 1;
+            const primaryWeightB = b.isPrimary ? 0 : 1;
+            if (primaryWeightA !== primaryWeightB) {
+              return primaryWeightA - primaryWeightB;
             }
             const orderA = Number.isFinite(a.order) ? a.order : Number.POSITIVE_INFINITY;
             const orderB = Number.isFinite(b.order) ? b.order : Number.POSITIVE_INFINITY;
@@ -907,45 +870,46 @@ export function initializePlanningChoices({ userRole }) {
             return a.slotKey.localeCompare(b.slotKey);
           });
 
-        const primary = sortedGroup[0];
-        if (!primary) {
+        const primarySelection =
+          orderedSelections.find((selection) => selection.isPrimary) ?? orderedSelections[0] ?? null;
+        if (!primarySelection) {
           return;
         }
-        primary.isPrimary = true;
-        const normalizedGroup = [primary, ...sortedGroup.slice(1).map((selection) => {
-          selection.isPrimary = false;
-          return selection;
-        })];
 
-        normalizedGroup.forEach((selection, position) => {
-          selection.choiceIndex = assignedIndex;
-          selection.choiceRank = position + 1;
-          selection.choiceLabel = formatChoiceLabel(selection);
-          selection.groupId = group.id;
-          selection.groupOrder = group.order;
-          selection.order = globalOrder++;
-        });
+        const normalizedGroup = [];
+        primarySelection.isPrimary = true;
+        primarySelection.choiceIndex = choiceIndex;
+        primarySelection.choiceRank = 1;
+        primarySelection.groupId = group.id;
+        primarySelection.groupOrder = choiceIndex;
+        primarySelection.choiceLabel = formatChoiceLabel(primarySelection);
+        primarySelection.order = globalOrder++;
+        normalizedGroup.push(primarySelection);
 
-        natureGroups.set(assignedIndex, normalizedGroup);
-        state.indexToGroupId[nature].set(assignedIndex, group.id);
+        orderedSelections
+          .filter((selection) => selection !== primarySelection)
+          .forEach((selection, position) => {
+            selection.isPrimary = false;
+            selection.choiceIndex = choiceIndex;
+            selection.choiceRank = position + 2;
+            selection.groupId = group.id;
+            selection.groupOrder = choiceIndex;
+            selection.choiceLabel = formatChoiceLabel(selection);
+            selection.order = globalOrder++;
+            normalizedGroup.push(selection);
+          });
+
+        natureGroups.set(choiceIndex, normalizedGroup);
+        state.indexToGroupId[nature].set(choiceIndex, group.id);
       });
 
       groupedSelections[nature] = natureGroups;
 
-      const highestGroupOrder = orderedGroups.reduce(
-        (max, group) => (Number.isFinite(group.order) ? Math.max(max, group.order) : max),
-        0
-      );
-      state.nextGroupOrder[nature] = Math.max(highestGroupOrder + 1, nextIndex);
+      const usedIndexes = new Set(sortedIndexes);
 
       const series = getChoiceSeries(nature);
       if (series) {
-        const nextActiveIndex = clamp(
-          CHOICE_INDEX_MIN + natureGroups.size,
-          CHOICE_INDEX_MIN,
-          CHOICE_INDEX_MAX
-        );
-        series.activeIndex = nextActiveIndex;
+        series.activeIndex = sanitizeChoiceIndex(series.activeIndex ?? CHOICE_INDEX_MIN);
       }
     });
 
@@ -1337,58 +1301,66 @@ export function initializePlanningChoices({ userRole }) {
       .filter(({ selection }) => selection && sanitizeChoiceNature(selection.nature) === sanitizedNature);
 
     if (!domItems.length) {
-      state.nextGroupOrder[sanitizedNature] = CHOICE_INDEX_MIN;
       invalidateGroupedSelections();
       refreshSelections();
       return;
     }
 
-    const groups = [];
-    let currentGroup = [];
-    domItems.forEach(({ selection, role }) => {
-      const isPrincipal = role === 'principal';
-      if (isPrincipal || currentGroup.length === 0) {
-        if (currentGroup.length) {
-          groups.push(currentGroup);
-        }
-        currentGroup = [];
+    const groupsByIndex = new Map();
+    const groupOrder = [];
+    domItems.forEach((entry) => {
+      const index = sanitizeChoiceIndex(entry.selection.choiceIndex);
+      if (!groupsByIndex.has(index)) {
+        groupsByIndex.set(index, []);
+        groupOrder.push(index);
       }
-      currentGroup.push({ selection, role });
+      groupsByIndex.get(index).push(entry);
     });
-    if (currentGroup.length) {
-      groups.push(currentGroup);
-    }
 
-    if (!groups.length) {
+    if (!groupOrder.length) {
+      invalidateGroupedSelections();
+      refreshSelections();
       return;
     }
 
+    const usedIndexes = new Set();
     let orderCounter = 1;
-    groups.forEach((group, groupIndex) => {
-      const groupOrder = groupIndex + CHOICE_INDEX_MIN;
-      let groupId = group[0]?.selection.groupId;
-      if (!groupId) {
-        groupId = `${sanitizedNature}-${state.groupIdCounter++}`;
+
+    groupOrder.forEach((choiceIndex) => {
+      const entries = groupsByIndex.get(choiceIndex) ?? [];
+      if (!entries.length) {
+        return;
       }
-      let primaryAssigned = false;
-      group.forEach(({ selection, role }, position) => {
+      const groupId = `${sanitizedNature}-${choiceIndex}`;
+      const primaryEntry =
+        entries.find((entry) => entry.role === 'principal') ?? entries[0];
+      const alternatives = entries.filter((entry) => entry !== primaryEntry);
+
+      const primarySelection = primaryEntry.selection;
+      primarySelection.nature = sanitizedNature;
+      primarySelection.groupId = groupId;
+      primarySelection.groupOrder = choiceIndex;
+      primarySelection.choiceIndex = choiceIndex;
+      primarySelection.isPrimary = true;
+      primarySelection.choiceRank = 1;
+      primarySelection.choiceLabel = formatChoiceLabel(primarySelection);
+      primarySelection.order = orderCounter++;
+
+      alternatives.forEach((entry, position) => {
+        const selection = entry.selection;
         selection.nature = sanitizedNature;
         selection.groupId = groupId;
-        selection.groupOrder = groupOrder;
+        selection.groupOrder = choiceIndex;
+        selection.choiceIndex = choiceIndex;
+        selection.isPrimary = false;
+        selection.choiceRank = position + 2;
+        selection.choiceLabel = formatChoiceLabel(selection);
         selection.order = orderCounter++;
-        if (role === 'principal') {
-          selection.isPrimary = true;
-          primaryAssigned = true;
-        } else {
-          selection.isPrimary = false;
-        }
       });
-      if (!primaryAssigned && group.length) {
-        group[0].selection.isPrimary = true;
-      }
+
+      usedIndexes.add(choiceIndex);
     });
 
-    state.nextGroupOrder[sanitizedNature] = groups.length + CHOICE_INDEX_MIN;
     invalidateGroupedSelections();
     refreshSelections();
   };
@@ -1459,29 +1431,22 @@ export function initializePlanningChoices({ userRole }) {
     );
     selection.choiceIndex = activeIndex;
 
-    const groupedSelections = getGroupedSelections();
-    const natureGroups = groupedSelections[nature] ?? new Map();
-    if (!(state.indexToGroupId[nature] instanceof Map)) {
-      state.indexToGroupId[nature] = new Map();
-    }
-    const indexLookup = state.indexToGroupId[nature];
-    const groupIdFromIndex = indexLookup.get(activeIndex) ?? null;
+    const existingGroup = state.selections.filter(
+      (item) =>
+        sanitizeChoiceNature(item.nature) === nature &&
+        sanitizeChoiceIndex(item.choiceIndex) === activeIndex
+    );
 
-    if (groupIdFromIndex && natureGroups.has(activeIndex)) {
-      const groupEntries = natureGroups.get(activeIndex) ?? [];
-      const reference = groupEntries[0] ?? null;
-      selection.groupId = groupIdFromIndex;
-      selection.groupOrder = reference?.groupOrder ?? activeIndex;
-      const hasPrimary = groupEntries.some((item) => item.isPrimary);
-      selection.isPrimary = !hasPrimary;
-    } else {
-      selection.groupId = `${nature}-${state.groupIdCounter++}`;
-      const nextOrder = state.nextGroupOrder[nature] ?? CHOICE_INDEX_MIN;
-      selection.groupOrder = nextOrder;
-      state.nextGroupOrder[nature] = nextOrder + 1;
+    selection.groupId = `${nature}-${activeIndex}`;
+    selection.groupOrder = activeIndex;
+    if (!existingGroup.length) {
       selection.isPrimary = true;
+      selection.choiceRank = 1;
+    } else {
+      selection.isPrimary = false;
+      selection.choiceRank = existingGroup.length + 1;
     }
-
+    selection.choiceLabel = formatChoiceLabel(selection);
     selection.order = state.nextSelectionOrder++;
     state.selectionMap.set(selection.slotKey, selection);
     state.selections.push(selection);
