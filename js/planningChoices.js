@@ -755,11 +755,7 @@ export function initializePlanningChoices({ userRole }) {
   const formatChoiceLabel = (selection) => {
     const index = sanitizeChoiceIndex(selection.choiceIndex);
     const rank = sanitizeChoiceRank(selection.choiceRank);
-    if (selection.isPrimary || rank <= 1) {
-      return String(index);
-    }
-    const alternativeRank = Math.max(1, rank - 1);
-    return `${index}.${alternativeRank}`;
+    return `${index}.${rank}`;
   };
 
   const getChoiceSeries = (nature) => state.choiceSeries[sanitizeChoiceNature(nature)];
