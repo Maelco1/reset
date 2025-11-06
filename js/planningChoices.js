@@ -524,12 +524,24 @@ export function initializePlanningChoices({ userRole }) {
     slotButtons: new Map(),
     selectionMap: new Map(),
     selections: [],
-    selectionMode: 'normale',
     choiceSeries: {
-      normale: { activeIndex: CHOICE_INDEX_MIN, buttons: new Map(), container: null },
-      bonne: { activeIndex: CHOICE_INDEX_MIN, buttons: new Map(), container: null }
+      normale: {
+        activeIndex: CHOICE_INDEX_MIN,
+        buttons: new Map(),
+        container: null,
+        panel: null,
+        activeLabel: null
+      },
+      bonne: {
+        activeIndex: CHOICE_INDEX_MIN,
+        buttons: new Map(),
+        container: null,
+        panel: null,
+        activeLabel: null
+      }
     },
     currentStep: 1,
+    selectionMode: 'normale',
     selectedTourId: PLANNING_TOURS[0].id,
     planningYear: new Date().getFullYear(),
     planningMonthOne: new Date().getMonth(),
@@ -738,7 +750,11 @@ export function initializePlanningChoices({ userRole }) {
     return numeric;
   };
 
-  const formatChoiceLabel = (selection) => String(selection.order ?? selection.choiceIndex ?? 1);
+  const formatChoiceLabel = (selection) => {
+    const index = sanitizeChoiceIndex(selection?.choiceIndex);
+    const rank = sanitizeChoiceRank(selection?.choiceRank);
+    return `${index}.${rank}`;
+  };
 
   const getChoiceSeries = (nature) => state.choiceSeries[sanitizeChoiceNature(nature)];
 
@@ -759,6 +775,9 @@ export function initializePlanningChoices({ userRole }) {
       button.classList.toggle('is-active', isActive);
       button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
     });
+    if (series.activeLabel) {
+      series.activeLabel.textContent = String(activeIndex);
+    }
   };
 
   const setActiveChoiceIndex = (nature, index) => {
@@ -815,25 +834,37 @@ export function initializePlanningChoices({ userRole }) {
       entries.forEach((selection) => {
         const index = sanitizeChoiceIndex(selection.choiceIndex);
         selection.choiceIndex = index;
-        const groupId = `${nature}-${index}`;
         if (!groups.has(index)) {
-          groups.set(index, { id: groupId, selections: [] });
+          groups.set(index, []);
         }
-        const group = groups.get(index);
-        selection.groupId = group.id;
-        selection.groupOrder = index;
-        group.selections.push(selection);
+        groups.get(index).push(selection);
       });
 
-      const sortedIndexes = Array.from(groups.keys()).sort((a, b) => a - b);
-      const natureGroups = new Map();
+      const groupDescriptors = Array.from(groups.entries()).map(([originalIndex, selections]) => {
+        const minOrder = Math.min(
+          ...selections.map((item) =>
+            Number.isFinite(item.order) ? item.order : Number.MAX_SAFE_INTEGER
+          )
+        );
+        return { originalIndex, selections: selections.slice(), minOrder };
+      });
 
-      sortedIndexes.forEach((choiceIndex) => {
-        const group = groups.get(choiceIndex);
-        if (!group) {
+      groupDescriptors.sort((a, b) => a.minOrder - b.minOrder || a.originalIndex - b.originalIndex);
+
+      const natureGroups = new Map();
+      let nextChoiceIndex = CHOICE_INDEX_MIN;
+
+      groupDescriptors.forEach(({ selections }) => {
+        if (!selections.length) {
           return;
         }
-        const orderedSelections = group.selections
+        if (nextChoiceIndex > CHOICE_INDEX_MAX) {
+          return;
+        }
+        const assignedIndex = nextChoiceIndex;
+        nextChoiceIndex += 1;
+        const groupId = `${nature}-${assignedIndex}`;
+        const orderedSelections = selections
           .slice()
           .sort((a, b) => {
             const rankA = Number.isFinite(a.choiceRank) ? a.choiceRank : Number.POSITIVE_INFINITY;
@@ -862,10 +893,10 @@ export function initializePlanningChoices({ userRole }) {
 
         const normalizedGroup = [];
         primarySelection.isPrimary = true;
-        primarySelection.choiceIndex = choiceIndex;
+        primarySelection.choiceIndex = assignedIndex;
         primarySelection.choiceRank = 1;
-        primarySelection.groupId = group.id;
-        primarySelection.groupOrder = choiceIndex;
+        primarySelection.groupId = groupId;
+        primarySelection.groupOrder = assignedIndex;
         primarySelection.order = globalOrder++;
         primarySelection.choiceLabel = formatChoiceLabel(primarySelection);
         normalizedGroup.push(primarySelection);
@@ -874,26 +905,37 @@ export function initializePlanningChoices({ userRole }) {
           .filter((selection) => selection !== primarySelection)
           .forEach((selection, position) => {
             selection.isPrimary = false;
-            selection.choiceIndex = choiceIndex;
+            selection.choiceIndex = assignedIndex;
             selection.choiceRank = position + 2;
-            selection.groupId = group.id;
-            selection.groupOrder = choiceIndex;
+            selection.groupId = groupId;
+            selection.groupOrder = assignedIndex;
             selection.order = globalOrder++;
             selection.choiceLabel = formatChoiceLabel(selection);
             normalizedGroup.push(selection);
           });
 
-        natureGroups.set(choiceIndex, normalizedGroup);
-        state.indexToGroupId[nature].set(choiceIndex, group.id);
+        natureGroups.set(assignedIndex, normalizedGroup);
+        state.indexToGroupId[nature].set(assignedIndex, groupId);
       });
 
       groupedSelections[nature] = natureGroups;
 
-      const usedIndexes = new Set(sortedIndexes);
-
       const series = getChoiceSeries(nature);
       if (series) {
-        series.activeIndex = sanitizeChoiceIndex(series.activeIndex ?? CHOICE_INDEX_MIN);
+        const hasAllIndexes = natureGroups.size >= CHOICE_INDEX_MAX;
+        let fallbackIndex = CHOICE_INDEX_MIN;
+        if (hasAllIndexes) {
+          fallbackIndex = CHOICE_INDEX_MAX;
+        } else {
+          for (let index = CHOICE_INDEX_MIN; index <= CHOICE_INDEX_MAX; index += 1) {
+            if (!natureGroups.has(index)) {
+              fallbackIndex = index;
+              break;
+            }
+          }
+        }
+        const sanitizedActive = sanitizeChoiceIndex(series.activeIndex ?? fallbackIndex);
+        series.activeIndex = natureGroups.has(sanitizedActive) ? sanitizedActive : fallbackIndex;
       }
     });
 
@@ -914,6 +956,18 @@ export function initializePlanningChoices({ userRole }) {
     state.nextSelectionOrder = state.selections.length + 1;
     state.groupedSelections = groupedSelections;
     return groupedSelections;
+  };
+
+  const getNextAvailableChoiceIndex = (nature) => {
+    const sanitizedNature = sanitizeChoiceNature(nature);
+    const groupedSelections = getGroupedSelections();
+    const natureGroups = groupedSelections[sanitizedNature] ?? new Map();
+    for (let index = CHOICE_INDEX_MIN; index <= CHOICE_INDEX_MAX; index += 1) {
+      if (!natureGroups.has(index)) {
+        return index;
+      }
+    }
+    return CHOICE_INDEX_MAX;
   };
 
   const getGroupedSelections = () => state.groupedSelections ?? computeGroupedSelections();
@@ -971,6 +1025,34 @@ export function initializePlanningChoices({ userRole }) {
     });
   };
 
+  const updateChoiceIndexPanels = () => {
+    CHOICE_SERIES.forEach((nature) => {
+      const series = getChoiceSeries(nature);
+      if (!series) {
+        return;
+      }
+      const isInteractiveNature = state.selectionMode === 'normale' || state.selectionMode === 'bonne';
+      const isCurrentNature = state.selectionMode === nature;
+      const shouldDisable = !isCurrentNature || !isInteractiveNature;
+      if (series.panel) {
+        series.panel.classList.toggle('is-disabled', shouldDisable);
+        series.panel.setAttribute('aria-disabled', shouldDisable ? 'true' : 'false');
+      }
+      if (series.container) {
+        series.container.setAttribute('aria-disabled', shouldDisable ? 'true' : 'false');
+      }
+      series.buttons.forEach((button) => {
+        if (shouldDisable) {
+          button.disabled = true;
+          button.tabIndex = -1;
+        } else {
+          button.disabled = false;
+          button.removeAttribute('tabindex');
+        }
+      });
+    });
+  };
+
   const initializeChoiceSelectors = () => {
     CHOICE_SERIES.forEach((nature) => {
       const series = getChoiceSeries(nature);
@@ -979,6 +1061,64 @@ export function initializePlanningChoices({ userRole }) {
       }
       series.buttons = new Map();
     });
+
+    document.querySelectorAll('[data-choice-panel]').forEach((element) => {
+      const nature = sanitizeChoiceNature(element.dataset.choicePanel);
+      const series = getChoiceSeries(nature);
+      if (!series) {
+        return;
+      }
+      series.panel = element;
+    });
+
+    document.querySelectorAll('[data-choice-active-label]').forEach((element) => {
+      const nature = sanitizeChoiceNature(element.dataset.choiceActiveLabel);
+      const series = getChoiceSeries(nature);
+      if (!series) {
+        return;
+      }
+      series.activeLabel = element;
+      series.activeLabel.textContent = String(sanitizeChoiceIndex(series.activeIndex));
+    });
+
+    document.querySelectorAll('[data-choice-index-container]').forEach((container) => {
+      const nature = sanitizeChoiceNature(container.dataset.choiceIndexContainer);
+      const series = getChoiceSeries(nature);
+      if (!series) {
+        return;
+      }
+      series.container = container;
+      series.buttons = new Map();
+      container.innerHTML = '';
+      for (let index = CHOICE_INDEX_MIN; index <= CHOICE_INDEX_MAX; index += 1) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'choice-index-button';
+        button.dataset.choiceIndex = String(index);
+        button.dataset.choiceNature = nature;
+        const number = document.createElement('span');
+        number.className = 'choice-index-number';
+        number.setAttribute('aria-hidden', 'true');
+        number.textContent = String(index);
+        const indicator = document.createElement('span');
+        indicator.className = 'choice-index-indicator';
+        indicator.setAttribute('aria-hidden', 'true');
+        const srLabel = document.createElement('span');
+        srLabel.className = 'sr-only';
+        srLabel.textContent = `Choix ${index}, aucun créneau sélectionné`;
+        button.appendChild(number);
+        button.appendChild(indicator);
+        button.appendChild(srLabel);
+        button.addEventListener('click', () => {
+          setActiveChoiceIndex(nature, index);
+        });
+        container.appendChild(button);
+        series.buttons.set(index, button);
+      }
+    });
+
+    updateChoiceIndexButtons();
+    updateChoiceIndexPanels();
   };
 
   const updateStepperButtons = () => {
@@ -1069,7 +1209,7 @@ export function initializePlanningChoices({ userRole }) {
       const tag = button.querySelector('.planning-assignment-tag');
       const roleLabel = button.querySelector('.planning-assignment-role');
       const srLabel = button.querySelector('.sr-only');
-      const choiceLabel = selection.choiceLabel ?? String(selection.order);
+      const choiceLabel = selection.choiceLabel ?? formatChoiceLabel(selection);
       if (tag) {
         tag.textContent = choiceLabel;
         tag.classList.remove('is-empty');
@@ -1158,7 +1298,7 @@ export function initializePlanningChoices({ userRole }) {
           item.dataset.choiceRank = String(selection.choiceRank ?? 1);
           item.dataset.choiceRole = selection.isPrimary ? 'principal' : 'alternative';
           item.dataset.summaryNature = selection.nature;
-          const choiceLabel = selection.choiceLabel ?? String(selection.choiceIndex ?? CHOICE_INDEX_MIN);
+          const choiceLabel = selection.choiceLabel ?? formatChoiceLabel(selection);
           const alternativeRank = Math.max(1, (selection.choiceRank ?? 1) - 1);
           item.innerHTML = `
             <div class="summary-item-order">${choiceLabel}</div>
@@ -1479,6 +1619,7 @@ export function initializePlanningChoices({ userRole }) {
     updateStepPanes();
     updateChoiceIndexActiveState('normale');
     updateChoiceIndexActiveState('bonne');
+    updateChoiceIndexPanels();
     if (step <= 2) {
       movePlanningSectionToStep(step);
       planningSection.classList.remove('hidden');
@@ -1507,8 +1648,7 @@ export function initializePlanningChoices({ userRole }) {
     selection.nature = sanitizeChoiceNature(selection.nature);
     selection.choiceIndex = getActiveChoiceIndex(selection.nature);
     addSelection(selection);
-    const sanitizedIndex = sanitizeChoiceIndex(selection.choiceIndex);
-    const nextIndex = clamp(sanitizedIndex + 1, CHOICE_INDEX_MIN, CHOICE_INDEX_MAX);
+    const nextIndex = getNextAvailableChoiceIndex(selection.nature);
     setActiveChoiceIndex(selection.nature, nextIndex);
   };
   const buildPlanningTable = (year, month) => {

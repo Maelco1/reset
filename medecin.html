@@ -58,6 +58,22 @@
             <p>Sélectionnez vos créneaux prioritaires. Seules les cases ouvertes en garde normale sont cliquables.</p>
           </header>
           <div class="planning-host" data-step-host="1">
+            <section class="choice-index-panel" data-choice-panel="normale">
+              <header class="choice-index-header">
+                <h3>Numérotation des choix</h3>
+                <p>Sélectionnez le numéro de choix actif pour vos gardes normales. Chaque numéro peut accueillir un créneau principal et ses alternatives.</p>
+                <p class="choice-index-status">
+                  Choix actif :
+                  <span class="choice-index-status-value" data-choice-active-label="normale">1</span>
+                </p>
+              </header>
+              <div
+                class="choice-index-grid"
+                role="toolbar"
+                aria-label="Numéros de choix pour les gardes normales"
+                data-choice-index-container="normale"
+              ></div>
+            </section>
             <section class="planning-section planning-step-section" data-planning-section>
               <div class="planning-surface">
                 <div class="section-header planning-section-header">
@@ -82,7 +98,24 @@
             <h2>Étape 2 — Bonnes gardes</h2>
             <p>Ajoutez des créneaux en bonne garde. Seules les cases ouvertes en bonne garde sont cliquables.</p>
           </header>
-          <div class="planning-host" data-step-host="2"></div>
+          <div class="planning-host" data-step-host="2">
+            <section class="choice-index-panel" data-choice-panel="bonne">
+              <header class="choice-index-header">
+                <h3>Numérotation des bonnes gardes</h3>
+                <p>Choisissez un numéro pour attribuer vos gardes en bonne garde. Les alternatives partagent le même numéro que leur créneau principal.</p>
+                <p class="choice-index-status">
+                  Choix actif :
+                  <span class="choice-index-status-value" data-choice-active-label="bonne">1</span>
+                </p>
+              </header>
+              <div
+                class="choice-index-grid"
+                role="toolbar"
+                aria-label="Numéros de choix pour les bonnes gardes"
+                data-choice-index-container="bonne"
+              ></div>
+            </section>
+          </div>
           <footer class="step-pane-footer">
             <div class="step-actions">
               <button type="button" class="step-nav secondary" data-action="previous">Étape précédente</button>
